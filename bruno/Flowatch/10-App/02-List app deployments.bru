@@ -1,0 +1,16 @@
+meta {
+  name: List app deployments
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{appBase}}/app-repository/deployments?size=10
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}

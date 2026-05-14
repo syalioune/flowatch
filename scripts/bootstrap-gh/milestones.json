@@ -1,0 +1,27 @@
+[
+  {
+    "title": "0.0.1",
+    "state": "open",
+    "description": "Tech Foundation: TS migration, Vite + Biome + Vitest + Playwright + TanStack Router, GitHub Actions CI, Conventional Commits + release-please, Docker stack hardened, repo hygiene (CODEOWNERS, branch protection, dependabot SHA-pin)."
+  },
+  {
+    "title": "0.1.0",
+    "state": "open",
+    "description": "v1 MVP — parity rebuild. All 10 existing screens working against flowable-rest 7.2.0 on the bootstrapped stack; explicit loading/error/empty/data states everywhere; API Inspector preserved; three-look design system preserved; one-command demo stack; Apache 2.0 license."
+  },
+  {
+    "title": "0.2.0",
+    "state": "open",
+    "description": "6.x parity gaps: process diagram token overlay (FR-29), variable edit (FR-19), task edit + attachments (FR-44/45), user & group lifecycle (FR-46/47), multi-connection (FR-49), batches + event subscriptions surface (FR-53/54), app-definition browse (FR-55), DMN execution history (FR-57), model versioning (FR-59)."
+  },
+  {
+    "title": "0.3.0",
+    "state": "open",
+    "description": "Operator polish: form-js designer (FR-23/51 scope-reduced), pluggable auth — Basic/Bearer/OIDC PKCE (FR-4/48), engine version compatibility warning (NFR-7), Flowable-specific bpmn-js properties panel (FR-38)."
+  },
+  {
+    "title": "1.0.0",
+    "state": "open",
+    "description": "GA: full accessibility audit (WCAG AA across 8 look×theme combos), Playwright snapshot coverage of every screen, public release on flowatch.dev, forum announcement, README screenshots per look. Compatibility-stable from this point forward."
+  }
+]

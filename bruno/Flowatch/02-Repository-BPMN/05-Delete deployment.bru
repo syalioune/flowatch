@@ -1,0 +1,33 @@
+meta {
+  name: Delete deployment
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/repository/deployments/{{deploymentId}}?cascade={{cascade}}
+  body: none
+  auth: basic
+}
+
+params:query {
+  cascade: false
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  deploymentId: PASTE_A_REAL_DEPLOYMENT_ID_HERE
+  cascade: false
+}
+
+docs {
+  # Delete deployment
+
+  `cascade=true` removes related runtime + historic data. Only when explicit.
+
+  Related: PRD FR-12.
+}

@@ -1,0 +1,39 @@
+name: "🧩 E2E Tests"
+description: "User-flows with Playwright/Cypress from UI to DB"
+title: "[E2E Tests]: "
+labels: ["area:tests", "state:backlog", "priority:medium"]
+body:
+  - type: input
+    id: parent
+    attributes:
+      label: Parent Story
+      placeholder: "#123"
+  - type: textarea
+    id: flows
+    attributes:
+      label: Flows
+      placeholder: "List main paths, preconditions, and assertions"
+  - type: checkboxes
+    id: env
+    attributes:
+      label: Environment
+      options:
+        - label: Deterministic seed data (idempotent)
+        - label: Ephemeral DB/app containers launched in CI
+        - label: Test accounts/roles prepared
+  - type: checkboxes
+    id: assertions
+    attributes:
+      label: Core Assertions
+      options:
+        - label: All ACs validated end-to-end
+        - label: UI reflects server state updates
+        - label: Accessibility checks (smoke-level)
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: Definition of Done
+      options:
+        - label: Flaky tests addressed (retry/timeouts tuned)
+        - label: Screenshots/videos on failure saved as CI artifacts
+        - label: E2E test job added to pipeline and green

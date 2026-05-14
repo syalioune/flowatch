@@ -1,0 +1,27 @@
+meta {
+  name: Get task form-data
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/form/form-data?taskId={{taskId}}
+  body: none
+  auth: basic
+}
+
+params:query {
+  taskId: PASTE_A_TASK_ID
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs {
+  # Get task form-data
+
+  Returns Flowable's form-data definition for rendering.
+  Related: PRD FR-22.
+}

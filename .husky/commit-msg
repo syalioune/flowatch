@@ -1,0 +1,16 @@
+#!/bin/sh
+
+# Enforce Conventional Commits via commitlint.
+# This is the proper enforcement gate (runs after the editor) — exit code is
+# honoured by git, so a bad message blocks the commit.
+# Rules live in commitlint.config.cjs at the repo root.
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO_ROOT" || exit 1
+
+if [ ! -d "node_modules/@commitlint" ]; then
+  echo "✗ commitlint not installed. Run 'npm install' at the repo root first." >&2
+  exit 1
+fi
+
+npx --no-install commitlint --edit "$1"

@@ -1,0 +1,24 @@
+meta {
+  name: List tasks
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/runtime/tasks?size=10
+  body: none
+  auth: basic
+}
+
+params:query {
+  size: 10
+  ~assignee: {{username}}
+  ~processInstanceId:
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs { Related: PRD FR-20. }

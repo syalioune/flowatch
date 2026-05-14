@@ -1,0 +1,33 @@
+meta {
+  name: Edit instance variables (FR-19)
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/runtime/process-instances/{{instanceId}}/variables
+  body: json
+  auth: basic
+}
+
+body:json {
+  [
+    { "name": "probe", "value": "x", "type": "string", "scope": "local" }
+  ]
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  instanceId: PASTE_AN_INSTANCE_ID
+}
+
+docs {
+  # Edit instance variables
+
+  Array body. Returns 201 Created. Verified live in docs/compat.md.
+  Related: PRD FR-19.
+}

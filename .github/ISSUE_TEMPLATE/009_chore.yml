@@ -1,0 +1,10 @@
+name: "🧹 Chore"
+description: Maintenance or refactor work
+labels: ["type:chore", "state:backlog", "priority:medium"]
+body:
+  - type: textarea
+    id: why
+    attributes: { label: Why / goal }
+  - type: textarea
+    id: scope
+    attributes: { label: Scope }

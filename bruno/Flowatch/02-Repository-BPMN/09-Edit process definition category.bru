@@ -1,0 +1,33 @@
+meta {
+  name: Edit process definition category (FR-43)
+  type: http
+  seq: 9
+}
+
+put {
+  url: {{baseUrl}}/repository/process-definitions/{{processDefinitionId}}
+  body: json
+  auth: basic
+}
+
+body:json {
+  {
+    "category": "audit-probe"
+  }
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  processDefinitionId: PASTE_A_PROCESS_DEFINITION_ID
+}
+
+docs {
+  # Edit category (FR-43)
+
+  Mutating PUT — verified live in docs/compat.md.
+  Revert with `{"category":""}`.
+}

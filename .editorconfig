@@ -1,0 +1,56 @@
+# EditorConfig — https://editorconfig.org
+# Single source of truth for whitespace/encoding across editors.
+# Biome enforces stricter rules at format time; EditorConfig keeps every
+# editor's defaults consistent before a file is even saved.
+
+root = true
+
+# --- All files ---
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+max_line_length = 100
+
+# --- Markdown: trailing spaces are significant (line breaks) ---
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off
+
+# --- Makefile: tabs required ---
+[{Makefile,*.mk}]
+indent_style = tab
+
+# --- Shell scripts: POSIX-ish 4-space indent for readability ---
+[*.{sh,bash}]
+indent_size = 4
+
+# --- Python (the user-stories importer, kept for reference) ---
+[*.py]
+indent_size = 4
+max_line_length = 100
+
+# --- JSON / YAML / TOML / config files ---
+[*.{json,yml,yaml,toml,jsonc}]
+indent_size = 2
+
+# --- BPMN / DMN XML — preserve modeler-emitted formatting ---
+[*.{bpmn,bpmn20.xml,dmn,dmn11.xml,xml}]
+indent_size = 2
+trim_trailing_whitespace = false
+
+# --- SVG — keep two-space indent for readability of the branding marks ---
+[*.svg]
+indent_size = 2
+
+# --- Bruno collection: .bru files are a custom DSL; keep verbatim ---
+[*.bru]
+trim_trailing_whitespace = false
+
+# --- package-lock.json: don't reformat ---
+[package-lock.json]
+indent_size = unset
+insert_final_newline = unset

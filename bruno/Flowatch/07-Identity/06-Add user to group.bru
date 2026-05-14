@@ -1,0 +1,28 @@
+meta {
+  name: Add user to group
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/identity/users/{{userId}}/groups
+  body: json
+  auth: basic
+}
+
+body:json {
+  {
+    "groupId": "managers"
+  }
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  userId: rest-admin
+}
+
+docs { Related: PRD FR-30. }

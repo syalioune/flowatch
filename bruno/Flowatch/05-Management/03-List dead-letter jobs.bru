@@ -1,0 +1,16 @@
+meta {
+  name: List dead-letter jobs
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/management/deadletter-jobs?size=10
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}

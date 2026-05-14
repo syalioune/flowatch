@@ -1,0 +1,28 @@
+meta {
+  name: Move dead-letter job back to executable
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/management/deadletter-jobs/{{jobId}}
+  body: json
+  auth: basic
+}
+
+body:json {
+  {
+    "action": "move"
+  }
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  jobId: PASTE_A_DEADLETTER_JOB_ID
+}
+
+docs { Related: PRD FR-26. }

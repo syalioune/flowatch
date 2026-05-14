@@ -1,0 +1,29 @@
+meta {
+  name: DMN execution history (FR-57)
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{dmnBase}}/dmn-history/historic-decision-executions?size=10
+  body: none
+  auth: basic
+}
+
+params:query {
+  size: 10
+  ~decisionKey:
+  ~processInstanceId:
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs {
+  # DMN execution history — verified working
+
+  Audit log of every rule execution (inputs, outputs, hit policy, timing).
+  Related: PRD FR-57. The biggest 6.x parity win that's a bite-sized v1.x add.
+}

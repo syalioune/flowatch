@@ -1,0 +1,6 @@
+[
+  "CI / check",
+  "CI / unit",
+  "CI / e2e",
+  "CI / build"
+]

@@ -1,0 +1,27 @@
+meta {
+  name: Get DMN XML
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{dmnBase}}/dmn-repository/deployments/{{deploymentId}}/resourcedata/{{resourceId}}
+  body: none
+  auth: basic
+}
+
+headers {
+  Accept: application/xml
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  deploymentId: PASTE_DMN_DEPLOYMENT_ID
+  resourceId: PASTE_DMN_RESOURCE_ID
+}
+
+docs { Related: PRD FR-34. }

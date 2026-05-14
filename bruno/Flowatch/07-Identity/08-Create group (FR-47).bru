@@ -1,0 +1,26 @@
+meta {
+  name: Create group (FR-47)
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/identity/groups
+  body: json
+  auth: basic
+}
+
+body:json {
+  {
+    "id": "managers",
+    "name": "Managers",
+    "type": "assignment"
+  }
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs { Related: PRD FR-47. }

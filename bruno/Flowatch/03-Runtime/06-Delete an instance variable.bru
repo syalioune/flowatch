@@ -1,0 +1,21 @@
+meta {
+  name: Delete an instance variable
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/runtime/process-instances/{{instanceId}}/variables/{{variableName}}
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  instanceId: PASTE_AN_INSTANCE_ID
+  variableName: probe
+}

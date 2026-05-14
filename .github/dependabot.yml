@@ -1,0 +1,47 @@
+version: 2
+updates:
+  # GitHub Actions versions (SHA-pinned per PRD NFR-26; Dependabot bumps the SHAs).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - "type:chore"
+      - "area:ci-cd"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+
+  # npm dependencies (Flowatch is a single-package project at repo root).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - "type:chore"
+      - "area:tooling"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      # Group bpmn.io toolkit updates — they're tightly coupled.
+      bpmn-io:
+        patterns:
+          - "bpmn-js*"
+          - "dmn-js*"
+          - "@bpmn-io/*"
+      # Group test toolchain so vitest+playwright bumps arrive together.
+      test-toolchain:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "@playwright/*"
+          - "playwright"
+          - "@testing-library/*"
+      # Group lint/format updates.
+      lint-format:
+        patterns:
+          - "@biomejs/*"
+          - "biome"

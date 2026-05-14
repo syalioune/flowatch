@@ -1,0 +1,4 @@
+# Trivy CVE Ignore List
+# Policy: this file should be empty. Any entry must have a time-boxed
+# justification and a tracked issue. Prefer fixing at the source via
+# dependency/base-image upgrades.

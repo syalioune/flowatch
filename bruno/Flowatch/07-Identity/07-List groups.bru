@@ -1,0 +1,16 @@
+meta {
+  name: List groups
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/identity/groups?size=20
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}

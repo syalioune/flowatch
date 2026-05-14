@@ -1,0 +1,26 @@
+meta {
+  name: Get definition identity links
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/repository/process-definitions/{{processDefinitionId}}/identitylinks
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  processDefinitionId: PASTE_A_PROCESS_DEFINITION_ID
+}
+
+docs {
+  # Identity links (who can start this process)
+
+  Verified working in docs/compat.md.
+}

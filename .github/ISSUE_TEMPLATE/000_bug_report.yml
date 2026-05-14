@@ -1,0 +1,42 @@
+name: "🐛 Bug report"
+description: Report a defect
+labels: ["type:bug", "state:backlog", "priority:medium"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: "What happened? What should have happened?"
+      placeholder: Short, actionable summary
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes: { label: Steps to reproduce, placeholder: "1) ...\n2) ...\n3) ..." }
+  - type: textarea
+    id: expected
+    attributes: { label: Expected }
+  - type: textarea
+    id: actual
+    attributes: { label: Actual }
+  - type: input
+    id: version
+    attributes: { label: Version/build, placeholder: commit/tag, environment }
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - S0 - Critical (prod down / data loss)
+        - S1 - High
+        - S2 - Medium
+        - S3 - Low
+  - type: textarea
+    id: logs
+    attributes: { label: Logs / screenshots }
+  - type: checkboxes
+    id: regress
+    attributes:
+      label: Regression?
+      options:
+        - label: This is a regression from a previous version
+          required: false

@@ -1,0 +1,1054 @@
+Title,Body,Labels,Milestone
+QGT-SYS-001: Add tsconfig and migrate `src/api.js` to TypeScript,"
+As CI, I want the project to have a `tsconfig.json` extending `@tsconfig/vite-react` with strict mode on, so that subsequent files migrate one at a time with type-checking enforcement.
+
+**Acceptance Criteria:**
+
+**Given** the project currently uses plain `.jsx`/`.js`
+**When** `tsconfig.json` is added with `""strict"": true`, `""noUncheckedIndexedAccess"": true`, `""exactOptionalPropertyTypes"": true`, and `src/api.js` is renamed to `src/api.ts` with types for the Flowable response envelopes
+**Then** `npx tsc --noEmit` exits 0 across the project
+**And** the `request()` function has typed signatures for HTTP method, path, options, and return value
+**And** ADR-001 and Pattern P-001 are referenced in the file's top-level comment.","type:user-story,state:backlog,area:qgt,release:0.0.1",0.0.1
+QGT-SYS-002: Install Biome v2 and remove ESLint/Prettier dependencies,"
+As CI, I want Biome v2 to be the only lint+format tool, so that the toolchain has one binary and one config file. Per ADR-007 and PRD FR-F2.
+
+**Acceptance Criteria:**
+
+**Given** the project may have legacy ESLint or Prettier configs
+**When** `@biomejs/biome` is installed, `biome.json` is added at repo root, and any `.eslintrc*` / `.prettierrc*` files are removed
+**Then** `npx biome ci` passes on the migrated `src/api.ts`
+**And** the `package.json` has scripts `lint`, `format`, `check` wrapping Biome
+**And** ESLint and Prettier packages are absent from `package.json` and `package-lock.json`.","type:user-story,state:backlog,area:qgt,release:0.0.1",0.0.1
+QGT-SYS-003: Wire pre-commit Biome formatter via Husky,"
+As a contributor, I want Biome to auto-format my staged files on commit, so that I don't have to remember to run it manually.
+
+**Acceptance Criteria:**
+
+**Given** Husky and the `.husky/pre-commit` hook are already wired (from the imported tooling)
+**When** Biome is installed and I run a `git commit` with formatting violations
+**Then** the hook runs `npx biome format --write` against the staged files
+**And** the corrected files are re-staged automatically
+**And** the commit succeeds with no manual intervention.","type:user-story,state:backlog,area:qgt,release:0.0.1",0.0.1
+QGT-SYS-004: Migrate remaining `src/` files to TypeScript,"
+As a maintainer, I want every source file under `src/` to be `.ts` or `.tsx`, so that the project is fully type-checked end-to-end. Per ADR-001.
+
+**Acceptance Criteria:**
+
+**Given** `src/api.ts` already migrated
+**When** every other file in `src/` is renamed to `.tsx` or `.ts` (components.tsx, screens.tsx, modeler.tsx, tweaks-panel.tsx, etc.) and types are added for component props, `useApi` hook return shape, `Flowable*` REST DTOs
+**Then** `npx tsc --noEmit` passes cleanly with no `any` outside explicit migration markers
+**And** `npx biome check src/` passes
+**And** the migration markers (where `any` is intentionally accepted) reference an open issue for tightening.
+
+---","type:user-story,state:backlog,area:qgt,release:0.0.1",0.0.1
+QGT-SYS-005: Install Vitest and add unit test for `request()` funnel,"
+As CI, I want Vitest to run unit tests on every push, so that regressions to the request funnel are caught immediately.
+
+**Acceptance Criteria:**
+
+**Given** Vitest is not yet installed
+**When** `vitest` + `@testing-library/react` + `@testing-library/jest-dom` are installed, `vitest.config.ts` is added, and `src/api/__tests__/request.test.ts` covers the `request()` success path, 4xx error path, and 5xx error path (using a real fetch-mock at the HTTP level — no `vi.mock(api)`)
+**Then** `npx vitest run` passes
+**And** coverage for `src/api/client.ts` is ≥ 70% per the threshold set in `vitest.config.ts`
+**And** Pattern P-001 is referenced in the test file (the funnel rule).","type:user-story,state:backlog,area:qgt,release:0.0.1",0.0.1
+QGT-SYS-006: Wire Vitest browser mode with Playwright provider for component tests,"
+As a maintainer, I want component tests to run in real Chromium so that `window`, `localStorage`, `IntersectionObserver`, and DOM events behave as they will in production.
+
+**Acceptance Criteria:**
+
+**Given** Vitest unit tier is wired (Story 2.1)
+**When** `@vitest/browser` + `@playwright/test` are installed and `vitest.workspace.ts` configures a separate browser project pointing at the Playwright provider, with one example component test (e.g. `<ErrorBox>`) under `src/components/__tests__/ErrorBox.spec.tsx`
+**Then** `npx vitest --workspace=vitest.workspace.ts run` passes both projects
+**And** the example test asserts a real DOM-rendered error message matching the verbatim engine response.","type:user-story,state:backlog,area:qgt,release:0.0.1",0.0.1
+QGT-SYS-007: Add Playwright E2E config and one golden-path test against Docker Flowable,"
+As CI, I want one Playwright E2E test that exercises the full operator path (deploy BPMN → start instance → claim task → complete task → check history) against a Dockerized `flowable-rest:7.2.0`, so that any regression in the Flowable REST contract surfaces in CI.
+
+**Acceptance Criteria:**
+
+**Given** the Docker Compose stack is defined (existing `docker-compose.yml`)
+**When** `playwright.config.ts` is added with a `webServer` block that starts `docker compose up -d` + waits for `/management/engine` to return 200, and `e2e/golden-path.spec.ts` walks the deploy → start → claim → complete → history flow
+**Then** `npx playwright test` exits 0 with the test passing
+**And** the test uses real Flowable, no mocks (Pattern P-009)
+**And** Docker teardown happens in the `webServer.gracefulShutdown` config.","type:user-story,state:backlog,area:qgt,release:0.0.1",0.0.1
+QGT-SYS-008: Add visual snapshot baseline for the API Inspector (single look × theme × density),"
+As a maintainer, I want at least one visual snapshot guarding the API Inspector's appearance, so that accidental design-system regressions surface as failing tests. Per NFR-23.
+
+**Acceptance Criteria:**
+
+**Given** Playwright is wired (Story 2.3)
+**When** `e2e/visual/api-inspector.spec.ts` runs the app in `editorial / light / regular` and takes a snapshot of the Inspector drawer with 3 sample API_LOG entries
+**Then** `npx playwright test --update-snapshots` produces the baseline
+**And** subsequent `npx playwright test` passes against the baseline
+**And** the test verifies the method-coloured pill mapping (GET → info, POST → ok, PUT → warn, DELETE → bad).","type:user-story,state:backlog,area:qgt,release:0.0.1",0.0.1
+QGT-SYS-009: Add `npm test` / `npm run e2e` / `npm run test:browser` script aliases,"
+As a contributor, I want one-line npm scripts for each test tier, so that I don't have to remember which Vitest project flag is which.
+
+**Acceptance Criteria:**
+
+**Given** Vitest + Playwright are installed
+**When** `package.json` is updated with scripts `test` (Vitest unit), `test:browser` (Vitest browser mode), `e2e` (Playwright), `test:all` (everything in sequence)
+**Then** each script runs the expected tier and reports a clear exit code
+**And** the scripts are documented in DEVELOPERS.md §5.
+
+---","type:user-story,state:backlog,area:qgt,release:0.0.1",0.0.1
+NAV-SYS-001: Install TanStack Router and add the root route,"
+As a maintainer, I want TanStack Router installed with a single root route mounting the chrome (Sidebar + Topbar + ApiInspector + Toaster), so that subsequent screen routes can be added incrementally without ripping out the current `App.jsx` switch.
+
+**Acceptance Criteria:**
+
+**Given** TanStack Router is not yet installed
+**When** `@tanstack/react-router` + `@tanstack/router-vite-plugin` are installed, `src/routes/__root.tsx` is added with the chrome, and `vite.config.ts` includes the router plugin
+**Then** `npm run dev` starts and the root path `/` renders the chrome
+**And** the previous `view`-switch can coexist temporarily as the Dashboard placeholder.","type:user-story,state:backlog,area:nav,release:0.0.1",0.0.1
+"NAV-MIR-001: Convert Dashboard, BPMN, DMN screens to TanStack Router routes","
+As Mira, I want bookmarkable URLs for the Dashboard, BPMN modeler, and DMN modeler screens, so that I can return directly to where I was working.
+
+**Acceptance Criteria:**
+
+**Given** TanStack root route exists (Story 3.1)
+**When** `src/routes/index.tsx` (Dashboard), `src/routes/bpmn.tsx`, and `src/routes/dmn.tsx` are added
+**Then** navigating to `/`, `/bpmn`, `/dmn` renders the right screen
+**And** the Sidebar nav items use `Link` components from TanStack Router with `data-active` driven by route match
+**And** browser back/forward buttons work between the three.","type:user-story,state:backlog,area:nav,release:0.0.1",0.0.1
+NAV-MIR-002: Convert Deployments + Definitions screens with detail routes,"
+As Mira, I want `/deployments/:id` and `/definitions/:id` URLs that deep-link to a specific deployment or definition, so that I can share or bookmark them.
+
+**Acceptance Criteria:**
+
+**Given** Dashboard + BPMN + DMN are routed (Story 3.2)
+**When** `src/routes/deployments/index.tsx`, `src/routes/deployments/$id.tsx`, `src/routes/definitions/index.tsx`, `src/routes/definitions/$id.tsx` are added
+**Then** clicking a row navigates to the detail URL
+**And** the detail route's loader fetches the resource via the appropriate `api.*` wrapper
+**And** invalid IDs surface as `ErrorBox` with the verbatim engine 404 message (Pattern P-002, P-003).","type:user-story,state:backlog,area:nav,release:0.0.1",0.0.1
+NAV-MIR-003: Convert Process Instances + Tasks + Jobs screens to routes,"
+As Mira, I want every operations screen reachable via URL so that I can bookmark ""open dead-letter jobs"" or ""my tasks"" pre-filtered.
+
+**Acceptance Criteria:**
+
+**Given** detail routes pattern is established (Story 3.3)
+**When** `src/routes/instances/index.tsx`, `src/routes/instances/$id.tsx`, `src/routes/tasks/index.tsx`, `src/routes/tasks/$id.tsx`, `src/routes/jobs.tsx` are added with search params for filters (`?type=executable|timer|deadletter`, `?assignee=me|all`)
+**Then** `/jobs?type=deadletter` opens the Jobs screen with the dead-letter tab active
+**And** `/tasks?assignee=me` filters tasks to the active user
+**And** search param state is typed (TanStack Router auto-types via Zod schema).","type:user-story,state:backlog,area:nav,release:0.0.1",0.0.1
+NAV-MIR-004: Convert History + Identity + Tenants screens to routes,"
+As Mira, I want History, Identity, and Tenants screens routable for the same bookmarking + sharing reasons as Story 3.4.
+
+**Acceptance Criteria:**
+
+**Given** the other screen sets are routed (Stories 3.2-3.4)
+**When** `src/routes/history.tsx`, `src/routes/identity/index.tsx`, `src/routes/identity/users.$id.tsx`, `src/routes/identity/groups.$id.tsx`, `src/routes/tenants.tsx` are added
+**Then** all 11 screens (Dashboard, BPMN, DMN, Deployments, Definitions, Instances, Tasks, Jobs, History, Identity, Tenants) are reachable via URL
+**And** the Sidebar Active state is driven by route match (not the legacy `view` state)
+**And** the legacy `view` state in `App.tsx` is removed.","type:user-story,state:backlog,area:nav,release:0.0.1",0.0.1
+NAV-SYS-002: Remove `VIEW_TITLE` and `ENDPOINT_BY_VIEW` legacy maps,"
+As a maintainer, I want the legacy `VIEW_TITLE` and `ENDPOINT_BY_VIEW` constants gone, so that the three-place-to-update toil is eliminated. Per FR-F5 and the PRD ""add a new screen"" task simplification.
+
+**Acceptance Criteria:**
+
+**Given** every screen is now a TanStack Router route (Stories 3.2-3.5)
+**When** `VIEW_TITLE` and `ENDPOINT_BY_VIEW` are removed from `src/App.tsx` and each route file declares its own `title` and `endpoints` metadata (via route `meta` or a small `useRouteMetadata()` hook)
+**Then** the Topbar title comes from the active route's metadata
+**And** the PageHead endpoint chips come from the active route's `endpoints` metadata
+**And** adding a new screen requires editing exactly one file (the new route).
+
+---","type:user-story,state:backlog,area:nav,release:0.0.1",0.0.1
+FND-SYS-001: Add `check` and `unit` GitHub Actions jobs,"
+As CI, I want `biome ci` + `tsc --noEmit` + `vitest run` to run on every PR, so that style/type/unit-test regressions block merge.
+
+**Acceptance Criteria:**
+
+**Given** Biome + Vitest are wired (Epics 1+2)
+**When** `.github/workflows/ci.yml` is added with `check` job (Biome ci + tsc --noEmit) and `unit` job (vitest run) configured to run on `push` and `pull_request`
+**Then** opening a PR triggers both jobs
+**And** both jobs are listed in `.github/protection/required_checks.json`
+**And** all GitHub Actions versions are SHA-pinned per NFR-26.","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+FND-SYS-002: Add `e2e` job with Docker Compose Flowable,"
+As CI, I want Playwright E2E to run against a Dockerized Flowable on every PR, so that regressions in the Flowable REST contract or Flowatch's wrappers surface before merge.
+
+**Acceptance Criteria:**
+
+**Given** Playwright is wired (Story 2.3)
+**When** `.github/workflows/ci.yml` includes an `e2e` job that runs `docker compose up -d`, waits for engine readiness, runs Playwright, and uploads the report as an artifact on failure
+**Then** the job passes when Story 2.3's golden-path test passes
+**And** the job runs in ≤ 5 minutes (target — Flowable cold-start is ~30s of that)
+**And** Pattern P-009 (live-API only) is honored — no mocks.","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+FND-SYS-003: Add `build` job that uploads the `dist/` artifact,"
+As CI, I want a `build` job that runs `vite build` and uploads `dist/`, so that the `pages` job can deploy it and so that build failures are caught before merge.
+
+**Acceptance Criteria:**
+
+**Given** Biome + TS are wired
+**When** `.github/workflows/ci.yml` includes a `build` job running `npm ci && npm run build` and uploading `dist/` via `actions/upload-artifact@<pinned-sha>`
+**Then** every PR has the build artifact attached
+**And** the build size is reported in the job summary
+**And** the job is listed in `.github/protection/required_checks.json`.","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+FND-DAA-001: Auto-deploy to GitHub Pages on merge to main,"
+As Daan, I want the latest `main` to be served at the Flowatch GitHub Pages URL, so that I can evaluate the live app without cloning. Per NFR-32.
+
+**Acceptance Criteria:**
+
+**Given** the `build` job uploads `dist/` (Story 4.3)
+**When** `.github/workflows/pages.yml` runs on `push` to `main`, downloads the `dist/` artifact, and deploys to GitHub Pages via `actions/deploy-pages@<pinned-sha>`
+**Then** merging to `main` produces a fresh public deployment at `https://syalioune.github.io/flowatch` within 5 minutes
+**And** the deploy URL is added as a badge in README.md
+**And** Pages deployment is configured for the `gh-pages` branch with `Source: GitHub Actions`.","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+FND-SYS-004: Wire Dependabot SHA-pin bumps weekly,"
+As a maintainer, I want Dependabot to bump SHA-pinned GitHub Actions weekly, so that the supply chain stays current without manual sweeps. Per NFR-26.
+
+**Acceptance Criteria:**
+
+**Given** `.github/dependabot.yml` is already configured for github-actions / npm / docker
+**When** workflow files use commit-SHA pins (e.g. `actions/checkout@abc123...`)
+**Then** Dependabot opens weekly PRs bumping the SHAs
+**And** the PRs are labeled `area:ci-cd` per the dependabot config
+**And** existing tests + check jobs gate the bump PRs.
+
+---","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+FND-SYS-005: Install commitlint and wire `.husky/commit-msg` hook,"
+As CI, I want commit messages validated against Conventional Commits 1.0 before the commit is created, so that non-conforming commits are blocked at the hook level (not just at PR review).
+
+**Acceptance Criteria:**
+
+**Given** `.husky/commit-msg` exists (from the imported tooling) and invokes `npx commitlint --edit`
+**When** `@commitlint/cli` + `@commitlint/config-conventional` are installed and `commitlint.config.cjs` is added at repo root with the scope vocabulary from `release.config.mjs` THEMES
+**Then** running `git commit -m ""feat: bad scope""` succeeds (valid CC)
+**And** running `git commit -m ""broken: bad type""` fails with a hook exit
+**And** the new commitlint scopes match every theme in release.config.mjs (validated by `node scripts/release/check-scope.mjs`).","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+FND-SYS-006: Wire release-please for automated release notes,"
+As a maintainer, I want release-please to generate release notes and version bumps from Conventional Commits on every push to main, so that I never hand-write a CHANGELOG. Per NFR-25.
+
+**Acceptance Criteria:**
+
+**Given** `release.config.mjs` is configured with Flowatch themes (existing)
+**When** `.github/workflows/release-please.yml` is added running `googleapis/release-please-action@<pinned-sha>` against `main`
+**Then** a `feat: …` commit on main produces a release-PR with a draft CHANGELOG.md entry
+**And** merging the release-PR creates a tag + GitHub Release with the auto-generated notes
+**And** the notes use the theme structure from release.config.mjs (Modelers, Runtime, etc.).","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+FND-SYS-007: Rewrite pre-existing commit history to Conventional Commits,"
+As a maintainer, I want every commit in the project's history to follow Conventional Commits, so that release-please can correctly compute version bumps from any range. Per project-context memory (""history WILL be rewritten"") and NFR-24.
+
+**Acceptance Criteria:**
+
+**Given** existing commits use free-form lowercase messages (`add src/screens.jsx`, `add vite.config.js`, etc.)
+**When** an interactive rebase from the initial commit rewrites each message into Conventional Commits format (e.g. `feat(screens): add screens.jsx`, `build(vite): add vite.config.js`)
+**Then** `git log --pretty=%s` shows every commit conforms to the CC regex `^(feat|fix|chore|docs|refactor|test|ci|build|perf|style)(\([a-z0-9-]+\))?!?: .+`
+**And** the rewrite is force-pushed to `main` (one-time, authorized by `force_push_next_commit.md` memory)
+**And** the team is notified to re-clone (single-maintainer means just the maintainer).","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+FND-SYS-008: Add Apache 2.0 SPDX headers to all new source files,"
+As a maintainer, I want every new source file under `src/` to start with an SPDX-License-Identifier header, so that license provenance is auditable per NFR-28.
+
+**Acceptance Criteria:**
+
+**Given** the repo is Apache 2.0 licensed (LICENSE file exists)
+**When** every `.ts`, `.tsx`, `.css`, `.html` file under `src/` and `branding/` gets a top comment `// SPDX-License-Identifier: Apache-2.0` (or `/* … */` for CSS)
+**Then** a CI grep check (`scripts/ci/check-spdx.sh`) passes
+**And** the check is added to the `check` job in `.github/workflows/ci.yml`.
+
+---","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+FND-DAA-002: Verify one-command Docker stack reaches Dashboard in < 2 min,"
+As Daan, I want `docker compose up -d && npm run dev` to land me on a working Dashboard in under 2 minutes on a fresh machine, so that the evaluation friction is minimal.
+
+**Acceptance Criteria:**
+
+**Given** a clean machine with Docker + Node 18 installed
+**When** the user runs `docker compose up -d && npm install && npm run dev` and opens `http://localhost:5173`
+**Then** the Dashboard renders with the connection indicator green within 120 seconds (including Docker pull + Flowable warmup on a typical broadband connection)
+**And** the `bash scripts/dev/run-dev.sh` script automates this in one command (Epic 6 has this already from Phase-2 work)
+**And** README.md ""Quick start"" section documents this end-to-end.","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+FND-MIR-001: Remove Google Fonts CDN from index.html (NFR-9 fix),"
+As an air-gapped operator, I want Flowatch to load IBM Plex fonts from the project bundle rather than `fonts.googleapis.com`, so that I can run it without external network. Per NFR-9.
+
+**Acceptance Criteria:**
+
+**Given** `index.html` currently has `<link rel=""preconnect"" href=""https://fonts.googleapis.com"">` and a Google Fonts stylesheet link
+**When** the IBM Plex font files (woff2) are self-hosted under `branding/fonts/` and `src/styles/fonts.css` declares `@font-face` rules pointing at them, and the Google Fonts links are removed from `index.html`
+**Then** `npm run dev` shows the correct fonts (IBM Plex Sans, Mono, Serif) across all three looks
+**And** browser DevTools Network tab shows zero requests to `fonts.googleapis.com` or `fonts.gstatic.com`
+**And** the build output size increase is < 500 KB (woff2 fonts).","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+FND-MIR-002: Harden nginx CORS proxy (production-aware config),"
+As Mira, I want the nginx CORS config to work in both local dev (allow `http://localhost:5173`) and production (allow the configured `flowatch.dev` origin), so that the same Docker image works in both contexts.
+
+**Acceptance Criteria:**
+
+**Given** `docker/nginx.conf` currently allows `http://localhost:5173`
+**When** the config is parameterized via env var `ALLOWED_ORIGIN` (defaulting to `http://localhost:5173`) and rebuilt to use `envsubst`
+**Then** running `docker compose up` with `ALLOWED_ORIGIN=https://syalioune.github.io` produces an nginx that allows that origin
+**And** the default unchanged behavior works for local dev
+**And** the OPTIONS preflight short-circuit (204) is preserved.","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+"FND-DAA-003: GitHub Pages first-run UX — ""configure your engine""","
+As Daan, I want the GitHub Pages demo to greet me with a clear ""Flowatch is the GUI; you need a Flowable engine to point it at"" message when no engine is reachable, so that I'm not stuck staring at ""engine unreachable"" errors.
+
+**Acceptance Criteria:**
+
+**Given** the GitHub Pages build has no Flowable engine to talk to
+**When** Flowatch's `ping()` on app load fails (NetworkError or 0 status)
+**Then** the Dashboard renders a first-run welcome card explaining ""Flowatch needs a Flowable engine. Configure connection →"" with a primary button opening the Settings modal
+**And** clicking outside the card dismisses it (next page loads will show the standard error states per Pattern P-002)
+**And** README.md documents that the Pages build is a ""bring your own engine"" demo.
+
+---","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+NAV-MIR-005: Load + persist connection config from localStorage,"
+As Mira, I want my last-used Flowable connection settings to persist across browser sessions, so that I don't re-enter credentials every time. Per FR-1.
+
+**Acceptance Criteria:**
+
+**Given** the user has opened the Settings modal and saved `baseUrl=http://prod:8080/flowable-rest/service`, `username=admin`, `password=…`, `tenantId=acme`
+**When** the user reloads the page
+**Then** `api.config()` returns the persisted values
+**And** the values come from `localStorage` key `flowatch.connection.v1` (per the rename — see project-context)
+**And** if no localStorage value exists, defaults (`http://localhost:8080/flowable-rest/service`, `rest-admin`, `test`, no tenant) are used.","type:user-story,state:backlog,area:nav,release:0.0.2",0.0.2
+NAV-MIR-006: Engine probe on app load surfaces connection state in chrome,"
+As Mira, I want a visible indicator (green / red / pending) of whether Flowatch can reach my engine, so that I notice immediately if the engine is down. Per FR-2.
+
+**Acceptance Criteria:**
+
+**Given** Flowatch starts and reads the connection config from localStorage
+**When** the app calls `api.ping()` on mount (which hits `/management/engine`) and the result resolves
+**Then** the sidebar footer's `.conn-pill` shows `data-state=""ok""` (green dot) + `<engine-name> <version> @ <host>` text when the response is 200
+**And** `data-state=""err""` (red dot) + `unreachable: <host>` text when the request fails (any reason — network, 401, timeout)
+**And** the indicator is updated when `api.setConfig()` is called (without a full reload).","type:user-story,state:backlog,area:nav,release:0.0.2",0.0.2
+NAV-MIR-007: ErrorBox renders verbatim engine error message,"
+As Mira, I want every error rendered in `ErrorBox` to show the literal engine response body (no friendly rewrites), so that I can diagnose what the engine actually said. Per FR-3 and Pattern P-003.
+
+**Acceptance Criteria:**
+
+**Given** a screen makes an API call that returns 4xx or 5xx with a JSON or text body
+**When** `ErrorBox` renders the resulting `Error.message`
+**Then** the displayed text is byte-for-byte identical to the engine's response body
+**And** the HTTP status is shown as `HTTP NNN` above the message
+**And** a `Retry` button calls the screen's `useApi.reload()`
+**And** an `Open Inspector` link opens the API Inspector drawer scrolled to the failed call.
+
+---","type:user-story,state:backlog,area:nav,release:0.0.2",0.0.2
+INS-SAS-001: API_LOG ring buffer + window event bus,"
+As Sasha, I want every Flowable REST call captured in an in-memory log so that I can inspect the REST traffic Flowatch generates. Per FR-6, FR-7, Pattern P-001.
+
+**Acceptance Criteria:**
+
+**Given** the `request()` funnel in `src/api/client.ts` (Pattern P-001)
+**When** any API call is made
+**Then** an entry `{ id, method, path, status, ms, at, error?, body? }` is unshifted into `API_LOG` (capped at 60)
+**And** `window.dispatchEvent(new CustomEvent('api:log', { detail: entry }))` fires synchronously
+**And** the entry's `Authorization` header is redacted in the log (per NFR-8).","type:user-story,state:backlog,area:ins,release:0.0.2",0.0.2
+INS-SAS-002: ApiInspector drawer subscribes to api:log and renders entries,"
+As Sasha, I want a right-edge drawer that shows API_LOG entries in real time, so that I can see exactly what Flowatch is doing when I click around. Per FR-7, UX spec Direction D-1.
+
+**Acceptance Criteria:**
+
+**Given** the API_LOG event bus fires (Story 8.1)
+**When** the user clicks the Inspector icon in the Topbar
+**Then** a drawer slides in from the right (320–480 px wide) and lists the 60 most-recent API calls
+**And** each row shows: method (color-coded), path, status, ms, time-ago
+**And** clicking a row expands it to show: full URL, request body (if any), response body (truncated to 4 KB)
+**And** the drawer can be filtered by method and by status range (2xx / 4xx / 5xx).","type:user-story,state:backlog,area:ins,release:0.0.2",0.0.2
+"INS-SAS-003: ""Copy as curl"" button per Inspector entry","
+As Sasha, I want a ""Copy as curl"" button on each entry so that I can paste the request into a terminal and reproduce it verbatim. Per FR-9.
+
+**Acceptance Criteria:**
+
+**Given** an Inspector entry is expanded (Story 8.2)
+**When** the user clicks the ""Copy as curl"" button
+**Then** the clipboard contains a `curl` invocation with the method, URL, `-u <username>:<password>` from the active connection (NOT redacted in this case — clipboard is intentional), the `Content-Type` header if applicable, and the request body
+**And** a toast confirms ""Copied curl command""
+**And** the generated command, when pasted into a shell with the right tools, reproduces the call.","type:user-story,state:backlog,area:ins,release:0.0.2",0.0.2
+INS-SYS-001: Pattern P-001 enforcement — Biome rule forbidding `fetch()` outside `src/api/`,"
+As CI, I want a lint rule that fails the build if any file outside `src/api/client.ts` calls `fetch()` directly, so that Pattern P-001 is mechanically enforced.
+
+**Acceptance Criteria:**
+
+**Given** Biome is wired (Epic 1)
+**When** `biome.json` adds a custom rule (or a grep-based pre-commit/CI script `scripts/ci/check-fetch-funnel.sh`) that fails when `\bfetch\(` appears outside `src/api/client.ts`
+**Then** `npx biome check` fails on a file outside `src/api/` that uses `fetch()`
+**And** the CI `check` job picks up the failure
+**And** the rule is documented in CONTRIBUTING.md (Pattern P-001 enforcement).
+
+---","type:user-story,state:backlog,area:ins,release:0.0.2",0.0.2
+DPL-MIR-001: Deployments list screen with pagination and tenant filter,"
+As Mira, I want a list of all BPMN deployments with name, deploy time, tenant, and a delete action, so that I can see what's been pushed to the engine.
+
+**Acceptance Criteria:**
+
+**Given** the user navigates to `/deployments`
+**When** the route loader calls `api.listDeployments({size:50, sort:'deployTime', order:'desc', tenantId})`
+**Then** the screen renders four states (loading skeleton → ErrorBox → ""No records."" empty → DataTable)
+**And** each row shows id (mono), name, deploy time (`fmtTime`), tenant, with a `⋮` action menu
+**And** the action menu has `Delete (cascade)` and `Delete (no cascade)` options
+**And** the URL stays as `/deployments` on filter changes (no params yet — handled in 0.0.3).","type:user-story,state:backlog,area:dpl,release:0.0.2",0.0.2
+DPL-MIR-002: Upload BPMN deployment via multipart form,"
+As Mira, I want a ""Upload"" button on the Deployments screen that lets me pick a `.bpmn` file from disk and deploy it, so that I don't have to use the modeler or curl. Per FR-11.
+
+**Acceptance Criteria:**
+
+**Given** the user is on `/deployments`
+**When** the user clicks the ""Upload"" button, picks a `.bpmn` or `.bpmn20.xml` file, and submits the modal
+**Then** `api.deployBpmn(filename, fileContents)` is called (multipart POST to `/repository/deployments`)
+**And** on success, a toast appears with ""Deployed: <id>"" and the list reloads
+**And** on failure, the modal stays open with `ErrorBox` showing the verbatim engine message (Pattern P-003).","type:user-story,state:backlog,area:dpl,release:0.0.2",0.0.2
+DPL-MIR-003: Delete deployment with confirmation,"
+As Mira, I want to delete a deployment with a confirmation step (and explicit ""cascade"" choice), so that I don't accidentally remove production data.
+
+**Acceptance Criteria:**
+
+**Given** a deployment is listed (Story 9.1)
+**When** the user picks `Delete` from the row action menu
+**Then** a confirmation modal appears with the deployment id + name + a ""cascade"" checkbox (default off)
+**And** clicking Confirm calls `api.deleteDeployment(id, cascade)`
+**And** on success, the row disappears from the list and a toast appears
+**And** on failure, an error toast surfaces the verbatim engine message.","type:user-story,state:backlog,area:dpl,release:0.0.2",0.0.2
+DPL-MIR-004: Process Definitions list with suspend/activate,"
+As Mira, I want to see all process definitions and toggle their suspend state per row, so that I can pause buggy ones without redeploying. Per FR-14.
+
+**Acceptance Criteria:**
+
+**Given** the user navigates to `/definitions`
+**When** the route loader calls `api.listProcessDefinitions({size:50, sort:'name', tenantId})`
+**Then** each row shows name, key, version, tenant, suspended status (badge), with a `Suspend` / `Activate` toggle action
+**And** clicking the toggle calls `api.suspendProcessDefinition(id, suspend)` and updates the badge optimistically
+**And** on failure, the badge reverts and an error toast surfaces.","type:user-story,state:backlog,area:dpl,release:0.0.2",0.0.2
+DPL-MIR-005: View process definition XML (deep link to BPMN modeler),"
+As Mira, I want a ""View XML"" or ""Open in modeler"" action on a definition that loads its BPMN into the modeler in read-only or edit mode, so that I can inspect or modify it without copy-pasting. Per FR-14, FR-36.
+
+**Acceptance Criteria:**
+
+**Given** a definition is listed (Story 9.4)
+**When** the user picks `Open in modeler` from the row action menu
+**Then** the app navigates to `/bpmn?definitionId=<id>`
+**And** the BPMN modeler loader picks up the search param, calls `api.getProcessDefinitionResource(id)`, and imports the XML
+**And** the modeler shows the current XML loaded with the dropdown set to the chosen definition.
+
+---","type:user-story,state:backlog,area:dpl,release:0.0.2",0.0.2
+RUN-MIR-001: List running process instances with tenant filter,"
+As Mira, I want to see all running instances of all definitions, sorted by start time descending, so that I can spot what's active and triage. Per FR-15.
+
+**Acceptance Criteria:**
+
+**Given** the user navigates to `/instances`
+**When** the route loader calls `api.listProcessInstances({size:50, sort:'startTime', order:'desc', tenantId})`
+**Then** each row shows id (mono), definition key, started (`fmtTime`), state (active / suspended / ended badge), business key
+**And** four canonical states render per Pattern P-002
+**And** clicking a row navigates to `/instances/:id`.","type:user-story,state:backlog,area:run,release:0.0.2",0.0.2
+RUN-MIR-002: Start a process instance from a definition,"
+As Mira, I want a ""Start instance"" button on the Process Definitions screen (or directly from Instances) that lets me enter a business key and initial variables, so that I can kick off a new run. Per FR-16.
+
+**Acceptance Criteria:**
+
+**Given** a list of process definitions exists
+**When** the user clicks ""Start instance"" and enters definition key, business key, and JSON variables in the modal
+**Then** `api.startProcessInstance({processDefinitionKey, businessKey, variables})` is called
+**And** on success, the modal closes, a toast confirms, and the user is navigated to `/instances/:id` of the new instance
+**And** on failure, the modal stays open with `ErrorBox` (Pattern P-003).","type:user-story,state:backlog,area:run,release:0.0.2",0.0.2
+RUN-MIR-003: Cancel running instance with optional reason,"
+As Mira, I want to cancel a running instance with an optional `deleteReason` so that the audit trail records why I stopped it. Per FR-17.
+
+**Acceptance Criteria:**
+
+**Given** an instance is visible on `/instances` or `/instances/:id`
+**When** the user picks `Cancel` from the action menu, optionally types a delete reason, and confirms
+**Then** `api.deleteProcessInstance(id, reason)` is called
+**And** on success, the instance is marked ended in the list (reload) and a toast confirms
+**And** the delete reason appears in the historic instance record (verified by `api.listHistoricInstances`).
+
+---","type:user-story,state:backlog,area:run,release:0.0.2",0.0.2
+RUN-MIR-004: Tasks list with assignee filter,"
+As Mira, I want a list of tasks filterable by assignee (me / unassigned / all), so that I can see what's mine to work on. Per FR-20.
+
+**Acceptance Criteria:**
+
+**Given** the user navigates to `/tasks?assignee=me`
+**When** the route loader calls `api.listTasks({size:50, assignee: currentUser})`
+**Then** each row shows task name, assignee, process instance id, due date (`fmtDue`), priority
+**And** changing the search param to `?assignee=all` removes the filter
+**And** task counts appear as nav-badge counts in the Sidebar (`api.listTasks({size:0})` for total).","type:user-story,state:backlog,area:run,release:0.0.2",0.0.2
+RUN-MIR-005: Claim and complete a task,"
+As Mira, I want to claim an unassigned task and complete it with one click each, so that I can work through my queue. Per FR-21.
+
+**Acceptance Criteria:**
+
+**Given** an unassigned task is listed
+**When** the user clicks `Claim`
+**Then** `api.taskAction(taskId, 'claim', { assignee: currentUser })` is called and the task moves into the user's queue (refresh)
+**And** clicking `Complete` calls `api.taskAction(taskId, 'complete')` and the task disappears from the active list
+**And** failures surface as error toasts with verbatim engine message.","type:user-story,state:backlog,area:run,release:0.0.2",0.0.2
+RUN-MIR-006: Render task form via `/form/form-data`,"
+As Mira, I want to see the task's form when I open the task detail, so that I can fill it in instead of completing blindly. Per FR-22.
+
+**Acceptance Criteria:**
+
+**Given** a task with a form definition exists
+**When** the user navigates to `/tasks/:id`
+**Then** `api.getTaskForm(taskId)` is called and the form fields are rendered (input, select, textarea per the form data shape)
+**And** submitting the form calls `api.submitTaskForm(taskId, properties)` which also completes the task
+**And** validation errors from the engine surface inline in the form (using the engine's verbatim message).","type:user-story,state:backlog,area:run,release:0.0.2",0.0.2
+RUN-MIR-007: Delegate and resolve task actions,"
+As Mira, I want `Delegate` and `Resolve` actions in addition to claim/complete, so that I can hand off a task or mark it done after a delegation. Per FR-21.
+
+**Acceptance Criteria:**
+
+**Given** a task is open on `/tasks/:id`
+**When** the user picks `Delegate` and enters a target user
+**Then** `api.taskAction(taskId, 'delegate', { assignee: target })` is called
+**And** when the user picks `Resolve` on a delegated task back to themselves
+**Then** `api.taskAction(taskId, 'resolve')` is called
+**And** the engine's response state is reflected in the task row immediately.
+
+---","type:user-story,state:backlog,area:run,release:0.0.2",0.0.2
+JOB-MIR-001: Jobs screen with three tabs,"
+As Mira, I want a Jobs screen split into Executable / Timer / Dead-letter tabs, so that I can find failing jobs without digging through all jobs. Per FR-24.
+
+**Acceptance Criteria:**
+
+**Given** the user navigates to `/jobs?type=executable`
+**When** the route loader calls `api.listJobs({size:50, withException: type === 'executable'})`
+**Then** the tab shows the right list with id, retries, exception flag (badge), due date
+**And** clicking `?type=timer` calls `api.listTimerJobs(...)`
+**And** clicking `?type=deadletter` calls `api.listDeadLetterJobs(...)`
+**And** the tab selection is in the URL search param (deep-linkable).","type:user-story,state:backlog,area:job,release:0.0.2",0.0.2
+JOB-MIR-002: Execute job on demand,"
+As Mira, I want to manually execute a job (e.g. after a fix) so that I don't have to wait for the next async cycle. Per FR-25.
+
+**Acceptance Criteria:**
+
+**Given** a job is listed on `/jobs`
+**When** the user clicks `Execute now`
+**Then** `api.executeJob(jobId)` is called
+**And** on success, the job disappears from the list (executed) — refresh
+**And** on failure, an error toast surfaces with verbatim message.","type:user-story,state:backlog,area:job,release:0.0.2",0.0.2
+JOB-MIR-003: Move dead-letter job back to executable,"
+As Mira, I want to retry a dead-letter job by moving it back to the executable queue, so that I can recover after fixing the root cause. Per FR-26.
+
+**Acceptance Criteria:**
+
+**Given** a dead-letter job is listed on `/jobs?type=deadletter`
+**When** the user clicks `Move to executable`
+**Then** `api.moveDeadLetterJob(jobId)` is called
+**And** on success, the job leaves the dead-letter tab and appears in the executable tab on refresh.","type:user-story,state:backlog,area:job,release:0.0.2",0.0.2
+JOB-MIR-004: Inspect job exception stacktrace,"
+As Mira, I want to see the verbatim stacktrace of a failed job, so that I can diagnose what went wrong without searching server logs. Per FR-27.
+
+**Acceptance Criteria:**
+
+**Given** a job with an exception is listed
+**When** the user expands the job row or opens detail
+**Then** `api.jobStacktrace(jobId)` is called with `raw: true` (text response)
+**And** the stacktrace is rendered in a monospace `<pre>` block with copy-to-clipboard
+**And** the stacktrace is shown verbatim (no truncation; reasonable scrollable area for long traces).
+
+---","type:user-story,state:backlog,area:job,release:0.0.2",0.0.2
+HST-MIR-001: Historic process instances list,"
+As Mira, I want a list of completed/ended process instances, so that I can audit past work. Per FR-28.
+
+**Acceptance Criteria:**
+
+**Given** the user navigates to `/history?type=instances`
+**When** the route loader calls `api.listHistoricInstances({size:50, sort:'endTime', order:'desc'})`
+**Then** each row shows id, definition key, started, ended, duration (`fmtMs`)
+**And** clicking a row navigates to `/instances/:id` (which shows historic + runtime in a unified detail view).","type:user-story,state:backlog,area:hst,release:0.0.2",0.0.2
+HST-MIR-002: Historic activity instances per instance,"
+As Mira, I want to see the audit trail of which activities ran for a specific instance, in order, so that I can trace what happened. Per FR-28.
+
+**Acceptance Criteria:**
+
+**Given** the user is on an instance detail page
+**When** they switch to the History tab (or the History section of the detail page)
+**Then** `api.listHistoricActivities({processInstanceId: id, size:200})` is called
+**And** each activity is listed with type, name, started, ended, duration, assignee (if applicable)
+**And** the list is sorted by start time ascending.","type:user-story,state:backlog,area:hst,release:0.0.2",0.0.2
+HST-MIR-003: Historic variable + task instances tabs,"
+As Mira, I want to see variable changes and tasks across history for a given instance, so that I can audit what data flowed and who acted. Per FR-28.
+
+**Acceptance Criteria:**
+
+**Given** the user is on `/history?type=variables` or `/history?type=tasks`
+**When** the route loader calls the corresponding wrapper (`listHistoricVariables`, `listHistoricTasks`)
+**Then** rows show variable/task with their context (instance id, name, value/type for variables; assignee/completion for tasks)
+**And** filtering by `processInstanceId` is supported via search param.
+
+---","type:user-story,state:backlog,area:hst,release:0.0.2",0.0.2
+IDT-MIR-001: List users with pagination,"
+As Mira, I want a list of all Flowable users with their basic info, so that I can see who can access the system. Per FR-30.
+
+**Acceptance Criteria:**
+
+**Given** the user navigates to `/identity`
+**When** the route loader calls `api.listUsers({size:50})`
+**Then** each row shows id, first/last name, email, with action `View groups`
+**And** four canonical states render per Pattern P-002.","type:user-story,state:backlog,area:idt,release:0.0.2",0.0.2
+IDT-MIR-002: List groups + view group members,"
+As Mira, I want to see all groups and (per-group) the users who belong, so that I can audit access.
+
+**Acceptance Criteria:**
+
+**Given** the user navigates to `/identity` with the ""Groups"" tab
+**When** the route loader calls `api.listGroups({size:50})`
+**Then** each group row shows id, name, type
+**And** clicking a group navigates to `/identity/groups/:id` which lists the members.","type:user-story,state:backlog,area:idt,release:0.0.2",0.0.2
+IDT-MIR-003: Add user to group (write op),"
+As Mira, I want to grant a user membership in a group from the Identity screen, so that I don't have to use curl for membership management. Per FR-30.
+
+**Acceptance Criteria:**
+
+**Given** a user detail or group detail page exists
+**When** the user clicks ""Add to group"" and picks a target group (or ""Add user"" on a group and picks a user)
+**Then** `api.addUserToGroup(userId, groupId)` is called
+**And** on success, the group/user appears in the list immediately + toast confirms.
+
+---","type:user-story,state:backlog,area:idt,release:0.0.2",0.0.2
+MDL-MIR-001: List DMN decisions + DMN deployments,"
+As Mira, I want to see all deployed decision tables/decisions, so that I can verify what business rules are live. Per FR-33.
+
+**Acceptance Criteria:**
+
+**Given** the user is on a DMN-aware screen (e.g. `/dmn` or under it)
+**When** `api.listDecisions({size:50, base: dmnBase()})` is called per Pattern P-004
+**Then** each row shows key, name, version, tenant
+**And** the URL is `/dmn` (the modeler) — list panel could be a sidebar within the modeler or a separate `/decisions` route (one-of, decided at implementation time).","type:user-story,state:backlog,area:mdl,release:0.0.2",0.0.2
+MDL-MIR-002: Deploy DMN file (multipart),"
+As Mira, I want to upload a `.dmn` file similarly to BPMN deploys, so that I can ship decision-table updates the same way as process updates. Per FR-33.
+
+**Acceptance Criteria:**
+
+**Given** the user clicks ""Deploy DMN"" on the DMN screen
+**When** they pick a `.dmn` file and confirm
+**Then** `api.deployDmn(filename, contents)` is called (multipart against `dmnBase()`)
+**And** on success, a toast confirms with the deployment id
+**And** the decisions list reloads.","type:user-story,state:backlog,area:mdl,release:0.0.2",0.0.2
+MDL-MIR-003: Execute a decision with input variables,"
+As Mira, I want to run a decision-table with sample inputs (without involving a process instance), so that I can test the rules in isolation. Per FR-33.
+
+**Acceptance Criteria:**
+
+**Given** a decision is listed
+**When** the user clicks ""Test execute"" and provides JSON input variables in a modal
+**Then** `api.executeDecision({ decisionKey, inputVariables })` is called
+**And** the output is rendered in a result panel with the matched rules + output variables
+**And** the call appears in the API Inspector as a `POST /dmn-rule/execute`.","type:user-story,state:backlog,area:mdl,release:0.0.2",0.0.2
+MDL-MIR-004: DMN decision execution history,"
+As Mira, I want a history view of every rule execution (inputs, outputs, hit policy, timing), so that I can audit how decisions ran for any given process. Per FR-57.
+
+**Acceptance Criteria:**
+
+**Given** the user navigates to a History panel scoped to DMN
+**When** `api.listDmnHistoryExecutions({size:50, decisionKey?, processInstanceId?})` is called against `/dmn-api/dmn-history/historic-decision-executions`
+**Then** each row shows decision key, instance id, started, evaluation duration, hit policy
+**And** clicking a row expands to show input + output variables verbatim.
+
+---","type:user-story,state:backlog,area:mdl,release:0.0.2",0.0.2
+MDL-SYS-001: Migrate BpmnModeler to TSX with vanilla bpmn-js wrapping,"
+As a maintainer, I want the BPMN modeler component to be TS-typed, so that the modeler's event-bus + element selection logic is checked. Per ADR-001 + Pattern P-006.
+
+**Acceptance Criteria:**
+
+**Given** existing `src/modeler.jsx` has a working `BpmnModeler` component
+**When** the file is migrated to `src/modeler/BpmnModeler.tsx`, the bpmn-js types are imported from `bpmn-js/lib/Modeler` typing, and the event-bus callbacks (`selection.changed`, `commandStack.changed`) have explicit types
+**Then** the modeler still works in `npm run dev` (load existing definition, edit, save)
+**And** `npx tsc --noEmit` passes for the file
+**And** Pattern P-006 is referenced in a comment.","type:user-story,state:backlog,area:mdl,release:0.0.2",0.0.2
+MDL-MIR-005: Load deployed BPMN into the modeler,"
+As Mira, I want to pick a deployed definition from a dropdown in the BPMN modeler and have its XML loaded for editing, so that I can iterate on existing process definitions. Per FR-36.
+
+**Acceptance Criteria:**
+
+**Given** the user is on `/bpmn` or `/bpmn?definitionId=<id>`
+**When** the modeler component mounts and (a) reads the `definitionId` search param OR (b) the user picks from the dropdown populated by `api.listProcessDefinitions`
+**Then** `api.getProcessDefinitionResource(id)` is called and the XML is imported via `modeler.importXML()`
+**And** the canvas zooms-to-fit
+**And** the ""Deploy"" button is enabled (the modeler tracks dirty state for re-deploy hint).","type:user-story,state:backlog,area:mdl,release:0.0.2",0.0.2
+"MDL-MIR-006: ""New from scratch"" + deploy edited model","
+As Mira, I want to start a new BPMN from a blank starter and deploy it without leaving the modeler, so that the modeler is a complete authoring loop. Per FR-37.
+
+**Acceptance Criteria:**
+
+**Given** the user is on `/bpmn` with no `definitionId` param
+**When** they click ""New from scratch"", the modeler loads `BLANK_BPMN_XML`
+**And** when they edit + click `Deploy`, the modeler exports XML and calls `api.deployBpmn(filename, xml)`
+**And** on success, the user is offered to ""Open the deployed definition"" (which navigates with the new `definitionId`).","type:user-story,state:backlog,area:mdl,release:0.0.2",0.0.2
+MDL-MIR-007: Same shape for DMN modeler (load / new / deploy),"
+As Mira, I want the DMN modeler experience to mirror the BPMN modeler (load existing decision, new from scratch, deploy via multipart), so that I'm not learning two different workflows. Per FR-34.
+
+**Acceptance Criteria:**
+
+**Given** Story 16.3 establishes the BPMN authoring loop
+**When** `src/modeler/DmnModeler.tsx` is implemented with the same lifecycle but using dmn-js + `dmnBase()` (Pattern P-004)
+**Then** the DMN modeler loads decisions via `api.getDmnResource(deploymentId, resourceId)`
+**And** deploys via `api.deployDmn(filename, xml)`
+**And** uses `LOAN_DMN_XML` as the starter for ""new from scratch"".
+
+---","type:user-story,state:backlog,area:mdl,release:0.0.2",0.0.2
+"DSY-SYS-001: Extract `styles.css` into `styles/{tokens,components,index}.css`","
+As a maintainer, I want the monolithic `styles.css` split into `tokens.css` (CSS variables per look × theme × density), `components.css` (`.btn`, `.tbl`, `.badge`, etc.), and `index.css` (imports + global resets), so that the file is more navigable. Per the post-rebuild source tree in architecture §5.
+
+**Acceptance Criteria:**
+
+**Given** existing `src/styles.css` works end-to-end
+**When** the file is split into the three target files under `src/styles/`, preserving every variable name and class hook verbatim (ADR-005 ""preserve verbatim"" rule)
+**Then** `npm run dev` renders identically in all 3 looks × 2 themes × 3 densities
+**And** no class hook is renamed (regression test: a `grep -rE '\.(btn|tbl|badge|kpi|panel|ep-chip|seg-btn)\b'` count matches before and after).","type:user-story,state:backlog,area:dsy,release:0.0.2",0.0.2
+DSY-MIR-001: Wire TweaksPanel keyboard shortcut + palette icon,"
+As Mira, I want Ctrl+Shift+T to toggle the TweaksPanel (Look / Theme / Density / Accent), so that I can quickly try different visual modes. Per FR-42.
+
+**Acceptance Criteria:**
+
+**Given** the existing TweaksPanel logic in `src/tweaks-panel.tsx`
+**When** the global `keydown` listener catches Ctrl+Shift+T and dispatches `window.postMessage({type:'__activate_edit_mode'})`
+**Then** the panel toggles visibility
+**And** clicking the palette icon in the Topbar does the same
+**And** changes persist to localStorage and are restored on reload.","type:user-story,state:backlog,area:dsy,release:0.0.2",0.0.2
+DSY-MIR-002: WCAG AA verification across 8 look × theme combinations,"
+As Mira (operator with accessibility needs), I want all 8 look × theme combinations to meet WCAG AA contrast, so that the UI is legible in every variant. Per NFR-16.
+
+**Acceptance Criteria:**
+
+**Given** the design system has 8 combinations (3 looks × 2 themes, with shared density tokens)
+**When** a manual audit pass evaluates `--fg` on `--bg`, `--fg-soft` on `--bg`, `--fg-mute` on `--bg`, and `--accent-fg` on `--accent` for every combination
+**Then** every pair meets WCAG AA contrast (4.5:1 minimum for body text, 3:1 for large text)
+**And** any failing pair is documented in `docs/a11y-audit-2026-MM.md` with a fix plan
+**And** an open issue is filed for any fix not done in this story (and tagged `area:design-system`, `area:tests`).","type:user-story,state:backlog,area:dsy,release:0.0.2",0.0.2
+DSY-SYS-002: Snapshot baseline per look × theme × density (Pattern P-007 enforcement),"
+As a maintainer, I want one Playwright snapshot per look × theme × density (18 baselines) of the Dashboard, so that theming regressions surface immediately. Per NFR-23.
+
+**Acceptance Criteria:**
+
+**Given** Playwright is wired (Epic 2)
+**When** `e2e/visual/dashboard-themes.spec.ts` iterates over the 3×2×3=18 combinations and snapshots `/` for each
+**Then** `npx playwright test --update-snapshots` produces 18 baselines
+**And** subsequent runs assert against the baselines
+**And** changing one CSS variable in a single combination's `:root` block fails exactly one snapshot (proving the snapshots are sensitive to drift).
+
+---","type:user-story,state:backlog,area:dsy,release:0.0.2",0.0.2
+I18N-MIR-001: Add keyboard-navigation Playwright assertions,"
+As Mira (keyboard user), I want every screen reachable and operable via keyboard only, so that I'm not blocked by missing focus management.
+
+**Acceptance Criteria:**
+
+**Given** every screen is routable (Epic 3)
+**When** `e2e/a11y/keyboard.spec.ts` walks Tab through each screen and asserts: focus order matches visual order, no keyboard traps in modals, Escape closes modal/drawer/dropdown
+**Then** the test passes on every screen
+**And** focus ring is visible (CSS `:focus-visible` rule asserted via screenshot per Story 17.4).","type:user-story,state:backlog,area:i18n,release:0.0.2",0.0.2
+I18N-MIR-002: Add ARIA assertions to forms + tables + status pills,"
+As a screen-reader user, I want every interactive element to have appropriate ARIA, so that I can navigate the app via assistive technology. Per NFR-17.
+
+**Acceptance Criteria:**
+
+**Given** Playwright is wired
+**When** `e2e/a11y/aria.spec.ts` asserts: icon-only buttons have `aria-label`, tables use `<th scope=""col"">` + `aria-sort`, status pills include screen-reader-only context (""Status: active""), modals have `role=""dialog""` + `aria-labelledby`
+**Then** the test passes on every screen with such elements.","type:user-story,state:backlog,area:i18n,release:0.0.2",0.0.2
+I18N-SYS-001: Visual snapshot per screen × per look (lighter than 17.4),"
+As a maintainer, I want one visual snapshot per screen in `editorial / light / regular`, so that screen-level regressions surface (independent of the look-combination matrix from 17.4). Per NFR-23.
+
+**Acceptance Criteria:**
+
+**Given** every screen is routable
+**When** `e2e/visual/per-screen.spec.ts` snapshots each of the 11 screens in the default look × theme × density
+**Then** 11 baselines exist
+**And** changing any screen's structure breaks the corresponding snapshot.
+
+---","type:user-story,state:backlog,area:i18n,release:0.0.2",0.0.2
+RUN-MIR-008: Edit a variable on a running instance,"
+As Mira, I want to edit a variable's value on a running instance (e.g. unstick a workflow waiting on a wrong input), so that I can recover without restarting the process. Per FR-19.
+
+**Acceptance Criteria:**
+
+**Given** an instance detail page shows the variables list
+**When** the user clicks ""Edit"" on a variable row, changes the value, picks a type, and saves
+**Then** `api.updateInstanceVariables(instanceId, [{name, value, type, scope: 'local'}])` is called (PUT with array body — verified live in compat.md)
+**And** on success, the variables list reloads and reflects the change
+**And** the API Inspector logs the call.","type:user-story,state:backlog,area:run,release:0.0.3",0.0.3
+RUN-MIR-009: Add and delete a variable,"
+As Mira, I want to add a new variable to a running instance (or delete one), so that I can patch in missing state.
+
+**Acceptance Criteria:**
+
+**Given** the variables list on instance detail
+**When** the user clicks ""Add variable"", enters name + value + type
+**Then** the same PUT endpoint is called to add it
+**And** clicking ""Delete"" on a variable row calls `DELETE /runtime/process-instances/{id}/variables/{name}`
+**And** both operations reload the list.","type:user-story,state:backlog,area:run,release:0.0.3",0.0.3
+DPL-MIR-006: Edit category on a definition,"
+As Mira, I want to edit a process definition's category (organizational tag) so that I can group related definitions. Per FR-43 (verified live in compat.md).
+
+**Acceptance Criteria:**
+
+**Given** a definition detail page
+**When** the user clicks ""Edit category"", enters a new category value, saves
+**Then** `api.updateDefinition(id, { category })` is called (PUT with `{category}` body)
+**And** the new category appears in the definition list (refresh).","type:user-story,state:backlog,area:dpl,release:0.0.3",0.0.3
+"RUN-MIR-010: Edit task properties (priority, due date, owner, assignee)","
+As Mira, I want to edit a task's priority, due date, owner, and assignee from the task detail page, so that I can adjust scheduling without canceling and recreating. Per FR-44.
+
+**Acceptance Criteria:**
+
+**Given** a task detail page
+**When** the user clicks ""Edit task"", changes priority / due date / owner / assignee, saves
+**Then** `api.updateTask(id, fields)` is called (PUT with the task body)
+**And** the task row reflects the changes in the list.","type:user-story,state:backlog,area:run,release:0.0.3",0.0.3
+RUN-MIR-011: Add attachment to a task,"
+As Mira, I want to attach a file or URL to a task, so that I can document context. Per FR-45.
+
+**Acceptance Criteria:**
+
+**Given** a task detail page
+**When** the user clicks ""Add attachment"", picks file or enters URL, saves
+**Then** `api.addTaskAttachment(taskId, { name, type, url|content })` is called (POST to `/runtime/tasks/{id}/attachments`)
+**And** the attachment appears in the task's attachment list.","type:user-story,state:backlog,area:run,release:0.0.3",0.0.3
+"RUN-MIR-012: List, download, delete task attachments","
+As Mira, I want to see, download, and delete attachments on a task, so that I can manage task evidence.
+
+**Acceptance Criteria:**
+
+**Given** a task with attachments
+**When** the user opens the Attachments panel
+**Then** `api.listTaskAttachments(taskId)` is called and renders the list
+**And** clicking download fetches and saves the file (binary or text)
+**And** clicking delete + confirming calls `api.deleteTaskAttachment(taskId, attachmentId)`.","type:user-story,state:backlog,area:run,release:0.0.3",0.0.3
+IDT-MIR-004: Create user,"
+As Mira, I want to create a user from the Identity screen, so that I can provision access without using curl. Per FR-46.
+
+**Acceptance Criteria:**
+
+**Given** the user navigates to `/identity` and clicks ""Create user""
+**When** they fill the modal (id, first name, last name, email, password) and submit
+**Then** `api.createUser({id, firstName, lastName, email, password})` is called (POST `/identity/users`)
+**And** the new user appears in the users list (refresh)
+**And** failures (e.g. duplicate id) surface as `ErrorBox` with verbatim engine message.","type:user-story,state:backlog,area:idt,release:0.0.3",0.0.3
+IDT-MIR-005: Update + delete user,"
+As Mira, I want to edit a user's name/email and delete them, so that I can manage the directory.
+
+**Acceptance Criteria:**
+
+**Given** a user detail page
+**When** the user clicks ""Edit user"", changes fields, saves
+**Then** `api.updateUser(id, fields)` is called (PUT)
+**And** clicking ""Delete user"" + confirming calls `api.deleteUser(id)`
+**And** both operations reflect immediately in the list.","type:user-story,state:backlog,area:idt,release:0.0.3",0.0.3
+IDT-MIR-006: Create + update + delete group,"
+As Mira, I want full CRUD on groups, so that I can manage role-equivalent collections. Per FR-47.
+
+**Acceptance Criteria:**
+
+**Given** the user is on `/identity` Groups tab
+**When** they create/edit/delete groups via the analogous flows to user CRUD
+**Then** each operation calls the right `api.*Group` wrapper
+**And** the groups list updates immediately on each operation.","type:user-story,state:backlog,area:idt,release:0.0.3",0.0.3
+AUT-MIR-001: Saved connections list in Settings,"
+As Mira, I want a list of saved Flowable connections (e.g. local-dev, staging, prod) with quick-switch, so that I don't re-enter credentials when switching environments. Per FR-49.
+
+**Acceptance Criteria:**
+
+**Given** Settings is open
+**When** the user clicks ""Manage connections"", adds a new connection with a label, baseUrl, username, password, tenant
+**Then** the connection is persisted in localStorage `flowatch.connections.v1` (a new structure, not the single `flowatch.connection.v1`)
+**And** a connection picker in the Topbar (next to tenant) allows quick switching
+**And** picking a connection updates `api.config()` and triggers `api.ping()` to refresh the indicator.","type:user-story,state:backlog,area:aut,release:0.0.3",0.0.3
+AUT-MIR-002: Per-connection auth strategy,"
+As Mira, I want each saved connection to remember its auth strategy (Basic / Bearer / OIDC config), so that I don't reconfigure auth every switch.
+
+**Acceptance Criteria:**
+
+**Given** multi-connection storage exists (Story 23.1)
+**When** the user configures different auth strategies per connection
+**Then** `flowatch.connections.v1[connectionId].authStrategy` stores the relevant config
+**And** switching connection switches auth strategy in `api.ts`'s `authStrategy` slot.","type:user-story,state:backlog,area:aut,release:0.0.3",0.0.3
+JOB-MIR-005: Batches surface,"
+As Mira, I want a screen listing long-running batch operations with status and per-part failure detail, so that I can monitor bulk delete or bulk migration runs. Per FR-53.
+
+**Acceptance Criteria:**
+
+**Given** the user navigates to `/jobs?type=batches` (or a new `/batches` route)
+**When** `api.listBatches({size:50})` is called against `/management/batches`
+**Then** each row shows id, status, started, total parts, succeeded, failed
+**And** clicking a row navigates to detail showing `/management/batches/{id}/batch-parts`.","type:user-story,state:backlog,area:job,release:0.0.3",0.0.3
+JOB-MIR-006: Event subscriptions surface,"
+As Mira, I want to see what messages/signals/timers a running instance is waiting on, so that I can diagnose stuck instances. Per FR-54.
+
+**Acceptance Criteria:**
+
+**Given** the user is on an instance detail page
+**When** `api.listEventSubscriptions({processInstanceId: id})` is called
+**Then** the page shows each subscription's eventType, eventName, created date
+**And** the list is also accessible via `/events?processInstanceId=:id`.","type:user-story,state:backlog,area:job,release:0.0.3",0.0.3
+DPL-MIR-007: Recognize `.bar` upload and browse contents,"
+As Mira, I want Flowatch to recognize a `.bar` (Flowable App archive) upload, list its bundled processes/forms/decisions, and surface a unified view, so that I can see what an app deployment contains. Per FR-55 (scope-reduced).
+
+**Acceptance Criteria:**
+
+**Given** the user uploads a `.bar` (or `.zip`) file on the Deployments screen
+**When** Flowatch detects the file extension and calls `api.listAppDefinitions()` from `/app-api/app-repository/app-definitions` after the deploy
+**Then** the resulting app deployment's contained artifacts are listed (BPMN process keys, DMN decision keys, form keys)
+**And** clicking an artifact navigates to its detail
+**And** the ""runtime side"" (running app-instances) is NOT exposed (per compat.md FR-55 scope reduction — documented as out of scope on the screen).","type:user-story,state:backlog,area:dpl,release:0.0.3",0.0.3
+MDL-MIR-008: Render BPMN diagram on instance detail,"
+As Mira, I want to see the BPMN diagram of an instance's process definition on the instance detail page, so that I have visual context.
+
+**Acceptance Criteria:**
+
+**Given** the user is on `/instances/:id`
+**When** the page calls `api.getProcessDefinitionResource(definitionId)` and embeds the rendered BPMN via a read-only `bpmn-js` viewer (not the full modeler — use `BpmnViewer` instead)
+**Then** the diagram appears on the page
+**And** the diagram has fit-to-viewport applied.","type:user-story,state:backlog,area:mdl,release:0.0.3",0.0.3
+MDL-MIR-009: Highlight current and historic activities on the diagram,"
+As Mira, I want completed and current activities highlighted on the diagram (color-coded), so that I can see where an instance is in its flow at a glance. Per FR-29.
+
+**Acceptance Criteria:**
+
+**Given** Story 26.1 renders the diagram
+**When** `api.listHistoricActivities({processInstanceId: id})` returns the activity history and the page applies `bpmn-js` element-color overrides (e.g. green for completed, yellow for current)
+**Then** the diagram visually shows the instance's path
+**And** the current activity (if instance still active) is highlighted distinctly from completed activities.","type:user-story,state:backlog,area:mdl,release:0.0.3",0.0.3
+"MDL-MIR-010: ""Save as new version"" in BPMN/DMN modeler","
+As Mira, I want a ""Save as new version"" button in the modeler that explicitly bumps the version, so that I can keep prior versions accessible. Per FR-59.
+
+**Acceptance Criteria:**
+
+**Given** the modeler has loaded a deployed definition
+**When** the user clicks ""Save as new version"" (vs. just ""Deploy"")
+**Then** the modeler exports XML and calls `api.deployBpmn(filename, xml)` (Flowable auto-versions per-key on each deployment)
+**And** the modeler reloads the definitions dropdown, showing both the old and new versions
+**And** the previously-loaded version's URL is preserved (e.g. via a ""View previous version"" link in the modeler header).
+
+---","type:user-story,state:backlog,area:mdl,release:0.0.3",0.0.3
+AUT-SYS-001: Refactor `api.ts` for AuthStrategy interface,"
+As a maintainer, I want `api.ts` to delegate Authorization header generation to a pluggable `AuthStrategy` interface, so that adding a new auth method doesn't touch every wrapper. Per ADR-009, FR-4.
+
+**Acceptance Criteria:**
+
+**Given** the current `api.ts` hard-codes Basic auth
+**When** an `AuthStrategy` interface is added (`kind`, `authorizationHeader()`, optional `onUnauthorized()`) and `request()` calls `authStrategy.authorizationHeader()`
+**Then** the existing Basic strategy is implemented as a concrete `BasicAuthStrategy` and assigned by default
+**And** all existing API tests still pass.","type:user-story,state:backlog,area:aut,release:1.0.0",1.0.0
+"AUT-MIR-003: Settings ""Authentication"" tab with Basic + Bearer + OIDC","
+As Mira, I want to pick from three authentication methods in Settings, so that I can use whichever my engine is configured for. Per FR-4.
+
+**Acceptance Criteria:**
+
+**Given** the Settings modal has tabs (Connection / Authentication / About)
+**When** the Authentication tab is implemented with three radio options (Basic / Bearer / OIDC)
+**Then** picking each shows its config fields (Basic: user/pass; Bearer: token text area; OIDC: issuer, clientId, scopes)
+**And** saving updates the active `AuthStrategy` in `api.ts`
+**And** the strategy persists in the connection config (Story 23.2 also).","type:user-story,state:backlog,area:aut,release:1.0.0",1.0.0
+AUT-SAS-001: Implement Bearer (paste-a-token) auth strategy,"
+As a developer testing a custom Spring Security setup, I want to paste a Bearer token into Settings and have Flowatch use it for all calls, so that I can test OAuth without configuring the full PKCE flow.
+
+**Acceptance Criteria:**
+
+**Given** the Settings Auth tab Bearer option (Story 28.2)
+**When** the user pastes a token and saves
+**Then** every API call sends `Authorization: Bearer <token>` (no longer Basic)
+**And** when the engine returns 401, the strategy's `onUnauthorized()` opens the Settings modal at the Auth tab.","type:user-story,state:backlog,area:aut,release:1.0.0",1.0.0
+AUT-MIR-004: Implement OIDC PKCE flow via react-oidc-context,"
+As Mira (in an enterprise env), I want full OIDC Authorization Code with PKCE, so that I can use my org's IdP (Keycloak etc.). Per ADR-009.
+
+**Acceptance Criteria:**
+
+**Given** `react-oidc-context` is installed and the Auth tab OIDC option (Story 28.2) is configured with issuer + clientId + scopes
+**When** the user starts a session
+**Then** Flowatch redirects to the IdP, handles the callback, stores tokens in memory (NOT localStorage, per NFR-11), and calls `api.*` with the access token as `Authorization: Bearer`
+**And** silent renew (refresh token with `offline_access` scope) works without UI disruption
+**And** a ""Sign out"" button revokes the session.","type:user-story,state:backlog,area:aut,release:1.0.0",1.0.0
+RUN-MIR-013: Install form-js and render task forms via it,"
+As Mira, I want task forms rendered by the modern form-js renderer (instead of the legacy `/form/form-data` body shape), so that the form UI is consistent with the rest of Flowatch. Per FR-23, FR-51 (scope-reduced).
+
+**Acceptance Criteria:**
+
+**Given** `@bpmn-io/form-js-viewer` is installed
+**When** a task with a form-js form definition is opened on `/tasks/:id`
+**Then** the form-js viewer renders the form with its native styling overridden by Flowatch's `data-look` system
+**And** submitting the form calls `api.submitTaskForm(taskId, properties)` with the form-js output structure.","type:user-story,state:backlog,area:run,release:1.0.0",1.0.0
+RUN-MIR-014: Form-js designer mode for authoring forms,"
+As Mira (form author), I want a designer mode where I can drag form components onto a canvas and save, so that I can author forms without writing JSON. Per FR-23.
+
+**Acceptance Criteria:**
+
+**Given** `@bpmn-io/form-js-editor` is installed
+**When** the user navigates to `/forms/new` or `/forms/:id/edit`, the editor mounts
+**Then** the user can drag input/textarea/select/radio/checkbox/number/datetime components
+**And** Save exports the form-js JSON
+**And** the form is stored either inline in the BPMN (via `extensionElements`) or in the (future) form-api if the operator runs `flowable-ui`-style deployment (out of scope per compat.md).","type:user-story,state:backlog,area:run,release:1.0.0",1.0.0
+RUN-MIR-015: Form-js standalone form deployment (deferred),"
+As Mira, I want standalone form definitions deployable to Flowable's form engine, so that the same form is reusable across tasks. Per FR-51 (deferred).
+
+**Acceptance Criteria:**
+
+**Given** `/form-api/*` is NOT exposed in `flowable-rest:7.2.0` (per compat.md)
+**When** this story is scheduled
+**Then** the implementation gates on the operator using an alternate Flowable image (e.g. `flowable-ui`) that exposes `/form-api/`
+**And** if `/form-api/` returns 404, the standalone-form UI is hidden and an explainer is shown.","type:user-story,state:backlog,area:run,release:1.0.0",1.0.0
+MDL-MIR-011: Implement Flowable extensions properties panel,"
+As Mira, I want the BPMN modeler's properties panel to expose Flowable-specific element extensions (assignees, candidate groups, listeners, form refs, async/exclusive flags), so that I don't have to edit XML by hand. Per FR-38.
+
+**Acceptance Criteria:**
+
+**Given** the BPMN modeler is open with a UserTask selected
+**When** the properties panel mounts
+**Then** it shows fields for `flowable:assignee`, `flowable:candidateUsers`, `flowable:candidateGroups`, `flowable:formKey`, `flowable:async`, `flowable:exclusive`, `flowable:executionListener`, `flowable:taskListener`
+**And** editing each field updates the element's `extensionElements` in the BPMN XML
+**And** the XML round-trip (export → re-import) preserves all Flowable-specific extensions (no data loss like Camunda Modeler's round-trip issue cited in market research).","type:user-story,state:backlog,area:mdl,release:1.0.0",1.0.0
+MDL-MIR-012: Properties panel covers DMN-specific extensions,"
+As Mira, I want the DMN modeler's properties panel to expose any Flowable-specific DMN extensions, so that decisions can be authored without XML editing.
+
+**Acceptance Criteria:**
+
+**Given** the DMN modeler is open
+**When** a decision element is selected
+**Then** any Flowable-DMN extensions (if applicable) are exposed in the properties panel
+**And** round-trip preserves them.","type:user-story,state:backlog,area:mdl,release:1.0.0",1.0.0
+NAV-MIR-008: Detect Flowable version drift and show banner,"
+As Mira, I want a non-blocking banner if I'm running a Flowable version Flowatch hasn't been tested against, so that I know to expect potential issues. Per NFR-7.
+
+**Acceptance Criteria:**
+
+**Given** `api.ping()` returns the engine version
+**When** the version doesn't match the `tested-against` version recorded in `docs/compat.md` (e.g. operator runs 7.5 but Flowatch was tested against 7.2)
+**Then** a dismissable banner appears in the chrome reading ""Flowatch is tested against Flowable 7.2.0. Detected: 7.5.0 — some features may differ. See docs/compat.md.""
+**And** clicking dismiss persists the dismissal for that version in localStorage.
+
+---","type:user-story,state:backlog,area:nav,release:1.0.0",1.0.0
+HST-MIR-004: Run end-to-end a11y audit across 8 look × theme combos + 11 screens,"
+As Mira (operator with accessibility needs), I want a full a11y audit producing a list of issues + fix plan, so that v1.0 is genuinely accessible. Per NFR-15-NFR-17.
+
+**Acceptance Criteria:**
+
+**Given** all screens are implemented and routable
+**When** an automated a11y scan (axe-core via Playwright) is run on every screen × every look × every theme
+**Then** the report is produced at `docs/a11y-audit-1.0.0.md`
+**And** every violation is either fixed in a follow-up story or documented as ""won't fix"" with rationale
+**And** the final a11y score is ≥ 95/100 axe-core threshold.","type:user-story,state:backlog,area:hst,release:1.0.0",1.0.0
+"HST-MIR-005: Fix every ""won't ship"" a11y violation found by Story 32.1","
+As Mira, I want every blocking a11y issue from the audit fixed before 1.0 ships, so that I can use Flowatch with a screen reader or keyboard.
+
+**Acceptance Criteria:**
+
+**Given** the audit report from Story 32.1
+**When** every ""won't ship"" violation has a corresponding fix in the codebase
+**Then** re-running the audit produces zero blocking violations
+**And** the score is ≥ 98/100.","type:user-story,state:backlog,area:hst,release:1.0.0",1.0.0
+DOC-DAA-001: Add README screenshots per look,"
+As Daan (evaluator landing on the GitHub repo), I want three screenshots in the README (one per look) at the top, so that I can see what Flowatch looks like before cloning. PRD Open Question 6 (resolved as Yes).
+
+**Acceptance Criteria:**
+
+**Given** all three looks render correctly
+**When** screenshots of the Dashboard in `editorial / light / regular`, `terminal / dark / compact`, `industrial / dark / regular` are captured (1440×900 viewport, headless Chromium via Playwright)
+**Then** the three PNGs are committed under `branding/screenshots/`
+**And** README.md embeds them in a row near the top with alt text per accessibility.","type:user-story,state:backlog,area:doc,release:1.0.0",1.0.0
+DOC-SYS-001: Forum announcement post draft,"
+As a maintainer, I want a draft post for the Flowable forum threads (12226 and 11896) announcing Flowatch 1.0, so that the discovery path is activated per market-research recommendation #4.
+
+**Acceptance Criteria:**
+
+**Given** v1.0 is tagged
+**When** a draft announcement is written to `docs/announcements/flowable-forum-2026-XX.md` with: positioning sentence, screenshot link, GitHub link, Docker quickstart, link to compat.md
+**Then** the draft is reviewed and ready to post (single-maintainer review)
+**And** the post explicitly references that the project fills the 7.0+ OSS UI gap (forum threads 12226 and 11896 demand signal).","type:user-story,state:backlog,area:doc,release:1.0.0",1.0.0
+DOC-DAA-002: Social-preview card for the GitHub repo,"
+As Daan, I want a clear social preview card when someone shares the GitHub repo URL on Twitter/LinkedIn, so that the project's purpose is communicated at-a-glance.
+
+**Acceptance Criteria:**
+
+**Given** Flowatch is published
+**When** an SVG/PNG social-preview card is created showing the lockup + tagline + ""OSS GUI for Flowable 7+ OSS""
+**Then** the card is uploaded to GitHub repo settings → Social preview
+**And** sharing the repo URL renders the card on major social platforms (verified manually).
+
+---
+
+## v2+ Placeholder Epics (no stories — gated)","type:user-story,state:backlog,area:doc,release:1.0.0",1.0.0

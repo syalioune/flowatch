@@ -1,0 +1,20 @@
+meta {
+  name: Historic variable instances
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/history/historic-variable-instances?processInstanceId={{instanceId}}
+  body: none
+  auth: basic
+}
+
+params:query {
+  processInstanceId: PASTE_AN_INSTANCE_ID
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}

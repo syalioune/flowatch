@@ -1,0 +1,49 @@
+name: "📚 Documentation"
+description: "Documentation task : Update FR/NFR/ADR, API contracts, Diagrams, Architecture,..."
+title: "[DOCS]: "
+labels: ["type:documentation", "state:backlog", "priority:medium", "area:docs"]
+body:
+  - type: input
+    id: parent
+    attributes:
+      label: Parent Story
+      description: Link the [US] issue
+      placeholder: "#123"
+  - type: textarea
+    id: fr_updates
+    attributes:
+      label: Functional Requirement updates
+      placeholder: "FR-*. Add/clarify fields, rules…"
+  - type: textarea
+    id: nfr_updates
+    attributes:
+      label: Non Functional Requirement updates
+  - type: textarea
+    id: adr_updates
+    attributes:
+      label: ADRs to create/update
+      placeholder: "ADR-025 lifecycle, ADR-026 SLA matrix…"
+  - type: textarea
+    id: api_contracts
+    attributes:
+      label: API Contracts
+      placeholder: "OpenAPI paths + components; GraphQL SDL (types/mutations/queries)"
+  - type: textarea
+    id: architecture
+    attributes:
+      label: Architecture
+      description: ERD, sequence, state machine, C4 (as needed)
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: Definition of Done
+      options:
+        - label: Functional Requirements updated with AC-impacting changes (trace AC references)
+        - label: Non Functional Requirements implications recorded (security, observability, performance)
+        - label: ADRs created/updated & status set (proposed/accepted)
+        - label: OpenAPI updated + example requests/responses + error (RFC7807)
+        - label: GraphQL SDL updated + example operations
+        - label: Architecture documents updated
+        - label: ERD/sequence/state diagrams updated and linked
+        - label: Changelog stub created
+        - label: All links validated (no dead links)

@@ -1,0 +1,20 @@
+meta {
+  name: List batch parts
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/management/batches/{{batchId}}/batch-parts
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  batchId: PASTE_A_BATCH_ID
+}

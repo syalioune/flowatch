@@ -1,0 +1,56 @@
+name: "🖥️ Frontend Implementation Task"
+description: "UI flows, state, accessibility, and API integrations"
+title: "[Frontend]: "
+labels: ["area:frontend", "state:backlog", "priority:medium"]
+body:
+  - type: input
+    id: parent
+    attributes:
+      label: Parent Story
+      placeholder: "#123"
+  - type: textarea
+    id: ux
+    attributes:
+      label: UX Changes
+      placeholder: "Screens, CTAs, modals; interaction details"
+  - type: textarea
+    id: data
+    attributes:
+      label: Data & State
+      placeholder: "Client models, slices/hooks, optimistic updates"
+  - type: textarea
+    id: api
+    attributes:
+      label: API Integration
+      placeholder: "REST/GraphQL calls; error surfaces; empty states"
+  - type: textarea
+    id: a11y_i18n
+    attributes:
+      label: Accessibility & i18n
+  - type: textarea
+    id: tests
+    attributes:
+      label: Tests
+      placeholder: "Component + integration tests with mocks"
+  - type: checkboxes
+    id: ac_map
+    attributes:
+      label: Acceptance Criteria Mapping
+      options:
+        - label: AC1 implemented and tested
+        - label: AC2 implemented and tested
+        - label: AC3 implemented and tested
+        - label: AC4 implemented and tested
+        - label: AC5+ (tick all that apply)
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: Definition of Done
+      options:
+        - label: UI matches design and ADR/NFR guidelines
+        - label: Forms validated; server errors surfaced (problem+json)
+        - label: Loading/empty/error states implemented
+        - label: Keyboard navigation and ARIA labels complete
+        - label: Timezone/locale formatting correct (UTC storage assumed)
+        - label: Unit/integration tests pass with coverage threshold
+        - label: No console errors/warnings; ESLint/TypeScript clean

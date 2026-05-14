@@ -1,0 +1,26 @@
+meta {
+  name: Engine info
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/management/engine
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs {
+  # Engine info
+
+  Health-check endpoint. Returns `{ name, version, resourceUrl, exception }`.
+
+  Used by Flowatch on app load to populate the connection indicator.
+
+  Related: PRD FR-2.
+}

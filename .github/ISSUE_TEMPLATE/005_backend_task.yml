@@ -1,0 +1,60 @@
+name: "⚙️ Backend Implementation Task"
+description: "Domain, ports/adapters, REST/GraphQL, persistence, and tests"
+title: "[Backend]: "
+labels: ["area:backend", "area:api", "state:backlog", "priority:medium"]
+body:
+  - type: input
+    id: parent
+    attributes:
+      label: Parent Story
+      placeholder: "#123"
+  - type: textarea
+    id: domain
+    attributes:
+      label: Domain & Use-cases
+      placeholder: "Entities/aggregates, value objects, invariants, services"
+  - type: textarea
+    id: persistence
+    attributes:
+      label: Persistence & Migrations
+      placeholder: "DDL changes, indexes, FKs, default values"
+  - type: textarea
+    id: adapters
+    attributes:
+      label: Adapters
+      placeholder: "REST endpoints; GraphQL schema/resolvers; RBAC checks"
+  - type: textarea
+    id: observability
+    attributes:
+      label: Observability & Audit
+      placeholder: "Domain events, logs, metrics (names/labels)"
+  - type: textarea
+    id: tests
+    attributes:
+      label: Tests (unit/integration/contract)
+      placeholder: "Testcontainers, schema snapshots, error cases"
+  - type: checkboxes
+    id: ac_map
+    attributes:
+      label: Acceptance Criteria Mapping
+      options:
+        - label: AC1 implemented and tested
+        - label: AC2 implemented and tested
+        - label: AC3 implemented and tested
+        - label: AC4 implemented and tested
+        - label: AC5+ (tick all that apply)
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: Definition of Done
+      options:
+        - label: Use-cases isolated (Clean Architecture), ports for external dependencies
+        - label: REST endpoints implemented per OpenAPI (examples validated)
+        - label: GraphQL mutation/query implemented per SDL
+        - label: RFC7807 errors for validation & business rules
+        - label: DB migrations applied with rollback scripts; idempotent
+        - label: RBAC enforced server-side (negative tests included)
+        - label: Metrics and audit events emitted
+        - label: Test coverage ≥ agreed threshold (unit/integration)
+        - label: Performance sanity (N+1 avoided, indexes present)
+        - label: Security review (input validation, authz, secrets)

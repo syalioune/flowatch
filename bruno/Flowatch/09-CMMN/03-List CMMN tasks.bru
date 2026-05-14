@@ -1,0 +1,16 @@
+meta {
+  name: List CMMN tasks
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{cmmnBase}}/cmmn-runtime/tasks?size=10
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}

@@ -1,0 +1,20 @@
+meta {
+  name: Get task variables
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/runtime/tasks/{{taskId}}/variables
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  taskId: PASTE_A_TASK_ID
+}

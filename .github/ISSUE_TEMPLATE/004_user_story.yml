@@ -1,0 +1,93 @@
+name: "🧑‍💻 User Story"
+description: "Capture a user story with ACs, scope, traceability, and delivery plan"
+title: "<AREA-CODE>-<PERSONA_TRIGRAMM>-<SEQ> <short summary>"
+labels: ["type:user-story", "state:backlog", "priority:high"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Guidance**
+        - Use the classic format: *As a <persona>, I want <capability>, so that <benefit>.*
+        - Keep ACs simple & testable.
+        - Reference FR/NFR/ADR and diagrams; ensure updates are planned.
+  # — Story core
+  - type: input
+    id: personas
+    attributes:
+      label: Persona(s)
+      description: Who benefits / acts here? See the personas defined in the PRD (`_bmad-output/planning-artifacts/prd.md` §5 — Mira, Daan, Sasha)
+      placeholder: "Mira (operator); Daan (evaluator); Sasha (admin-script-author)"
+    validations:
+      required: true
+  - type: textarea
+    id: story
+    attributes:
+      label: Story
+      description: Use the standard form
+      placeholder: "As a <persona>, I want <capability>, so that <benefit>."
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / Motivation
+      description: Why now? What pain or opportunity does this address?
+      placeholder: "Current gap, risks, user feedback, data points…"
+    validations:
+      required: true
+  # — Scope & context
+  - type: textarea
+    id: context
+    attributes:
+      label: Context / Notes
+      placeholder: "Links to designs, prior discussions, spikes, prototypes…"
+  # — Acceptance criteria
+  - type: textarea
+    id: ac_list
+    attributes:
+      label: Acceptance Criteria (Numbered)
+      description: Testable, unambiguous, numbered ACs (AC1, AC2, …)
+      placeholder: |
+        AC1: …
+        AC2: …
+        AC3: …
+    validations:
+      required: true
+  # — Traceability
+  - type: textarea
+    id: references
+    attributes:
+      label: Linked Artifacts (Traceability)
+      description: Reference specs this story touches or must align with
+      placeholder: "FR-…; NFR-…; ADR-…; Diagrams (ERD/sequence/state/C4); API contracts"
+    validations:
+      required: true
+  # — Definition of Ready / Done
+  - type: checkboxes
+    id: dor
+    attributes:
+      label: Definition of Ready (before starting)
+      options:
+        - label: Personas known and problem well articulated
+        - label: ACs are complete, specific, and testable
+        - label: Traceability (FR/NFR/ADR) linked
+        - label: Scope/non-goals clear
+        - label: Key dependencies identified
+        - label: Rough solution sketch agreed (if needed)
+    validations:
+      required: true
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: Definition of Done (to close the story)
+      options:
+        - label: All ACs validated via tests (unit/integration/E2E as applicable)
+        - label: FR/NFR/ADR and diagrams updated & linked in the PR(s)
+        - label: REST/GraphQL contracts published (OpenAPI/SDL artifacts)
+        - label: Security, RBAC, and error handling reviewed
+        - label: Observability added/updated (metrics/logs/audit)
+        - label: DB migrations applied with rollback plan
+        - label: CI pipeline green; coverage thresholds met
+        - label: Changelog entry & runbook updates added
+    validations:
+      required: true

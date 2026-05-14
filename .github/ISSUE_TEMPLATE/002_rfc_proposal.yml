@@ -1,0 +1,13 @@
+name: "📝 RFC / Proposal"
+description: Propose a change requiring discussion/consensus
+labels: ["type:rfc", "state:backlog", "priority:medium"]
+body:
+  - type: textarea
+    id: summary
+    attributes: { label: Summary }
+  - type: textarea
+    id: motivation
+    attributes: { label: Motivation }
+  - type: textarea
+    id: risks
+    attributes: { label: Risks / tradeoffs }

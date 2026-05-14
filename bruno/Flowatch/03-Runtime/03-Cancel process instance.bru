@@ -1,0 +1,26 @@
+meta {
+  name: Cancel process instance
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/runtime/process-instances/{{instanceId}}?deleteReason={{deleteReason}}
+  body: none
+  auth: basic
+}
+
+params:query {
+  ~deleteReason: cancelled-via-bruno
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  instanceId: PASTE_AN_INSTANCE_ID
+}
+
+docs { Related: PRD FR-17. }

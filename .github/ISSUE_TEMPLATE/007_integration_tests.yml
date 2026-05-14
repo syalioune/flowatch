@@ -1,0 +1,34 @@
+name: "✅ Integration Tests"
+description: "Cross-module tests validating business rules"
+title: "[IT Tests]: "
+labels: ["area:tests", "state:backlog", "priority:medium"]
+body:
+  - type: input
+    id: parent
+    attributes:
+      label: Parent Story
+      placeholder: "#123"
+  - type: textarea
+    id: scenarios
+    attributes:
+      label: Scenario Matrix
+      placeholder: "List key scenarios with preconditions and assertions"
+  - type: checkboxes
+    id: ac_map
+    attributes:
+      label: Acceptance Criteria Mapping
+      options:
+        - label: AC1 implemented and tested
+        - label: AC2 implemented and tested
+        - label: AC3 implemented and tested
+        - label: AC4 implemented and tested
+        - label: AC5+ (tick all that apply)
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: Definition of Done
+      options:
+        - label: Test data fixtures deterministic and reusable
+        - label: Testcontainers or in-memory substitutes configured
+        - label: CI job added and green
+        - label: Reports uploaded (JUnit/coverage)

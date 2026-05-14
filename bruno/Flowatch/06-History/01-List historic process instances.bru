@@ -1,0 +1,24 @@
+meta {
+  name: List historic process instances
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/history/historic-process-instances?size=10&sort=startTime&order=desc
+  body: none
+  auth: basic
+}
+
+params:query {
+  size: 10
+  sort: startTime
+  order: desc
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs { Related: PRD FR-28. }
