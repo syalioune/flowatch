@@ -319,12 +319,9 @@ export const Sidebar = ({ active, onNav, connection, onConnClick, counts }: Side
             );
             if (ROUTED_VIEWS.has(it.id) && VIEW_TO_PATH[it.id]) {
               const to = VIEW_TO_PATH[it.id] as string;
-              // biome-ignore lint/suspicious/noExplicitAny: TanStack Router types
-              //   activeProps/inactiveProps against the generated route tree's
-              //   LinkProps; pass-through of data-attributes works at runtime
-              //   but the type doesn't allow them. Story 3.6 removes this cast.
+              // biome-ignore lint/suspicious/noExplicitAny: TanStack Router's LinkProps doesn't expose data-* pass-through; Story 3.6 cleanup.
               const activeProps = { "data-active": "1" } as any;
-              // biome-ignore lint/suspicious/noExplicitAny: same as above
+              // biome-ignore lint/suspicious/noExplicitAny: TanStack Router's LinkProps doesn't expose data-* pass-through; Story 3.6 cleanup.
               const inactiveProps = { "data-active": "0" } as any;
               return (
                 <Link

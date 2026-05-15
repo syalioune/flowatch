@@ -1,3 +1,4 @@
+import { useNavigate } from "@tanstack/react-router";
 import React from "react";
 import {
   api,
@@ -6,15 +7,13 @@ import {
   type FlowableProcessInstance,
 } from "./api";
 import { fmtDue, fmtTime, Icon, PageHead, toast } from "./components";
-import DATA from "./data";
+import DATA, { type EndpointHint } from "./data";
+import { ErrorBox } from "./lib/error-box";
+import { useApi } from "./lib/useApi";
 
-type RuntimeJob = Loose<FlowableJob>;
-type RuntimeInstance = Loose<FlowableProcessInstance>;
-
-interface StartProcessPayload {
-  businessKey?: string;
-  variables?: Array<{ name: string; type: string; value: unknown }>;
-}
+// Re-export ErrorBox at the original public path so tests that imported it
+// from "../../screens" (Story 2.2) continue to compile.
+export { ErrorBox };
 
 // The Flowable REST DTOs in src/api.ts are deliberately minimal — they cover
 // only the fields the type-checker can verify exist on every response. Some
@@ -24,47 +23,13 @@ interface StartProcessPayload {
 // `Loose<T>` at the use site. Cross-epic flag: see Dev Agent Record.
 type Loose<T> = T & Record<string, unknown>;
 
-// ── Generic data hook ──────────────────────────────────────────────
-// Calls `fn` on mount + when any dependency changes. Tracks loading,
-// data, and error state in one place so screens stay readable.
-interface UseApiResult<T> {
-  loading: boolean;
-  data: T | null;
-  error: Error | null;
-  reload: () => void;
-}
+type RuntimeJob = Loose<FlowableJob>;
+type RuntimeInstance = Loose<FlowableProcessInstance>;
 
-function useApi<T>(fn: () => Promise<T> | T, deps: unknown[] = []): UseApiResult<T> {
-  const [state, setState] = React.useState<{
-    loading: boolean;
-    data: T | null;
-    error: Error | null;
-  }>({
-    loading: true,
-    data: null,
-    error: null,
-  });
-  const [tick, setTick] = React.useState(0);
-  const reload = React.useCallback(() => setTick((n) => n + 1), []);
-  React.useEffect(() => {
-    let cancelled = false;
-    setState((s) => ({ ...s, loading: true, error: null }));
-    Promise.resolve(fn())
-      .then((data) => {
-        if (!cancelled) setState({ loading: false, data, error: null });
-      })
-      .catch((err: Error) => {
-        if (!cancelled) setState({ loading: false, data: null, error: err });
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...deps, tick]);
-  return { ...state, reload };
+interface StartProcessPayload {
+  businessKey?: string;
+  variables?: Array<{ name: string; type: string; value: unknown }>;
 }
-
-import type { EndpointHint } from "./data";
 
 interface ScreenProps {
   onOpenInspector?: ((e: EndpointHint) => void) | undefined;
@@ -76,22 +41,6 @@ interface TenantsScreenProps extends ScreenProps {
   tenants?: { id: string; name: string }[];
 }
 
-export interface ErrorBoxProps {
-  error: unknown;
-  onRetry?: (() => void) | undefined;
-}
-export const ErrorBox = ({ error, onRetry }: ErrorBoxProps) => (
-  <div className="empty" style={{ padding: 24, color: "var(--bad)" }}>
-    <div className="mono" style={{ fontSize: 12, marginBottom: 8 }}>
-      {String((error as { message?: string } | null)?.message || error)}
-    </div>
-    {onRetry && (
-      <button className="btn" data-size="sm" onClick={onRetry}>
-        Retry
-      </button>
-    )}
-  </div>
-);
 const EmptyRow = ({ cols, msg = "No records." }: { cols: number; msg?: string }) => (
   <tr>
     <td colSpan={cols} className="empty" style={{ padding: 24 }}>
@@ -365,6 +314,7 @@ export const Dashboard = ({ onOpenInspector, onNav }: NavScreenProps) => {
 
 // ── Deployments ───────────────────────────────────────────────────
 export const Deployments = ({ onOpenInspector }: ScreenProps) => {
+  const navigate = useNavigate();
   const [filter, setFilter] = React.useState("");
   const deployments = useApi(
     () => api.listDeployments({ size: 200, sort: "deployTime", order: "desc" }),
@@ -382,6 +332,7 @@ export const Deployments = ({ onOpenInspector }: ScreenProps) => {
     await api.deleteDeployment(id, true);
     deployments.reload();
   };
+  const openDetail = (id: string) => navigate({ to: "/deployments/$id", params: { id } });
   return (
     <div className="page">
       <PageHead
@@ -432,7 +383,15 @@ export const Deployments = ({ onOpenInspector }: ScreenProps) => {
               <EmptyRow cols={6} msg="No deployments match." />
             )}
             {rows.map((d) => (
-              <tr key={d.id}>
+              <tr
+                key={d.id}
+                style={{ cursor: "pointer" }}
+                tabIndex={0}
+                onClick={() => openDetail(d.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") openDetail(d.id);
+                }}
+              >
                 <td>
                   <b style={{ fontWeight: 500 }}>{d.name || "—"}</b>
                 </td>
@@ -450,10 +409,14 @@ export const Deployments = ({ onOpenInspector }: ScreenProps) => {
                 <td className="mute mono">{fmtTime(d.deploymentTime)}</td>
                 <td>
                   <button
+                    type="button"
                     className="btn"
                     data-size="sm"
                     data-variant="ghost"
-                    onClick={() => remove(d.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      remove(d.id);
+                    }}
                     title="Delete (cascade)"
                   >
                     ×
@@ -470,11 +433,13 @@ export const Deployments = ({ onOpenInspector }: ScreenProps) => {
 
 // ── Process Definitions ─────────────────────────────────────────
 export const ProcessDefinitions = ({ onOpenInspector, onNav }: NavScreenProps) => {
+  const navigate = useNavigate();
   const [showSuspended, setShowSuspended] = React.useState(true);
   const [startingId, setStartingId] = React.useState<string | null>(null);
   const [startDialog, setStartDialog] = React.useState<FlowableProcessDefinition | null>(null);
   const definitions = useApi(() => api.listProcessDefinitions({ size: 200, sort: "name" }), []);
   const rows = (definitions.data?.data || []).filter((d) => showSuspended || !d.suspended);
+  const openDetail = (id: string) => navigate({ to: "/definitions/$id", params: { id } });
 
   const toggle = async (d: FlowableProcessDefinition) => {
     await api.suspendProcessDefinition(d.id, !d.suspended);
@@ -548,7 +513,15 @@ export const ProcessDefinitions = ({ onOpenInspector, onNav }: NavScreenProps) =
               <EmptyRow cols={7} msg="No process definitions." />
             )}
             {rows.map((d) => (
-              <tr key={d.id}>
+              <tr
+                key={d.id}
+                style={{ cursor: "pointer" }}
+                tabIndex={0}
+                onClick={() => openDetail(d.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") openDetail(d.id);
+                }}
+              >
                 <td>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <Icon name="bpmn" size={14} />
@@ -576,19 +549,27 @@ export const ProcessDefinitions = ({ onOpenInspector, onNav }: NavScreenProps) =
                 <td>
                   <div style={{ display: "flex", gap: 6 }}>
                     <button
+                      type="button"
                       className="btn"
                       data-size="sm"
                       disabled={startingId === d.id}
-                      onClick={() => setStartDialog(d)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setStartDialog(d);
+                      }}
                     >
                       <Icon name="play" size={11} />
                       {startingId === d.id ? "Starting…" : "Start"}
                     </button>
                     <button
+                      type="button"
                       className="btn"
                       data-size="sm"
                       data-variant="ghost"
-                      onClick={() => toggle(d)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggle(d);
+                      }}
                     >
                       {d.suspended ? "Activate" : "Suspend"}
                     </button>

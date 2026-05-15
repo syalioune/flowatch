@@ -214,8 +214,13 @@ interface ModelerProps {
   onOpenInspector?: (e: { method: string; path: string; desc: string }) => void;
 }
 
+interface BpmnModelerProps extends ModelerProps {
+  /** Deep-link: pre-select this definition and trigger its XML load on mount. */
+  initialDefinitionId?: string | undefined;
+}
+
 // ─── BPMN modeler (real bpmn-js) ───────────────────────────────────
-export const BpmnModeler = ({ onOpenInspector }: ModelerProps) => {
+export const BpmnModeler = ({ onOpenInspector, initialDefinitionId }: BpmnModelerProps) => {
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const modelerRef = React.useRef<AnyModeler | null>(null);
   const [selected, setSelected] = React.useState<AnyEl | null>(null);
@@ -228,13 +233,29 @@ export const BpmnModeler = ({ onOpenInspector }: ModelerProps) => {
   const [filename, setFilename] = React.useState("loan-approval.bpmn20.xml");
   const eps = DATA.endpoints.bpmnModeler;
 
-  // Load list of deployed process definitions for the loader dropdown
+  // Load list of deployed process definitions for the loader dropdown.
   React.useEffect(() => {
     api
       .listProcessDefinitions({ size: 200, sort: "name" })
       .then((r) => setDefinitions(r.data || []))
       .catch(() => setDefinitions([]));
   }, []);
+
+  // Deep-link: if initialDefinitionId was provided (/bpmn?defId=...), load it
+  // once the modeler is ready. Defer until both the definitions list AND the
+  // modeler instance are present.
+  const loadInvokedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (loadInvokedRef.current) return;
+    if (!initialDefinitionId) return;
+    if (!modelerRef.current) return;
+    if (definitions.length === 0) return;
+    loadInvokedRef.current = true;
+    loadDefinition(initialDefinitionId);
+    // loadDefinition is defined further down — exhaustive-deps would create a
+    // cycle, so we intentionally omit it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDefinitionId, definitions]);
 
   React.useEffect(() => {
     let m: AnyModeler;

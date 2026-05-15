@@ -12,6 +12,10 @@ import { Route as rootRouteImport } from "./routes/__root"
 import { Route as DmnRouteImport } from "./routes/dmn"
 import { Route as BpmnRouteImport } from "./routes/bpmn"
 import { Route as IndexRouteImport } from "./routes/index"
+import { Route as DeploymentsIndexRouteImport } from "./routes/deployments/index"
+import { Route as DefinitionsIndexRouteImport } from "./routes/definitions/index"
+import { Route as DeploymentsIdRouteImport } from "./routes/deployments/$id"
+import { Route as DefinitionsIdRouteImport } from "./routes/definitions/$id"
 
 const DmnRoute = DmnRouteImport.update({
   id: "/dmn",
@@ -28,35 +32,93 @@ const IndexRoute = IndexRouteImport.update({
   path: "/",
   getParentRoute: () => rootRouteImport,
 } as any)
+const DeploymentsIndexRoute = DeploymentsIndexRouteImport.update({
+  id: "/deployments/",
+  path: "/deployments/",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DefinitionsIndexRoute = DefinitionsIndexRouteImport.update({
+  id: "/definitions/",
+  path: "/definitions/",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeploymentsIdRoute = DeploymentsIdRouteImport.update({
+  id: "/deployments/$id",
+  path: "/deployments/$id",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DefinitionsIdRoute = DefinitionsIdRouteImport.update({
+  id: "/definitions/$id",
+  path: "/definitions/$id",
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
+  "/definitions/$id": typeof DefinitionsIdRoute
+  "/deployments/$id": typeof DeploymentsIdRoute
+  "/definitions/": typeof DefinitionsIndexRoute
+  "/deployments/": typeof DeploymentsIndexRoute
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
+  "/definitions/$id": typeof DefinitionsIdRoute
+  "/deployments/$id": typeof DeploymentsIdRoute
+  "/definitions": typeof DefinitionsIndexRoute
+  "/deployments": typeof DeploymentsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   "/": typeof IndexRoute
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
+  "/definitions/$id": typeof DefinitionsIdRoute
+  "/deployments/$id": typeof DeploymentsIdRoute
+  "/definitions/": typeof DefinitionsIndexRoute
+  "/deployments/": typeof DeploymentsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: "/" | "/bpmn" | "/dmn"
+  fullPaths:
+    | "/"
+    | "/bpmn"
+    | "/dmn"
+    | "/definitions/$id"
+    | "/deployments/$id"
+    | "/definitions/"
+    | "/deployments/"
   fileRoutesByTo: FileRoutesByTo
-  to: "/" | "/bpmn" | "/dmn"
-  id: "__root__" | "/" | "/bpmn" | "/dmn"
+  to:
+    | "/"
+    | "/bpmn"
+    | "/dmn"
+    | "/definitions/$id"
+    | "/deployments/$id"
+    | "/definitions"
+    | "/deployments"
+  id:
+    | "__root__"
+    | "/"
+    | "/bpmn"
+    | "/dmn"
+    | "/definitions/$id"
+    | "/deployments/$id"
+    | "/definitions/"
+    | "/deployments/"
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BpmnRoute: typeof BpmnRoute
   DmnRoute: typeof DmnRoute
+  DefinitionsIdRoute: typeof DefinitionsIdRoute
+  DeploymentsIdRoute: typeof DeploymentsIdRoute
+  DefinitionsIndexRoute: typeof DefinitionsIndexRoute
+  DeploymentsIndexRoute: typeof DeploymentsIndexRoute
 }
 
 declare module "@tanstack/react-router" {
@@ -82,6 +144,34 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    "/deployments/": {
+      id: "/deployments/"
+      path: "/deployments"
+      fullPath: "/deployments/"
+      preLoaderRoute: typeof DeploymentsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/definitions/": {
+      id: "/definitions/"
+      path: "/definitions"
+      fullPath: "/definitions/"
+      preLoaderRoute: typeof DefinitionsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/deployments/$id": {
+      id: "/deployments/$id"
+      path: "/deployments/$id"
+      fullPath: "/deployments/$id"
+      preLoaderRoute: typeof DeploymentsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/definitions/$id": {
+      id: "/definitions/$id"
+      path: "/definitions/$id"
+      fullPath: "/definitions/$id"
+      preLoaderRoute: typeof DefinitionsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +179,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BpmnRoute: BpmnRoute,
   DmnRoute: DmnRoute,
+  DefinitionsIdRoute: DefinitionsIdRoute,
+  DeploymentsIdRoute: DeploymentsIdRoute,
+  DefinitionsIndexRoute: DefinitionsIndexRoute,
+  DeploymentsIndexRoute: DeploymentsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
