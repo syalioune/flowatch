@@ -1,8 +1,30 @@
 import React from "react";
-import { API_LOG, api } from "./api";
+import { API_LOG, type ApiLogEntry, api, type FlowableConfig } from "./api";
+import type { EndpointHint } from "./data";
 
-export const Icon = ({ name, size = 14 }) => {
-  const paths = {
+interface ApiLogEvent extends CustomEvent<ApiLogEntry> {}
+interface AppToastEvent
+  extends CustomEvent<{
+    kind?: string;
+    text: string;
+    sub?: string;
+    ttl?: number;
+    action?: { label: string; onClick: () => void };
+  }> {}
+declare global {
+  interface WindowEventMap {
+    "api:log": ApiLogEvent;
+    "app:toast": AppToastEvent;
+  }
+}
+
+interface IconProps {
+  name: string;
+  size?: number;
+}
+
+export const Icon = ({ name, size = 14 }: IconProps) => {
+  const paths: Record<string, React.ReactNode> = {
     dashboard: (
       <>
         <rect x="3" y="3" width="7" height="9" rx="1.5" />
@@ -197,7 +219,13 @@ const Logo = () => (
   </div>
 );
 
-export const EndpointChip = ({ method, path, onClick }) => (
+interface EndpointChipProps {
+  method: string;
+  path: string;
+  onClick?: () => void;
+}
+
+export const EndpointChip = ({ method, path, onClick }: EndpointChipProps) => (
   <button className="ep-chip" onClick={onClick} title={`${method} ${path}`}>
     <span className="ep-method" data-m={method}>
       {method}
@@ -206,7 +234,12 @@ export const EndpointChip = ({ method, path, onClick }) => (
   </button>
 );
 
-export const EndpointRow = ({ items, onOpenInspector }) => (
+interface EndpointRowProps {
+  items: EndpointHint[];
+  onOpenInspector?: ((e: EndpointHint) => void) | undefined;
+}
+
+export const EndpointRow = ({ items, onOpenInspector }: EndpointRowProps) => (
   <div className="ep-chip-row">
     {items.map((e, i) => (
       <EndpointChip
@@ -253,7 +286,20 @@ const NAV = [
   },
 ];
 
-export const Sidebar = ({ active, onNav, connection, onConnClick, counts }) => (
+interface ConnectionState {
+  state: "pending" | "ok" | "err";
+  host: string;
+}
+
+interface SidebarProps {
+  active: string;
+  onNav: (id: string) => void;
+  connection: ConnectionState;
+  onConnClick: () => void;
+  counts?: Record<string, number | null | undefined>;
+}
+
+export const Sidebar = ({ active, onNav, connection, onConnClick, counts }: SidebarProps) => (
   <aside className="sidebar">
     <Logo />
     <nav className="nav">
@@ -288,6 +334,23 @@ export const Sidebar = ({ active, onNav, connection, onConnClick, counts }) => (
   </aside>
 );
 
+interface Tenant {
+  id: string;
+  name: string;
+}
+
+interface TopbarProps {
+  tenant: Tenant;
+  tenants?: Tenant[];
+  onTenant: () => void;
+  theme: "light" | "dark";
+  onTheme: (v: "light" | "dark") => void;
+  onInspector: () => void;
+  inspectorOpen: boolean;
+  onSettings: () => void;
+  onTweaks: () => void;
+}
+
 export const Topbar = ({
   tenant,
   onTenant,
@@ -297,7 +360,7 @@ export const Topbar = ({
   inspectorOpen,
   onSettings,
   onTweaks,
-}) => (
+}: TopbarProps) => (
   <div className="topbar">
     <div className="tenant-switch" onClick={onTenant}>
       <Icon name="tenant" size={13} />
@@ -343,10 +406,17 @@ export const Topbar = ({
   </div>
 );
 
-export const SettingsModal = ({ open, onClose }) => {
-  const [cfg, setCfg] = React.useState(api.config());
+interface SettingsModalProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+type PingResult = { ok: true; name?: string; version?: string } | { ok: false; error: string };
+
+export const SettingsModal = ({ open, onClose }: SettingsModalProps) => {
+  const [cfg, setCfg] = React.useState<FlowableConfig>(api.config());
   const [pinging, setPinging] = React.useState(false);
-  const [pingRes, setPingRes] = React.useState(null);
+  const [pingRes, setPingRes] = React.useState<PingResult | null>(null);
   if (!open) return null;
   const save = () => {
     api.setConfig(cfg);
@@ -360,7 +430,7 @@ export const SettingsModal = ({ open, onClose }) => {
       const r = await api.ping();
       setPingRes({ ok: true, name: r?.name, version: r?.version });
     } catch (e) {
-      setPingRes({ ok: false, error: String(e.message || e) });
+      setPingRes({ ok: false, error: String((e as Error)?.message || e) });
     } finally {
       setPinging(false);
     }
@@ -448,7 +518,7 @@ export const SettingsModal = ({ open, onClose }) => {
   );
 };
 
-const buildFetchSnippet = (cfg, ep) => {
+const buildFetchSnippet = (cfg: FlowableConfig, ep: EndpointHint): string => {
   const u = `${cfg.baseUrl.replace(/\/$/, "")}${ep.path}`;
   return `// ${ep.desc || ""}
 const auth = btoa("${cfg.username}:••••");
@@ -475,7 +545,7 @@ const res = await fetch(
 const data = await res.json();`;
 };
 
-const buildCurlSnippet = (cfg, ep) => {
+const buildCurlSnippet = (cfg: FlowableConfig, ep: EndpointHint): string => {
   const u = `${cfg.baseUrl.replace(/\/$/, "")}${ep.path}`;
   return `curl -u ${cfg.username}:•••• \\
   -X ${ep.method} \\
@@ -483,15 +553,35 @@ const buildCurlSnippet = (cfg, ep) => {
   "${u}"`;
 };
 
-export const ApiInspector = ({ open, onClose, screenEndpoints, screenTitle }) => {
-  const [log, setLog] = React.useState([...API_LOG]);
-  const [tab, setTab] = React.useState("endpoints");
-  const [snippet, setSnippet] = React.useState("fetch");
+interface ApiInspectorProps {
+  open: boolean;
+  onClose: () => void;
+  screenEndpoints?: EndpointHint[];
+  screenTitle: string;
+}
+
+type InspectorResult =
+  | { ok: true; status: number | undefined; ms: number | undefined; data: unknown }
+  | { ok: false; status: number | undefined; ms: number | undefined; error: string };
+
+export const ApiInspector = ({
+  open,
+  onClose,
+  screenEndpoints,
+  screenTitle,
+}: ApiInspectorProps) => {
+  const [log, setLog] = React.useState<ApiLogEntry[]>([...API_LOG]);
+  const [tab, setTab] = React.useState<"endpoints" | "calls">("endpoints");
+  const [snippet, setSnippet] = React.useState<"fetch" | "curl">("fetch");
   const [running, setRunning] = React.useState(false);
-  const [result, setResult] = React.useState(null);
+  const [result, setResult] = React.useState<InspectorResult | null>(null);
   const cfg = api.config();
-  const firstEp = (screenEndpoints || [{ method: "GET", path: "/", desc: "" }])[0];
-  const [tryPath, setTryPath] = React.useState(firstEp.path);
+  const firstEp: EndpointHint = (screenEndpoints && screenEndpoints[0]) || {
+    method: "GET",
+    path: "/",
+    desc: "",
+  };
+  const [tryPath, setTryPath] = React.useState<string>(firstEp.path);
 
   React.useEffect(() => {
     setTryPath(firstEp.path);
@@ -513,13 +603,18 @@ export const ApiInspector = ({ open, onClose, screenEndpoints, screenTitle }) =>
       setResult({ ok: true, status: last?.status, ms: last?.ms, data });
     } catch (e) {
       const last = API_LOG[0];
-      setResult({ ok: false, status: last?.status, ms: last?.ms, error: String(e.message || e) });
+      setResult({
+        ok: false,
+        status: last?.status,
+        ms: last?.ms,
+        error: String((e as Error)?.message || e),
+      });
     } finally {
       setRunning(false);
     }
   };
 
-  const previewBody = (d) => {
+  const previewBody = (d: unknown): string => {
     if (d == null) return "";
     if (typeof d === "string") return d.slice(0, 4000);
     try {
@@ -529,7 +624,7 @@ export const ApiInspector = ({ open, onClose, screenEndpoints, screenTitle }) =>
     }
   };
 
-  const bucket = (s) => {
+  const bucket = (s: number | undefined): string => {
     if (!s) return "err";
     if (s >= 200 && s < 300) return "2xx";
     if (s >= 400 && s < 500) return "4xx";
@@ -649,9 +744,9 @@ export const ApiInspector = ({ open, onClose, screenEndpoints, screenTitle }) =>
                     data-s={
                       result.ok
                         ? "2xx"
-                        : result.status >= 500
+                        : (result.status ?? 0) >= 500
                           ? "5xx"
-                          : result.status >= 400
+                          : (result.status ?? 0) >= 400
                             ? "4xx"
                             : "err"
                     }
@@ -706,7 +801,21 @@ export const ApiInspector = ({ open, onClose, screenEndpoints, screenTitle }) =>
   );
 };
 
-export const PageHead = ({ title, subtitle, endpoints, actions, onOpenInspector }) => (
+interface PageHeadProps {
+  title: string;
+  subtitle?: React.ReactNode;
+  endpoints?: EndpointHint[];
+  actions?: React.ReactNode;
+  onOpenInspector?: ((e: EndpointHint) => void) | undefined;
+}
+
+export const PageHead = ({
+  title,
+  subtitle,
+  endpoints,
+  actions,
+  onOpenInspector,
+}: PageHeadProps) => (
   <div className="page-head">
     <div>
       <h1 className="page-title">{title}</h1>
@@ -721,23 +830,35 @@ export const PageHead = ({ title, subtitle, endpoints, actions, onOpenInspector 
   </div>
 );
 
-export const toast = (detail) => {
+interface ToastDetail {
+  kind?: string;
+  text: string;
+  sub?: string;
+  ttl?: number;
+  action?: { label: string; onClick: () => void };
+}
+
+interface ToastItem extends ToastDetail {
+  id: string;
+}
+
+export const toast = (detail: ToastDetail) => {
   window.dispatchEvent(new CustomEvent("app:toast", { detail }));
 };
 
 export const Toaster = () => {
-  const [items, setItems] = React.useState([]);
+  const [items, setItems] = React.useState<ToastItem[]>([]);
   React.useEffect(() => {
-    const onToast = (e) => {
+    const onToast = (e: AppToastEvent) => {
       const id = Math.random().toString(36).slice(2);
-      const t = { id, kind: "info", ttl: 4000, ...e.detail };
+      const t: ToastItem = { id, kind: "info", ttl: 4000, ...e.detail };
       setItems((xs) => [...xs, t]);
       setTimeout(() => setItems((xs) => xs.filter((x) => x.id !== id)), t.ttl);
     };
     window.addEventListener("app:toast", onToast);
     return () => window.removeEventListener("app:toast", onToast);
   }, []);
-  const dismiss = (id) => setItems((xs) => xs.filter((x) => x.id !== id));
+  const dismiss = (id: string) => setItems((xs) => xs.filter((x) => x.id !== id));
   return (
     <div className="toaster">
       {items.map((t) => (
@@ -752,7 +873,7 @@ export const Toaster = () => {
               data-size="sm"
               data-variant="ghost"
               onClick={() => {
-                t.action.onClick();
+                t.action?.onClick();
                 dismiss(t.id);
               }}
             >
@@ -768,7 +889,7 @@ export const Toaster = () => {
   );
 };
 
-export const fmtTime = (iso) => {
+export const fmtTime = (iso: string | null | undefined): string => {
   if (!iso) return "—";
   const d = new Date(iso);
   const diff = (Date.now() - d.getTime()) / 1000;
@@ -778,7 +899,7 @@ export const fmtTime = (iso) => {
   return `${Math.round(diff / 86400)}d ago`;
 };
 
-export const fmtDue = (iso) => {
+export const fmtDue = (iso: string | null | undefined): string => {
   if (iso == null) return "—";
   const d = new Date(iso);
   const diff = (d.getTime() - Date.now()) / 1000;

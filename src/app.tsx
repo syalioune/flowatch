@@ -1,8 +1,8 @@
 import React from "react";
 import { api } from "./api";
-import { ApiInspector, SettingsModal, Sidebar, Toaster, Topbar } from "./components.jsx";
-import DATA from "./data.js";
-import { BpmnModeler, DmnModeler } from "./modeler.jsx";
+import { ApiInspector, SettingsModal, Sidebar, Toaster, Topbar } from "./components";
+import DATA from "./data";
+import { BpmnModeler, DmnModeler } from "./modeler";
 import {
   Dashboard,
   Deployments,
@@ -13,7 +13,7 @@ import {
   ProcessInstances,
   Tasks,
   Tenants,
-} from "./screens.jsx";
+} from "./screens";
 import {
   TweakButton,
   TweakRadio,
@@ -21,7 +21,7 @@ import {
   TweakSelect,
   TweaksPanel,
   useTweaks,
-} from "./tweaks-panel.jsx";
+} from "./tweaks-panel";
 
 const TWEAK_DEFAULTS = {
   look: "editorial",
@@ -66,24 +66,55 @@ const VIEW_TITLE = {
   tenants: "Tenants",
 };
 
-const DEFAULT_TENANT = { id: "", name: "All tenants" };
+type ViewKey =
+  | "dashboard"
+  | "bpmn"
+  | "dmn"
+  | "deployments"
+  | "definitions"
+  | "instances"
+  | "jobs"
+  | "tasks"
+  | "history"
+  | "identity"
+  | "tenants";
+
+interface Tenant {
+  id: string;
+  name: string;
+}
+interface AppConnectionState {
+  state: "pending" | "ok" | "err";
+  host: string;
+}
+
+const DEFAULT_TENANT: Tenant = { id: "", name: "All tenants" };
 
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const [view, setView] = React.useState("dashboard");
+  const [view, setView] = React.useState<ViewKey>("dashboard");
+  const navTo = React.useCallback((v: string) => setView(v as ViewKey), []);
   const [inspectorOpen, setInspectorOpen] = React.useState(false);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
-  const [tenants, setTenants] = React.useState([DEFAULT_TENANT]);
-  const [tenant, setTenant] = React.useState(DEFAULT_TENANT);
-  const [conn, setConn] = React.useState({ state: "pending", host: "connecting…" });
-  const [navCounts, setNavCounts] = React.useState({});
+  const [tenants, setTenants] = React.useState<Tenant[]>([DEFAULT_TENANT]);
+  const [tenant, setTenant] = React.useState<Tenant>(DEFAULT_TENANT);
+  const [conn, setConn] = React.useState<AppConnectionState>({
+    state: "pending",
+    host: "connecting…",
+  });
+  const [navCounts, setNavCounts] = React.useState<Record<string, number | null>>({});
 
   React.useEffect(() => {
-    document.documentElement.dataset.look = t.look;
-    document.documentElement.dataset.theme = t.theme;
-    document.documentElement.dataset.density = t.density;
-    const a = ACCENT_PALETTES[t.accent];
-    if (a && a.hue !== null) {
+    document.documentElement.dataset.look = t.look as string;
+    document.documentElement.dataset.theme = t.theme as string;
+    document.documentElement.dataset.density = t.density as string;
+    const a = (
+      ACCENT_PALETTES as Record<
+        string,
+        { name: string; hue?: null } | { name: string; light: string; dark: string }
+      >
+    )[t.accent as string];
+    if (a && "light" in a) {
       const c = t.theme === "dark" ? a.dark : a.light;
       document.documentElement.style.setProperty("--accent", c);
     } else {
@@ -101,7 +132,7 @@ function App() {
           state: "ok",
           host: `${host} · ${r?.name || "engine"} ${r?.version || ""}`.trim(),
         });
-      } catch (e) {
+      } catch (_e) {
         setConn({ state: "err", host: `${host} · unreachable` });
       }
       try {
@@ -132,7 +163,7 @@ function App() {
 
   // Ctrl+Shift+T keyboard shortcut for TweaksPanel
   React.useEffect(() => {
-    const handler = (e) => {
+    const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key === "T") {
         e.preventDefault();
         window.postMessage({ type: "__activate_edit_mode" }, window.origin);
@@ -154,17 +185,24 @@ function App() {
     if (tenants.length <= 1) return;
     const i = tenants.findIndex((x) => x.id === tenant.id);
     const next = tenants[(i + 1) % tenants.length];
+    if (!next) return;
     setTenant(next);
     api.setConfig({ tenantId: next.id });
   };
 
-  const endpoints = (ENDPOINT_BY_VIEW[view] || (() => []))();
-  const screenTitle = VIEW_TITLE[view] || view;
+  const endpointFn = (
+    ENDPOINT_BY_VIEW as Record<
+      string,
+      (() => ReturnType<typeof DATA.endpoints.dashboard.slice>) | undefined
+    >
+  )[view];
+  const endpoints = (endpointFn || (() => []))();
+  const screenTitle = (VIEW_TITLE as Record<string, string>)[view] || view;
 
   let Screen = null;
   switch (view) {
     case "dashboard":
-      Screen = <Dashboard onNav={setView} onOpenInspector={openInspector} />;
+      Screen = <Dashboard onNav={navTo} onOpenInspector={openInspector} />;
       break;
     case "bpmn":
       Screen = <BpmnModeler onOpenInspector={openInspector} />;
@@ -176,7 +214,7 @@ function App() {
       Screen = <Deployments onOpenInspector={openInspector} />;
       break;
     case "definitions":
-      Screen = <ProcessDefinitions onOpenInspector={openInspector} onNav={setView} />;
+      Screen = <ProcessDefinitions onOpenInspector={openInspector} onNav={navTo} />;
       break;
     case "instances":
       Screen = <ProcessInstances onOpenInspector={openInspector} />;
@@ -197,14 +235,14 @@ function App() {
       Screen = <Tenants onOpenInspector={openInspector} tenants={tenants.filter((x) => x.id)} />;
       break;
     default:
-      Screen = <Dashboard onNav={setView} onOpenInspector={openInspector} />;
+      Screen = <Dashboard onNav={navTo} onOpenInspector={openInspector} />;
   }
 
   return (
     <div className="app">
       <Sidebar
         active={view}
-        onNav={setView}
+        onNav={navTo}
         connection={conn}
         counts={navCounts}
         onConnClick={() => setSettingsOpen(true)}
@@ -213,7 +251,7 @@ function App() {
         tenant={tenant}
         tenants={tenants}
         onTenant={cycleTenant}
-        theme={t.theme}
+        theme={t.theme as "light" | "dark"}
         onTheme={(v) => setTweak("theme", v)}
         onInspector={() => setInspectorOpen(!inspectorOpen)}
         inspectorOpen={inspectorOpen}
@@ -280,7 +318,7 @@ function App() {
                 key={k}
                 className="seg-btn"
                 data-on={view === k ? "1" : "0"}
-                onClick={() => setView(k)}
+                onClick={() => setView(k as ViewKey)}
                 style={{ fontSize: 11, padding: "5px 8px" }}
               >
                 {v}

@@ -1,13 +1,49 @@
 import React from "react";
-import { api } from "./api";
-import { fmtDue, fmtTime, Icon, PageHead, toast } from "./components.jsx";
-import DATA from "./data.js";
+import {
+  api,
+  type FlowableJob,
+  type FlowableProcessDefinition,
+  type FlowableProcessInstance,
+} from "./api";
+import { fmtDue, fmtTime, Icon, PageHead, toast } from "./components";
+import DATA from "./data";
+
+type RuntimeJob = Loose<FlowableJob>;
+type RuntimeInstance = Loose<FlowableProcessInstance>;
+
+interface StartProcessPayload {
+  businessKey?: string;
+  variables?: Array<{ name: string; type: string; value: unknown }>;
+}
+
+// The Flowable REST DTOs in src/api.ts are deliberately minimal — they cover
+// only the fields the type-checker can verify exist on every response. Some
+// screens consume additional fields (e.g. processDefinitionName, activityId,
+// jobType, elementId) that Flowable returns but api.ts doesn't declare. To
+// avoid widening api.ts (which is Story 1.1's domain), we cast inline to
+// `Loose<T>` at the use site. Cross-epic flag: see Dev Agent Record.
+type Loose<T> = T & Record<string, unknown>;
 
 // ── Generic data hook ──────────────────────────────────────────────
 // Calls `fn` on mount + when any dependency changes. Tracks loading,
 // data, and error state in one place so screens stay readable.
-function useApi(fn, deps = []) {
-  const [state, setState] = React.useState({ loading: true, data: null, error: null });
+interface UseApiResult<T> {
+  loading: boolean;
+  data: T | null;
+  error: Error | null;
+  reload: () => void;
+}
+
+function useApi<T>(fn: () => Promise<T> | T, deps: unknown[] = []): UseApiResult<T> {
+  const [state, setState] = React.useState<{
+    loading: boolean;
+    data: T | null;
+    error: Error | null;
+  }>({
+    loading: true,
+    data: null,
+    error: null,
+  });
   const [tick, setTick] = React.useState(0);
   const reload = React.useCallback(() => setTick((n) => n + 1), []);
   React.useEffect(() => {
@@ -17,7 +53,7 @@ function useApi(fn, deps = []) {
       .then((data) => {
         if (!cancelled) setState({ loading: false, data, error: null });
       })
-      .catch((err) => {
+      .catch((err: Error) => {
         if (!cancelled) setState({ loading: false, data: null, error: err });
       });
     return () => {
@@ -28,10 +64,26 @@ function useApi(fn, deps = []) {
   return { ...state, reload };
 }
 
-const ErrorBox = ({ error, onRetry }) => (
+import type { EndpointHint } from "./data";
+
+interface ScreenProps {
+  onOpenInspector?: ((e: EndpointHint) => void) | undefined;
+}
+interface NavScreenProps extends ScreenProps {
+  onNav: (view: string) => void;
+}
+interface TenantsScreenProps extends ScreenProps {
+  tenants?: { id: string; name: string }[];
+}
+
+interface ErrorBoxProps {
+  error: unknown;
+  onRetry?: (() => void) | undefined;
+}
+const ErrorBox = ({ error, onRetry }: ErrorBoxProps) => (
   <div className="empty" style={{ padding: 24, color: "var(--bad)" }}>
     <div className="mono" style={{ fontSize: 12, marginBottom: 8 }}>
-      {String(error?.message || error)}
+      {String((error as { message?: string } | null)?.message || error)}
     </div>
     {onRetry && (
       <button className="btn" data-size="sm" onClick={onRetry}>
@@ -40,7 +92,7 @@ const ErrorBox = ({ error, onRetry }) => (
     )}
   </div>
 );
-const EmptyRow = ({ cols, msg = "No records." }) => (
+const EmptyRow = ({ cols, msg = "No records." }: { cols: number; msg?: string }) => (
   <tr>
     <td colSpan={cols} className="empty" style={{ padding: 24 }}>
       {msg}
@@ -48,7 +100,7 @@ const EmptyRow = ({ cols, msg = "No records." }) => (
   </tr>
 );
 
-const fmtMs = (ms) => {
+const fmtMs = (ms: number | null | undefined): string => {
   if (ms == null) return "—";
   const s = ms / 1000;
   if (s < 1) return `${ms}ms`;
@@ -60,10 +112,11 @@ const fmtMs = (ms) => {
   return `${(h / 24).toFixed(1)}d`;
 };
 
-const stateOf = (pi) => (pi.suspended ? "suspended" : pi.ended ? "ended" : "active");
+const stateOf = (pi: { suspended?: boolean; ended?: boolean }): string =>
+  pi.suspended ? "suspended" : pi.ended ? "ended" : "active";
 
 // ── Dashboard ────────────────────────────────────────────────────────
-export const Dashboard = ({ onOpenInspector, onNav }) => {
+export const Dashboard = ({ onOpenInspector, onNav }: NavScreenProps) => {
   const eps = DATA.endpoints.dashboard;
   const instances = useApi(
     () => api.listProcessInstances({ size: 8, sort: "startTime", order: "desc" }),
@@ -160,20 +213,26 @@ export const Dashboard = ({ onOpenInspector, onNav }) => {
                   (instances.data?.data || []).length === 0 && (
                     <EmptyRow cols={5} msg="No running instances." />
                   )}
-                {(instances.data?.data || []).slice(0, 6).map((p) => (
-                  <tr key={p.id}>
-                    <td className="mono">{p.businessKey || p.id}</td>
-                    <td>{p.processDefinitionName || p.processDefinitionKey}</td>
-                    <td className="soft">{p.activityId || "—"}</td>
-                    <td className="mute mono">{fmtTime(p.startTime)}</td>
-                    <td>
-                      <span className="badge" data-tone={stateOf(p) === "active" ? "ok" : "warn"}>
-                        <span className="dot" />
-                        {stateOf(p)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {(instances.data?.data || []).slice(0, 6).map((p0) => {
+                  const p = p0 as Loose<typeof p0>;
+                  return (
+                    <tr key={p0.id}>
+                      <td className="mono">{p0.businessKey || p0.id}</td>
+                      <td>{(p.processDefinitionName as string) || p0.processDefinitionKey}</td>
+                      <td className="soft">{(p.activityId as string) || "—"}</td>
+                      <td className="mute mono">{fmtTime(p0.startTime)}</td>
+                      <td>
+                        <span
+                          className="badge"
+                          data-tone={stateOf(p0) === "active" ? "ok" : "warn"}
+                        >
+                          <span className="dot" />
+                          {stateOf(p0)}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -197,7 +256,7 @@ export const Dashboard = ({ onOpenInspector, onNav }) => {
             )}
             {failingJobs.error && <ErrorBox error={failingJobs.error} />}
             {failingJobs.data &&
-              (failingJobs.data.data || []).map((j) => (
+              ((failingJobs.data.data || []) as RuntimeJob[]).map((j) => (
                 <div
                   key={j.id}
                   style={{ padding: "12px 14px", borderBottom: "1px solid var(--line)" }}
@@ -205,7 +264,7 @@ export const Dashboard = ({ onOpenInspector, onNav }) => {
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span className="badge" data-tone="bad">
                       <span className="dot" />
-                      {j.jobType || "job"}
+                      {(j.jobType as string | undefined) || "job"}
                     </span>
                     <span className="mono" style={{ fontSize: 11.5, color: "var(--fg-mute)" }}>
                       {j.id}
@@ -221,7 +280,8 @@ export const Dashboard = ({ onOpenInspector, onNav }) => {
                     className="mono"
                     style={{ fontSize: 10.5, marginTop: 4, color: "var(--fg-mute)" }}
                   >
-                    {j.elementId ? `${j.elementId} · ` : ""}pi:{j.processInstanceId || "—"}
+                    {j.elementId ? `${j.elementId as string} · ` : ""}pi:
+                    {j.processInstanceId || "—"}
                   </div>
                   <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                     <button
@@ -304,7 +364,7 @@ export const Dashboard = ({ onOpenInspector, onNav }) => {
 };
 
 // ── Deployments ───────────────────────────────────────────────────
-export const Deployments = ({ onOpenInspector }) => {
+export const Deployments = ({ onOpenInspector }: ScreenProps) => {
   const [filter, setFilter] = React.useState("");
   const deployments = useApi(
     () => api.listDeployments({ size: 200, sort: "deployTime", order: "desc" }),
@@ -317,7 +377,7 @@ export const Deployments = ({ onOpenInspector }) => {
       (d.category || "").toLowerCase().includes(filter.toLowerCase()) ||
       (d.tenantId || "").toLowerCase().includes(filter.toLowerCase()),
   );
-  const remove = async (id) => {
+  const remove = async (id: string) => {
     if (!confirm("Delete deployment? Cascading will remove instances too.")) return;
     await api.deleteDeployment(id, true);
     deployments.reload();
@@ -409,30 +469,33 @@ export const Deployments = ({ onOpenInspector }) => {
 };
 
 // ── Process Definitions ─────────────────────────────────────────
-export const ProcessDefinitions = ({ onOpenInspector, onNav }) => {
+export const ProcessDefinitions = ({ onOpenInspector, onNav }: NavScreenProps) => {
   const [showSuspended, setShowSuspended] = React.useState(true);
-  const [startingId, setStartingId] = React.useState(null);
-  const [startDialog, setStartDialog] = React.useState(null);
+  const [startingId, setStartingId] = React.useState<string | null>(null);
+  const [startDialog, setStartDialog] = React.useState<FlowableProcessDefinition | null>(null);
   const definitions = useApi(() => api.listProcessDefinitions({ size: 200, sort: "name" }), []);
   const rows = (definitions.data?.data || []).filter((d) => showSuspended || !d.suspended);
 
-  const toggle = async (d) => {
+  const toggle = async (d: FlowableProcessDefinition) => {
     await api.suspendProcessDefinition(d.id, !d.suspended);
     definitions.reload();
   };
-  const launch = async (d, payload) => {
+  const launch = async (d: FlowableProcessDefinition, payload: StartProcessPayload) => {
     setStartingId(d.id);
     try {
       const r = await api.startProcessInstance({ processDefinitionId: d.id, ...payload });
+      const action = onNav
+        ? { label: "View instances", onClick: () => onNav("instances") }
+        : undefined;
       toast({
         kind: "ok",
         text: `Started ${d.name || d.key}`,
-        sub: r?.id ? `instance ${r.id}` : null,
-        action: onNav ? { label: "View instances", onClick: () => onNav("instances") } : null,
+        ...(r?.id ? { sub: `instance ${r.id}` } : {}),
+        ...(action ? { action } : {}),
       });
       setStartDialog(null);
     } catch (e) {
-      toast({ kind: "err", text: `Start failed: ${e.message || e}`, ttl: 8000 });
+      toast({ kind: "err", text: `Start failed: ${(e as Error)?.message || e}`, ttl: 8000 });
     } finally {
       setStartingId(null);
     }
@@ -550,17 +613,30 @@ export const ProcessDefinitions = ({ onOpenInspector, onNav }) => {
 
 const VAR_TYPES = ["string", "integer", "double", "boolean", "json"];
 
-const StartProcessDialog = ({ definition, busy, onCancel, onStart }) => {
+interface VarRow {
+  name: string;
+  type: string;
+  value: string;
+}
+
+interface StartProcessDialogProps {
+  definition: FlowableProcessDefinition;
+  busy: boolean;
+  onCancel: () => void;
+  onStart: (payload: StartProcessPayload) => void;
+}
+
+const StartProcessDialog = ({ definition, busy, onCancel, onStart }: StartProcessDialogProps) => {
   const [businessKey, setBusinessKey] = React.useState("");
-  const [vars, setVars] = React.useState([{ name: "", type: "string", value: "" }]);
-  const [parseError, setParseError] = React.useState(null);
+  const [vars, setVars] = React.useState<VarRow[]>([{ name: "", type: "string", value: "" }]);
+  const [parseError, setParseError] = React.useState<string | null>(null);
 
   const addRow = () => setVars((xs) => [...xs, { name: "", type: "string", value: "" }]);
-  const removeRow = (i) => setVars((xs) => xs.filter((_, idx) => idx !== i));
-  const updateRow = (i, patch) =>
+  const removeRow = (i: number) => setVars((xs) => xs.filter((_, idx) => idx !== i));
+  const updateRow = (i: number, patch: Partial<VarRow>) =>
     setVars((xs) => xs.map((v, idx) => (idx === i ? { ...v, ...patch } : v)));
 
-  const coerce = (v) => {
+  const coerce = (v: VarRow): { value: unknown; type: string } => {
     if (v.type === "integer") return { value: parseInt(v.value, 10), type: "integer" };
     if (v.type === "double") return { value: parseFloat(v.value), type: "double" };
     if (v.type === "boolean") return { value: v.value === "true", type: "boolean" };
@@ -570,7 +646,7 @@ const StartProcessDialog = ({ definition, busy, onCancel, onStart }) => {
 
   const submit = () => {
     setParseError(null);
-    const payload = {};
+    const payload: StartProcessPayload = {};
     if (businessKey.trim()) payload.businessKey = businessKey.trim();
     const named = vars.filter((v) => v.name.trim());
     if (named.length) {
@@ -581,10 +657,10 @@ const StartProcessDialog = ({ definition, busy, onCancel, onStart }) => {
             throw new Error(`'${v.name}' is not an integer`);
           if (v.type === "double" && Number.isNaN(c.value))
             throw new Error(`'${v.name}' is not a number`);
-          return { name: v.name.trim(), ...c };
+          return { name: v.name.trim(), value: c.value, type: c.type };
         });
       } catch (e) {
-        setParseError(String(e.message || e));
+        setParseError(String((e as Error)?.message || e));
         return;
       }
     }
@@ -691,23 +767,23 @@ const StartProcessDialog = ({ definition, busy, onCancel, onStart }) => {
 };
 
 // ── Process Instances ─────────────────────────────────────────────
-export const ProcessInstances = ({ onOpenInspector }) => {
+export const ProcessInstances = ({ onOpenInspector }: ScreenProps) => {
   const instances = useApi(
     () => api.listProcessInstances({ size: 200, sort: "startTime", order: "desc" }),
     [],
   );
-  const list = instances.data?.data || [];
-  const [selectedId, setSelectedId] = React.useState(null);
+  const list = (instances.data?.data || []) as RuntimeInstance[];
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
   React.useEffect(() => {
     if (!selectedId && list[0]) setSelectedId(list[0].id);
   }, [list, selectedId]);
-  const sel = list.find((p) => p.id === selectedId) || null;
+  const sel = (list.find((p) => p.id === selectedId) || null) as RuntimeInstance | null;
   const vars = useApi(
     () => (sel ? api.getProcessInstanceVariables(sel.id) : Promise.resolve([])),
     [sel?.id],
   );
 
-  const cancel = async (id) => {
+  const cancel = async (id: string) => {
     const reason = prompt("Cancel reason?");
     if (reason == null) return;
     await api.deleteProcessInstance(id, reason || "user-cancelled");
@@ -757,9 +833,13 @@ export const ProcessInstances = ({ onOpenInspector }) => {
                   onClick={() => setSelectedId(p.id)}
                 >
                   <td className="mono">{p.businessKey || p.id}</td>
-                  <td>{p.processDefinitionName || p.processDefinitionKey}</td>
-                  <td className="soft">{p.activityId || "—"}</td>
-                  <td className="mono mute">{p.startUserId || <span className="mute">—</span>}</td>
+                  <td>
+                    {(p.processDefinitionName as string | undefined) || p.processDefinitionKey}
+                  </td>
+                  <td className="soft">{(p.activityId as string | undefined) || "—"}</td>
+                  <td className="mono mute">
+                    {(p.startUserId as string | undefined) || <span className="mute">—</span>}
+                  </td>
                   <td className="mute mono">{fmtTime(p.startTime)}</td>
                   <td>
                     <span className="badge" data-tone={stateOf(p) === "active" ? "ok" : "warn"}>
@@ -798,11 +878,21 @@ export const ProcessInstances = ({ onOpenInspector }) => {
                 >
                   <Info
                     label="Definition"
-                    value={sel.processDefinitionName || sel.processDefinitionKey}
+                    value={
+                      (sel.processDefinitionName as string | undefined) || sel.processDefinitionKey
+                    }
                   />
                   <Info label="Started" value={fmtTime(sel.startTime)} />
-                  <Info label="Started by" value={sel.startUserId || "—"} mono />
-                  <Info label="Activity" value={sel.activityId || "—"} mono />
+                  <Info
+                    label="Started by"
+                    value={(sel.startUserId as string | undefined) || "—"}
+                    mono
+                  />
+                  <Info
+                    label="Activity"
+                    value={(sel.activityId as string | undefined) || "—"}
+                    mono
+                  />
                 </div>
                 <div className="drawer-sect">
                   Variables
@@ -865,7 +955,13 @@ export const ProcessInstances = ({ onOpenInspector }) => {
   );
 };
 
-const Info = ({ label, value, mono }) => (
+interface InfoProps {
+  label: string;
+  value: React.ReactNode;
+  mono?: boolean;
+}
+
+const Info = ({ label, value, mono }: InfoProps) => (
   <div>
     <div className="text-xs mute" style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>
       {label}
@@ -877,17 +973,17 @@ const Info = ({ label, value, mono }) => (
 );
 
 // ── Jobs ──────────────────────────────────────────────────────────
-export const Jobs = ({ onOpenInspector }) => {
-  const [tab, setTab] = React.useState("jobs");
+export const Jobs = ({ onOpenInspector }: ScreenProps) => {
+  const [tab, setTab] = React.useState<"jobs" | "timers" | "deadletter">("jobs");
   const fetcher = () => {
     if (tab === "timers") return api.listTimerJobs({ size: 200 });
     if (tab === "deadletter") return api.listDeadLetterJobs({ size: 200 });
     return api.listJobs({ size: 200 });
   };
   const jobs = useApi(fetcher, [tab]);
-  const list = jobs.data?.data || [];
+  const list = (jobs.data?.data || []) as RuntimeJob[];
 
-  const retry = async (j) => {
+  const retry = async (j: RuntimeJob) => {
     if (tab === "deadletter") await api.moveDeadLetterJob(j.id);
     else await api.executeJob(j.id);
     jobs.reload();
@@ -960,7 +1056,11 @@ export const Jobs = ({ onOpenInspector }) => {
             {list.map((j) => (
               <tr key={j.id}>
                 <td className="mono">{j.id}</td>
-                <td className="mono mute">{j.elementId || j.elementName || "—"}</td>
+                <td className="mono mute">
+                  {(j.elementId as string | undefined) ||
+                    (j.elementName as string | undefined) ||
+                    "—"}
+                </td>
                 <td className="mono">{j.processInstanceId || <span className="mute">—</span>}</td>
                 <td className="mute mono">{j.dueDate ? fmtDue(j.dueDate) : "—"}</td>
                 <td
@@ -999,9 +1099,21 @@ export const Jobs = ({ onOpenInspector }) => {
   );
 };
 
+type RuntimeTask = Loose<import("./api").FlowableTask>;
+type FormFieldEnumValue = string | { id?: string; name?: string };
+type FormField = {
+  id: string;
+  name?: string;
+  required?: boolean;
+  type: string;
+  value?: string;
+  enumValues?: FormFieldEnumValue[];
+};
+type TaskForm = { formKey?: string; formProperties?: FormField[] } | null;
+
 // ── Tasks ──────────────────────────────────────────────────────────
-export const Tasks = ({ onOpenInspector }) => {
-  const [filter, setFilter] = React.useState("all");
+export const Tasks = ({ onOpenInspector }: ScreenProps) => {
+  const [filter, setFilter] = React.useState<"all" | "mine" | "unassigned">("all");
   const fetcher = () => {
     const cfg = api.config();
     if (filter === "mine" && cfg.username)
@@ -1010,16 +1122,19 @@ export const Tasks = ({ onOpenInspector }) => {
     return api.listTasks({ size: 200 });
   };
   const tasks = useApi(fetcher, [filter]);
-  const list = tasks.data?.data || [];
-  const [selectedId, setSelectedId] = React.useState(null);
+  const list = (tasks.data?.data || []) as RuntimeTask[];
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
   React.useEffect(() => {
     if (!selectedId && list[0]) setSelectedId(list[0].id);
     if (selectedId && !list.find((t) => t.id === selectedId)) setSelectedId(list[0]?.id || null);
   }, [list, selectedId]);
-  const sel = list.find((t) => t.id === selectedId) || null;
+  const sel = (list.find((t) => t.id === selectedId) || null) as RuntimeTask | null;
 
-  const form = useApi(
-    () => (sel ? api.getTaskForm(sel.id).catch(() => null) : Promise.resolve(null)),
+  const form = useApi<TaskForm>(
+    () =>
+      sel
+        ? (api.getTaskForm(sel.id).catch(() => null) as Promise<TaskForm>)
+        : Promise.resolve(null),
     [sel?.id],
   );
   const taskVars = useApi(
@@ -1131,10 +1246,15 @@ export const Tasks = ({ onOpenInspector }) => {
                   )}
                 </div>
                 <div style={{ fontSize: 11.5, color: "var(--fg-mute)", display: "flex", gap: 8 }}>
-                  <span>{t.processDefinitionName || t.processDefinitionKey || "—"}</span>
+                  <span>
+                    {(t.processDefinitionName as string | undefined) ||
+                      (t.processDefinitionKey as string | undefined) ||
+                      "—"}
+                  </span>
                   <span>·</span>
                   <span className="mono">
-                    {t.assignee || (t.candidateGroup ? `group:${t.candidateGroup}` : "unclaimed")}
+                    {t.assignee ||
+                      (t.candidateGroup ? `group:${t.candidateGroup as string}` : "unclaimed")}
                   </span>
                 </div>
                 <div
@@ -1173,7 +1293,11 @@ export const Tasks = ({ onOpenInspector }) => {
                 >
                   <Info
                     label="Process"
-                    value={sel.processDefinitionName || sel.processDefinitionKey || "—"}
+                    value={
+                      (sel.processDefinitionName as string | undefined) ||
+                      (sel.processDefinitionKey as string | undefined) ||
+                      "—"
+                    }
                   />
                   <Info label="Instance" value={sel.processInstanceId || "—"} mono />
                   <Info label="Assignee" value={sel.assignee || "—"} mono />
@@ -1212,11 +1336,15 @@ export const Tasks = ({ onOpenInspector }) => {
                         </label>
                         {f.type === "enum" && Array.isArray(f.enumValues) && (
                           <div className="seg-row">
-                            {f.enumValues.map((v) => (
-                              <button key={v.id || v} className="seg-btn">
-                                {v.name || v.id || v}
-                              </button>
-                            ))}
+                            {f.enumValues.map((v) => {
+                              const key = typeof v === "string" ? v : v.id || v.name || "";
+                              const label = typeof v === "string" ? v : v.name || v.id || "";
+                              return (
+                                <button key={key} className="seg-btn">
+                                  {label}
+                                </button>
+                              );
+                            })}
                           </div>
                         )}
                         {f.type !== "enum" && (
@@ -1292,31 +1420,43 @@ export const Tasks = ({ onOpenInspector }) => {
   );
 };
 
+type HistoricInstance = Loose<import("./api").FlowableHistoricProcessInstance>;
+type HistoricActivity = Loose<import("./api").FlowableHistoricActivity>;
+type HistoricVariable = Loose<import("./api").FlowableHistoricVariable>;
+type EmptyPage<T> = { data: T[]; total?: number };
+
 // ── History ──────────────────────────────────────────────────────
-export const History = ({ onOpenInspector }) => {
+export const History = ({ onOpenInspector }: ScreenProps) => {
   const completed = useApi(
     () => api.listHistoricInstances({ finished: true, size: 100, sort: "endTime", order: "desc" }),
     [],
   );
-  const list = completed.data?.data || [];
-  const [selectedId, setSelectedId] = React.useState(null);
+  const list = (completed.data?.data || []) as HistoricInstance[];
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
   React.useEffect(() => {
     if (!selectedId && list[0]) setSelectedId(list[0].id);
   }, [list, selectedId]);
-  const sel = list.find((p) => p.id === selectedId) || null;
-  const [tab, setTab] = React.useState("audit");
-  const audit = useApi(
+  const sel = (list.find((p) => p.id === selectedId) || null) as HistoricInstance | null;
+  const [tab, setTab] = React.useState<"audit" | "variables">("audit");
+  const audit = useApi<EmptyPage<HistoricActivity>>(
     () =>
       sel
-        ? api.listHistoricActivities({ processInstanceId: sel.id, size: 200, sort: "startTime" })
-        : Promise.resolve({ data: [] }),
+        ? (api.listHistoricActivities({
+            processInstanceId: sel.id,
+            size: 200,
+            sort: "startTime",
+          }) as unknown as Promise<EmptyPage<HistoricActivity>>)
+        : Promise.resolve({ data: [] as HistoricActivity[] }),
     [sel?.id],
   );
-  const vars = useApi(
+  const vars = useApi<EmptyPage<HistoricVariable>>(
     () =>
       sel
-        ? api.listHistoricVariables({ processInstanceId: sel.id, size: 200 })
-        : Promise.resolve({ data: [] }),
+        ? (api.listHistoricVariables({
+            processInstanceId: sel.id,
+            size: 200,
+          }) as unknown as Promise<EmptyPage<HistoricVariable>>)
+        : Promise.resolve({ data: [] as HistoricVariable[] }),
     [sel?.id],
   );
 
@@ -1361,7 +1501,9 @@ export const History = ({ onOpenInspector }) => {
                   onClick={() => setSelectedId(p.id)}
                 >
                   <td className="mono">{p.businessKey || p.id}</td>
-                  <td>{p.processDefinitionName || p.processDefinitionKey}</td>
+                  <td>
+                    {(p.processDefinitionName as string | undefined) || p.processDefinitionKey}
+                  </td>
                   <td className="mono">{fmtMs(p.durationInMillis)}</td>
                   <td className="mute mono">{fmtTime(p.startTime)}</td>
                   <td className="mute mono">{fmtTime(p.endTime)}</td>
@@ -1449,7 +1591,7 @@ export const History = ({ onOpenInspector }) => {
                             </div>
                             <div className="mono" style={{ fontSize: 11, color: "var(--fg-mute)" }}>
                               {a.activityType} · {a.activityId}
-                              {a.assignee && <> · assignee: {a.assignee}</>}
+                              {a.assignee != null && <> · assignee: {a.assignee as string}</>}
                             </div>
                             <div
                               className="mono"
@@ -1512,8 +1654,8 @@ export const History = ({ onOpenInspector }) => {
 };
 
 // ── Identity ─────────────────────────────────────────────────────
-export const Identity = ({ onOpenInspector }) => {
-  const [tab, setTab] = React.useState("users");
+export const Identity = ({ onOpenInspector }: ScreenProps) => {
+  const [tab, setTab] = React.useState<"users" | "groups">("users");
   const users = useApi(() => api.listUsers({ size: 500 }), []);
   const groups = useApi(() => api.listGroups({ size: 500 }), []);
   const userList = users.data?.data || [];
@@ -1600,7 +1742,11 @@ export const Identity = ({ onOpenInspector }) => {
                     </td>
                     <td className="mono mute">{u.id}</td>
                     <td className="mono">{u.email || <span className="mute">—</span>}</td>
-                    <td>{u.displayName || <span className="mute">—</span>}</td>
+                    <td>
+                      {((u as Loose<typeof u>).displayName as string | undefined) || (
+                        <span className="mute">—</span>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
@@ -1655,7 +1801,7 @@ export const Identity = ({ onOpenInspector }) => {
 };
 
 // ── Tenants ─────────────────────────────────────────────────────
-export const Tenants = ({ onOpenInspector, tenants }) => {
+export const Tenants = ({ onOpenInspector, tenants }: TenantsScreenProps) => {
   return (
     <div className="page">
       <PageHead
