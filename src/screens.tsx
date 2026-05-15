@@ -1127,7 +1127,23 @@ type HistoricVariable = Loose<import("./api").FlowableHistoricVariable>;
 type EmptyPage<T> = { data: T[]; total?: number };
 
 // ── History ──────────────────────────────────────────────────────
-export const History = ({ onOpenInspector }: ScreenProps) => {
+export type HistoryType = "instances" | "activities" | "variables" | "tasks";
+
+interface HistoryScreenProps extends ScreenProps {
+  initialType?: HistoryType | undefined;
+  onTypeChange?: ((t: HistoryType) => void) | undefined;
+}
+
+export const History = ({ onOpenInspector, initialType, onTypeChange }: HistoryScreenProps) => {
+  const [histType, setHistType] = React.useState<HistoryType>(initialType ?? "instances");
+  React.useEffect(() => {
+    if (initialType && initialType !== histType) setHistType(initialType);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialType]);
+  const setType = (t: HistoryType) => {
+    setHistType(t);
+    onTypeChange?.(t);
+  };
   const completed = useApi(
     () => api.listHistoricInstances({ finished: true, size: 100, sort: "endTime", order: "desc" }),
     [],
@@ -1169,198 +1185,350 @@ export const History = ({ onOpenInspector }: ScreenProps) => {
         endpoints={DATA.endpoints.history}
         onOpenInspector={onOpenInspector}
         actions={
-          <button className="btn" onClick={completed.reload}>
+          <button type="button" className="btn" onClick={completed.reload}>
             <Icon name="refresh" size={13} />
             Refresh
           </button>
         }
       />
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 480px", gap: 16 }}>
-        <div className="tbl-wrap">
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Business key</th>
-                <th>Definition</th>
+      <div className="seg-row" style={{ marginBottom: 12 }}>
+        <button
+          type="button"
+          className="seg-btn"
+          data-on={histType === "instances" ? "1" : "0"}
+          onClick={() => setType("instances")}
+        >
+          Instances
+        </button>
+        <button
+          type="button"
+          className="seg-btn"
+          data-on={histType === "activities" ? "1" : "0"}
+          onClick={() => setType("activities")}
+        >
+          Activities
+        </button>
+        <button
+          type="button"
+          className="seg-btn"
+          data-on={histType === "variables" ? "1" : "0"}
+          onClick={() => setType("variables")}
+        >
+          Variables
+        </button>
+        <button
+          type="button"
+          className="seg-btn"
+          data-on={histType === "tasks" ? "1" : "0"}
+          onClick={() => setType("tasks")}
+        >
+          Tasks
+        </button>
+      </div>
+      {histType !== "instances" && <HistoryFlatTable type={histType} />}
+      {histType === "instances" && (
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 480px", gap: 16 }}>
+          <div className="tbl-wrap">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Business key</th>
+                  <th>Definition</th>
+                  <th>Duration</th>
+                  <th>Started</th>
+                  <th>Ended</th>
+                </tr>
+              </thead>
+              <tbody>
+                {completed.loading && <EmptyRow cols={5} msg="Loading…" />}
+                {completed.error && (
+                  <EmptyRow cols={5} msg={String(completed.error.message || completed.error)} />
+                )}
+                {!completed.loading && !completed.error && list.length === 0 && (
+                  <EmptyRow cols={5} msg="No completed instances yet." />
+                )}
+                {list.map((p) => (
+                  <tr
+                    key={p.id}
+                    data-selected={p.id === selectedId ? "1" : "0"}
+                    onClick={() => setSelectedId(p.id)}
+                  >
+                    <td className="mono">{p.businessKey || p.id}</td>
+                    <td>
+                      {(p.processDefinitionName as string | undefined) || p.processDefinitionKey}
+                    </td>
+                    <td className="mono">{fmtMs(p.durationInMillis)}</td>
+                    <td className="mute mono">{fmtTime(p.startTime)}</td>
+                    <td className="mute mono">{fmtTime(p.endTime)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="panel">
+            {!sel && (
+              <div className="empty" style={{ padding: 24 }}>
+                Select an instance.
+              </div>
+            )}
+            {sel && (
+              <>
+                <div className="panel-hd">
+                  <span className="panel-title">{sel.businessKey || sel.id}</span>
+                  <span className="mono mute" style={{ marginLeft: "auto", fontSize: 11 }}>
+                    {sel.id}
+                  </span>
+                </div>
+                <div className="panel-body" style={{ paddingTop: 0 }}>
+                  <div className="tabs">
+                    <div
+                      className="tab"
+                      data-active={tab === "audit" ? "1" : "0"}
+                      onClick={() => setTab("audit")}
+                    >
+                      Audit trail
+                    </div>
+                    <div
+                      className="tab"
+                      data-active={tab === "variables" ? "1" : "0"}
+                      onClick={() => setTab("variables")}
+                    >
+                      Variables
+                    </div>
+                  </div>
+                  {tab === "audit" && (
+                    <>
+                      {audit.loading && (
+                        <div className="empty" style={{ padding: 14 }}>
+                          Loading…
+                        </div>
+                      )}
+                      {audit.error && <ErrorBox error={audit.error} />}
+                      {audit.data && (
+                        <div style={{ position: "relative", paddingLeft: 18 }}>
+                          <div
+                            style={{
+                              position: "absolute",
+                              left: 7,
+                              top: 6,
+                              bottom: 6,
+                              width: 1,
+                              background: "var(--line)",
+                            }}
+                          />
+                          {(audit.data.data || []).length === 0 && (
+                            <div className="mute">No activity records.</div>
+                          )}
+                          {(audit.data.data || []).map((a) => (
+                            <div key={a.id} style={{ position: "relative", paddingBottom: 14 }}>
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  left: -15,
+                                  top: 4,
+                                  width: 11,
+                                  height: 11,
+                                  borderRadius: "50%",
+                                  background:
+                                    a.activityType === "endEvent"
+                                      ? "var(--fg)"
+                                      : a.activityType === "userTask"
+                                        ? "var(--accent)"
+                                        : "var(--bg-elev)",
+                                  border: `1.5px solid ${a.activityType === "userTask" ? "var(--accent)" : "var(--fg-soft)"}`,
+                                }}
+                              />
+                              <div style={{ fontSize: 13, fontWeight: 500 }}>
+                                {a.activityName || a.activityId}
+                              </div>
+                              <div
+                                className="mono"
+                                style={{ fontSize: 11, color: "var(--fg-mute)" }}
+                              >
+                                {a.activityType} · {a.activityId}
+                                {a.assignee != null && <> · assignee: {a.assignee as string}</>}
+                              </div>
+                              <div
+                                className="mono"
+                                style={{ fontSize: 11, color: "var(--fg-soft)", marginTop: 2 }}
+                              >
+                                {fmtMs(a.durationInMillis)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {tab === "variables" && (
+                    <>
+                      {vars.loading && (
+                        <div className="empty" style={{ padding: 14 }}>
+                          Loading…
+                        </div>
+                      )}
+                      {vars.error && <ErrorBox error={vars.error} />}
+                      {vars.data && (
+                        <table className="tbl" style={{ border: 0 }}>
+                          <thead>
+                            <tr>
+                              <th>Name</th>
+                              <th>Value</th>
+                              <th>Type</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(vars.data.data || []).length === 0 && (
+                              <tr>
+                                <td colSpan={3} className="mute" style={{ padding: 14 }}>
+                                  No variables.
+                                </td>
+                              </tr>
+                            )}
+                            {(vars.data.data || []).map((v) => (
+                              <tr key={v.id}>
+                                <td className="mono">{v.variableName}</td>
+                                <td className="mono">
+                                  {typeof v.value === "string" ? `"${v.value}"` : String(v.value)}
+                                </td>
+                                <td className="mute mono">{v.variableType}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const HistoryFlatTable = ({ type }: { type: HistoryType }) => {
+  type AnyPage = { data: Array<Record<string, unknown>>; total?: number };
+  const fetcher = (): Promise<AnyPage> => {
+    if (type === "activities")
+      return api.listHistoricActivities({
+        size: 200,
+        sort: "startTime",
+      }) as unknown as Promise<AnyPage>;
+    if (type === "variables")
+      return api.listHistoricVariables({ size: 200 }) as unknown as Promise<AnyPage>;
+    return api.listHistoricTasks({ size: 200, finished: true }) as unknown as Promise<AnyPage>;
+  };
+  const data = useApi(fetcher, [type]);
+  const rows = (data.data?.data || []) as unknown as Array<Record<string, unknown>>;
+  return (
+    <div className="tbl-wrap">
+      <table className="tbl">
+        <thead>
+          <tr>
+            {type === "activities" && (
+              <>
+                <th>Activity</th>
+                <th>Type</th>
+                <th>Instance</th>
+                <th>Started</th>
+                <th>Duration</th>
+              </>
+            )}
+            {type === "variables" && (
+              <>
+                <th>Name</th>
+                <th>Value</th>
+                <th>Type</th>
+                <th>Instance</th>
+              </>
+            )}
+            {type === "tasks" && (
+              <>
+                <th>Task</th>
+                <th>Assignee</th>
                 <th>Duration</th>
                 <th>Started</th>
                 <th>Ended</th>
-              </tr>
-            </thead>
-            <tbody>
-              {completed.loading && <EmptyRow cols={5} msg="Loading…" />}
-              {completed.error && (
-                <EmptyRow cols={5} msg={String(completed.error.message || completed.error)} />
+              </>
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {data.loading && <EmptyRow cols={5} msg="Loading…" />}
+          {data.error && (
+            <EmptyRow cols={5} msg={String((data.error as Error)?.message || data.error)} />
+          )}
+          {!data.loading && !data.error && rows.length === 0 && (
+            <EmptyRow cols={5} msg="No records." />
+          )}
+          {rows.map((r) => (
+            <tr key={String(r.id)}>
+              {type === "activities" && (
+                <>
+                  <td>{String(r.activityName || r.activityId || "—")}</td>
+                  <td className="mono">{String(r.activityType || "—")}</td>
+                  <td className="mono mute">{String(r.processInstanceId || "—")}</td>
+                  <td className="mute mono">{fmtTime(r.startTime as string | undefined)}</td>
+                  <td className="mono">{fmtMs(r.durationInMillis as number | undefined)}</td>
+                </>
               )}
-              {!completed.loading && !completed.error && list.length === 0 && (
-                <EmptyRow cols={5} msg="No completed instances yet." />
-              )}
-              {list.map((p) => (
-                <tr
-                  key={p.id}
-                  data-selected={p.id === selectedId ? "1" : "0"}
-                  onClick={() => setSelectedId(p.id)}
-                >
-                  <td className="mono">{p.businessKey || p.id}</td>
-                  <td>
-                    {(p.processDefinitionName as string | undefined) || p.processDefinitionKey}
+              {type === "variables" && (
+                <>
+                  <td className="mono">{String(r.variableName || "—")}</td>
+                  <td className="mono">
+                    {typeof r.value === "string" ? `"${r.value}"` : String(r.value)}
                   </td>
-                  <td className="mono">{fmtMs(p.durationInMillis)}</td>
-                  <td className="mute mono">{fmtTime(p.startTime)}</td>
-                  <td className="mute mono">{fmtTime(p.endTime)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="panel">
-          {!sel && (
-            <div className="empty" style={{ padding: 24 }}>
-              Select an instance.
-            </div>
-          )}
-          {sel && (
-            <>
-              <div className="panel-hd">
-                <span className="panel-title">{sel.businessKey || sel.id}</span>
-                <span className="mono mute" style={{ marginLeft: "auto", fontSize: 11 }}>
-                  {sel.id}
-                </span>
-              </div>
-              <div className="panel-body" style={{ paddingTop: 0 }}>
-                <div className="tabs">
-                  <div
-                    className="tab"
-                    data-active={tab === "audit" ? "1" : "0"}
-                    onClick={() => setTab("audit")}
-                  >
-                    Audit trail
-                  </div>
-                  <div
-                    className="tab"
-                    data-active={tab === "variables" ? "1" : "0"}
-                    onClick={() => setTab("variables")}
-                  >
-                    Variables
-                  </div>
-                </div>
-                {tab === "audit" && (
-                  <>
-                    {audit.loading && (
-                      <div className="empty" style={{ padding: 14 }}>
-                        Loading…
-                      </div>
-                    )}
-                    {audit.error && <ErrorBox error={audit.error} />}
-                    {audit.data && (
-                      <div style={{ position: "relative", paddingLeft: 18 }}>
-                        <div
-                          style={{
-                            position: "absolute",
-                            left: 7,
-                            top: 6,
-                            bottom: 6,
-                            width: 1,
-                            background: "var(--line)",
-                          }}
-                        />
-                        {(audit.data.data || []).length === 0 && (
-                          <div className="mute">No activity records.</div>
-                        )}
-                        {(audit.data.data || []).map((a) => (
-                          <div key={a.id} style={{ position: "relative", paddingBottom: 14 }}>
-                            <div
-                              style={{
-                                position: "absolute",
-                                left: -15,
-                                top: 4,
-                                width: 11,
-                                height: 11,
-                                borderRadius: "50%",
-                                background:
-                                  a.activityType === "endEvent"
-                                    ? "var(--fg)"
-                                    : a.activityType === "userTask"
-                                      ? "var(--accent)"
-                                      : "var(--bg-elev)",
-                                border: `1.5px solid ${a.activityType === "userTask" ? "var(--accent)" : "var(--fg-soft)"}`,
-                              }}
-                            />
-                            <div style={{ fontSize: 13, fontWeight: 500 }}>
-                              {a.activityName || a.activityId}
-                            </div>
-                            <div className="mono" style={{ fontSize: 11, color: "var(--fg-mute)" }}>
-                              {a.activityType} · {a.activityId}
-                              {a.assignee != null && <> · assignee: {a.assignee as string}</>}
-                            </div>
-                            <div
-                              className="mono"
-                              style={{ fontSize: 11, color: "var(--fg-soft)", marginTop: 2 }}
-                            >
-                              {fmtMs(a.durationInMillis)}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-                {tab === "variables" && (
-                  <>
-                    {vars.loading && (
-                      <div className="empty" style={{ padding: 14 }}>
-                        Loading…
-                      </div>
-                    )}
-                    {vars.error && <ErrorBox error={vars.error} />}
-                    {vars.data && (
-                      <table className="tbl" style={{ border: 0 }}>
-                        <thead>
-                          <tr>
-                            <th>Name</th>
-                            <th>Value</th>
-                            <th>Type</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(vars.data.data || []).length === 0 && (
-                            <tr>
-                              <td colSpan={3} className="mute" style={{ padding: 14 }}>
-                                No variables.
-                              </td>
-                            </tr>
-                          )}
-                          {(vars.data.data || []).map((v) => (
-                            <tr key={v.id}>
-                              <td className="mono">{v.variableName}</td>
-                              <td className="mono">
-                                {typeof v.value === "string" ? `"${v.value}"` : String(v.value)}
-                              </td>
-                              <td className="mute mono">{v.variableType}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+                  <td className="mute mono">{String(r.variableType || "—")}</td>
+                  <td className="mono mute">{String(r.processInstanceId || "—")}</td>
+                </>
+              )}
+              {type === "tasks" && (
+                <>
+                  <td>{String(r.name || r.id || "—")}</td>
+                  <td className="mono">{String(r.assignee || "—")}</td>
+                  <td className="mono">{fmtMs(r.durationInMillis as number | undefined)}</td>
+                  <td className="mute mono">{fmtTime(r.startTime as string | undefined)}</td>
+                  <td className="mute mono">{fmtTime(r.endTime as string | undefined)}</td>
+                </>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 };
 
 // ── Identity ─────────────────────────────────────────────────────
-export const Identity = ({ onOpenInspector }: ScreenProps) => {
-  const [tab, setTab] = React.useState<"users" | "groups">("users");
+
+export type IdentityTab = "users" | "groups";
+
+interface IdentityScreenProps extends ScreenProps {
+  initialTab?: IdentityTab | undefined;
+  onTabChange?: ((t: IdentityTab) => void) | undefined;
+}
+
+export const Identity = ({ onOpenInspector, initialTab, onTabChange }: IdentityScreenProps) => {
+  const navigate = useNavigate();
+  const [tab, setTab] = React.useState<IdentityTab>(initialTab ?? "users");
+  React.useEffect(() => {
+    if (initialTab && initialTab !== tab) setTab(initialTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTab]);
+  const setIdentityTab = (t: IdentityTab) => {
+    setTab(t);
+    onTabChange?.(t);
+  };
   const users = useApi(() => api.listUsers({ size: 500 }), []);
   const groups = useApi(() => api.listGroups({ size: 500 }), []);
   const userList = users.data?.data || [];
   const groupList = groups.data?.data || [];
+  const openUser = (id: string) => navigate({ to: "/identity/users/$id", params: { id } });
+  const openGroup = (id: string) => navigate({ to: "/identity/groups/$id", params: { id } });
 
   return (
     <div className="page">
@@ -1371,6 +1539,7 @@ export const Identity = ({ onOpenInspector }: ScreenProps) => {
         onOpenInspector={onOpenInspector}
         actions={
           <button
+            type="button"
             className="btn"
             onClick={() => {
               users.reload();
@@ -1386,14 +1555,14 @@ export const Identity = ({ onOpenInspector }: ScreenProps) => {
         <div
           className="tab"
           data-active={tab === "users" ? "1" : "0"}
-          onClick={() => setTab("users")}
+          onClick={() => setIdentityTab("users")}
         >
           Users · {users.data?.total ?? 0}
         </div>
         <div
           className="tab"
           data-active={tab === "groups" ? "1" : "0"}
-          onClick={() => setTab("groups")}
+          onClick={() => setIdentityTab("groups")}
         >
           Groups · {groups.data?.total ?? 0}
         </div>
@@ -1420,7 +1589,15 @@ export const Identity = ({ onOpenInspector }: ScreenProps) => {
               {userList.map((u) => {
                 const initials = `${(u.firstName || "?")[0]}${(u.lastName || "?")[0]}`;
                 return (
-                  <tr key={u.id}>
+                  <tr
+                    key={u.id}
+                    style={{ cursor: "pointer" }}
+                    tabIndex={0}
+                    onClick={() => openUser(u.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") openUser(u.id);
+                    }}
+                  >
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <div
@@ -1474,7 +1651,15 @@ export const Identity = ({ onOpenInspector }: ScreenProps) => {
                 <EmptyRow cols={3} msg="No groups." />
               )}
               {groupList.map((g) => (
-                <tr key={g.id}>
+                <tr
+                  key={g.id}
+                  style={{ cursor: "pointer" }}
+                  tabIndex={0}
+                  onClick={() => openGroup(g.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") openGroup(g.id);
+                  }}
+                >
                   <td>
                     <b style={{ fontWeight: 500 }}>{g.name || g.id}</b>
                   </td>

@@ -136,3 +136,29 @@ describe("api.getJob", () => {
     expect(url).toBe(`${BASE}/management/jobs/job-1`);
   });
 });
+
+describe("api.getUser", () => {
+  it("issues GET /identity/users/{id}", async () => {
+    const payload = { id: "kermit", firstName: "Kermit", lastName: "The Frog" };
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, json: payload }));
+
+    const result = await api.getUser("kermit");
+    expect(result).toEqual(payload);
+
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${BASE}/identity/users/kermit`);
+  });
+});
+
+describe("api.getGroup", () => {
+  it("issues GET /identity/groups/{id}", async () => {
+    const payload = { id: "managers", name: "Managers", type: "assignment" };
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, json: payload }));
+
+    const result = await api.getGroup("managers");
+    expect(result).toEqual(payload);
+
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${BASE}/identity/groups/managers`);
+  });
+});
