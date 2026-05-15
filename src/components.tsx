@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Link } from "@tanstack/react-router";
 import React from "react";
 import { API_LOG, type ApiLogEntry, api, type FlowableConfig } from "./api";

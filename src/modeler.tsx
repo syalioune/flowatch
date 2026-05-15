@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import BpmnModelerClass from "bpmn-js/lib/Modeler";
 // @migration-any: dmn-js has no shipped .d.ts; the default export is treated as
 // a constructor and all event-bus / DI container interactions are `any`. ADR-001

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * TypeScript augmentation for TanStack Router's per-route staticData.
  *

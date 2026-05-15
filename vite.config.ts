@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";

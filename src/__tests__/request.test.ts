@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Vitest unit suite for the request() funnel in src/api.ts.
  *

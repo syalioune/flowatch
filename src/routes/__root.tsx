@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createRootRoute } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 import App from "../app";

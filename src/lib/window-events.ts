@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Ambient declarations for the project's window-scoped CustomEvent registry.
  *

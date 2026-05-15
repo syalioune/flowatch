@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Outlet, useNavigate } from "@tanstack/react-router";
 import React from "react";
 import { api } from "./api";
