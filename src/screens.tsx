@@ -76,11 +76,11 @@ interface TenantsScreenProps extends ScreenProps {
   tenants?: { id: string; name: string }[];
 }
 
-interface ErrorBoxProps {
+export interface ErrorBoxProps {
   error: unknown;
   onRetry?: (() => void) | undefined;
 }
-const ErrorBox = ({ error, onRetry }: ErrorBoxProps) => (
+export const ErrorBox = ({ error, onRetry }: ErrorBoxProps) => (
   <div className="empty" style={{ padding: 24, color: "var(--bad)" }}>
     <div className="mono" style={{ fontSize: 12, marginBottom: 8 }}>
       {String((error as { message?: string } | null)?.message || error)}

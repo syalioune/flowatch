@@ -1,6 +1,10 @@
 node_modules/
 dist/
 coverage/
+# Vitest browser mode emits diagnostic screenshots on failure — Story 2.4
+# introduces the deliberate snapshot baseline; everything else is transient.
+src/**/__screenshots__/
+__screenshots__/
 .env
 .env.local
 .DS_Store
