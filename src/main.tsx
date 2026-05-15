@@ -1,5 +1,6 @@
+import { createRouter, RouterProvider } from "@tanstack/react-router";
 import ReactDOM from "react-dom/client";
-import App from "./app";
+import { routeTree } from "./routeTree.gen";
 import "./styles.css";
 
 // bpmn-js assets
@@ -15,6 +16,14 @@ import "dmn-js/dist/assets/dmn-js-decision-table.css";
 import "dmn-js/dist/assets/dmn-js-literal-expression.css";
 import "dmn-js/dist/assets/dmn-font/css/dmn-embedded.css";
 
+const router = createRouter({ routeTree });
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: typeof router;
+  }
+}
+
 const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("root element not found");
-ReactDOM.createRoot(rootEl).render(<App />);
+ReactDOM.createRoot(rootEl).render(<RouterProvider router={router} />);

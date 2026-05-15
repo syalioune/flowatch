@@ -14,7 +14,8 @@
       "!**/build",
       "!**/_bmad-output",
       "!**/_bmad",
-      "!**/package-lock.json"
+      "!**/package-lock.json",
+      "!src/routeTree.gen.ts"
     ]
   },
   "formatter": {
