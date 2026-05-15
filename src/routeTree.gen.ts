@@ -9,14 +9,24 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from "./routes/__root"
+import { Route as JobsRouteImport } from "./routes/jobs"
 import { Route as DmnRouteImport } from "./routes/dmn"
 import { Route as BpmnRouteImport } from "./routes/bpmn"
 import { Route as IndexRouteImport } from "./routes/index"
+import { Route as TasksIndexRouteImport } from "./routes/tasks/index"
+import { Route as InstancesIndexRouteImport } from "./routes/instances/index"
 import { Route as DeploymentsIndexRouteImport } from "./routes/deployments/index"
 import { Route as DefinitionsIndexRouteImport } from "./routes/definitions/index"
+import { Route as TasksIdRouteImport } from "./routes/tasks/$id"
+import { Route as InstancesIdRouteImport } from "./routes/instances/$id"
 import { Route as DeploymentsIdRouteImport } from "./routes/deployments/$id"
 import { Route as DefinitionsIdRouteImport } from "./routes/definitions/$id"
 
+const JobsRoute = JobsRouteImport.update({
+  id: "/jobs",
+  path: "/jobs",
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DmnRoute = DmnRouteImport.update({
   id: "/dmn",
   path: "/dmn",
@@ -32,6 +42,16 @@ const IndexRoute = IndexRouteImport.update({
   path: "/",
   getParentRoute: () => rootRouteImport,
 } as any)
+const TasksIndexRoute = TasksIndexRouteImport.update({
+  id: "/tasks/",
+  path: "/tasks/",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InstancesIndexRoute = InstancesIndexRouteImport.update({
+  id: "/instances/",
+  path: "/instances/",
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DeploymentsIndexRoute = DeploymentsIndexRouteImport.update({
   id: "/deployments/",
   path: "/deployments/",
@@ -40,6 +60,16 @@ const DeploymentsIndexRoute = DeploymentsIndexRouteImport.update({
 const DefinitionsIndexRoute = DefinitionsIndexRouteImport.update({
   id: "/definitions/",
   path: "/definitions/",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TasksIdRoute = TasksIdRouteImport.update({
+  id: "/tasks/$id",
+  path: "/tasks/$id",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InstancesIdRoute = InstancesIdRouteImport.update({
+  id: "/instances/$id",
+  path: "/instances/$id",
   getParentRoute: () => rootRouteImport,
 } as any)
 const DeploymentsIdRoute = DeploymentsIdRouteImport.update({
@@ -57,29 +87,44 @@ export interface FileRoutesByFullPath {
   "/": typeof IndexRoute
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
+  "/jobs": typeof JobsRoute
   "/definitions/$id": typeof DefinitionsIdRoute
   "/deployments/$id": typeof DeploymentsIdRoute
+  "/instances/$id": typeof InstancesIdRoute
+  "/tasks/$id": typeof TasksIdRoute
   "/definitions/": typeof DefinitionsIndexRoute
   "/deployments/": typeof DeploymentsIndexRoute
+  "/instances/": typeof InstancesIndexRoute
+  "/tasks/": typeof TasksIndexRoute
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
+  "/jobs": typeof JobsRoute
   "/definitions/$id": typeof DefinitionsIdRoute
   "/deployments/$id": typeof DeploymentsIdRoute
+  "/instances/$id": typeof InstancesIdRoute
+  "/tasks/$id": typeof TasksIdRoute
   "/definitions": typeof DefinitionsIndexRoute
   "/deployments": typeof DeploymentsIndexRoute
+  "/instances": typeof InstancesIndexRoute
+  "/tasks": typeof TasksIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   "/": typeof IndexRoute
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
+  "/jobs": typeof JobsRoute
   "/definitions/$id": typeof DefinitionsIdRoute
   "/deployments/$id": typeof DeploymentsIdRoute
+  "/instances/$id": typeof InstancesIdRoute
+  "/tasks/$id": typeof TasksIdRoute
   "/definitions/": typeof DefinitionsIndexRoute
   "/deployments/": typeof DeploymentsIndexRoute
+  "/instances/": typeof InstancesIndexRoute
+  "/tasks/": typeof TasksIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -87,42 +132,69 @@ export interface FileRouteTypes {
     | "/"
     | "/bpmn"
     | "/dmn"
+    | "/jobs"
     | "/definitions/$id"
     | "/deployments/$id"
+    | "/instances/$id"
+    | "/tasks/$id"
     | "/definitions/"
     | "/deployments/"
+    | "/instances/"
+    | "/tasks/"
   fileRoutesByTo: FileRoutesByTo
   to:
     | "/"
     | "/bpmn"
     | "/dmn"
+    | "/jobs"
     | "/definitions/$id"
     | "/deployments/$id"
+    | "/instances/$id"
+    | "/tasks/$id"
     | "/definitions"
     | "/deployments"
+    | "/instances"
+    | "/tasks"
   id:
     | "__root__"
     | "/"
     | "/bpmn"
     | "/dmn"
+    | "/jobs"
     | "/definitions/$id"
     | "/deployments/$id"
+    | "/instances/$id"
+    | "/tasks/$id"
     | "/definitions/"
     | "/deployments/"
+    | "/instances/"
+    | "/tasks/"
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BpmnRoute: typeof BpmnRoute
   DmnRoute: typeof DmnRoute
+  JobsRoute: typeof JobsRoute
   DefinitionsIdRoute: typeof DefinitionsIdRoute
   DeploymentsIdRoute: typeof DeploymentsIdRoute
+  InstancesIdRoute: typeof InstancesIdRoute
+  TasksIdRoute: typeof TasksIdRoute
   DefinitionsIndexRoute: typeof DefinitionsIndexRoute
   DeploymentsIndexRoute: typeof DeploymentsIndexRoute
+  InstancesIndexRoute: typeof InstancesIndexRoute
+  TasksIndexRoute: typeof TasksIndexRoute
 }
 
 declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
+    "/jobs": {
+      id: "/jobs"
+      path: "/jobs"
+      fullPath: "/jobs"
+      preLoaderRoute: typeof JobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     "/dmn": {
       id: "/dmn"
       path: "/dmn"
@@ -144,6 +216,20 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    "/tasks/": {
+      id: "/tasks/"
+      path: "/tasks"
+      fullPath: "/tasks/"
+      preLoaderRoute: typeof TasksIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/instances/": {
+      id: "/instances/"
+      path: "/instances"
+      fullPath: "/instances/"
+      preLoaderRoute: typeof InstancesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     "/deployments/": {
       id: "/deployments/"
       path: "/deployments"
@@ -156,6 +242,20 @@ declare module "@tanstack/react-router" {
       path: "/definitions"
       fullPath: "/definitions/"
       preLoaderRoute: typeof DefinitionsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/tasks/$id": {
+      id: "/tasks/$id"
+      path: "/tasks/$id"
+      fullPath: "/tasks/$id"
+      preLoaderRoute: typeof TasksIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/instances/$id": {
+      id: "/instances/$id"
+      path: "/instances/$id"
+      fullPath: "/instances/$id"
+      preLoaderRoute: typeof InstancesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/deployments/$id": {
@@ -179,10 +279,15 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BpmnRoute: BpmnRoute,
   DmnRoute: DmnRoute,
+  JobsRoute: JobsRoute,
   DefinitionsIdRoute: DefinitionsIdRoute,
   DeploymentsIdRoute: DeploymentsIdRoute,
+  InstancesIdRoute: InstancesIdRoute,
+  TasksIdRoute: TasksIdRoute,
   DefinitionsIndexRoute: DefinitionsIndexRoute,
   DeploymentsIndexRoute: DeploymentsIndexRoute,
+  InstancesIndexRoute: InstancesIndexRoute,
+  TasksIndexRoute: TasksIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

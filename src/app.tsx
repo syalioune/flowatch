@@ -5,7 +5,7 @@ import { ApiInspector, SettingsModal, Sidebar, Toaster, Topbar } from "./compone
 import DATA from "./data";
 import { PATH_TO_VIEW, ROUTED_VIEWS, VIEW_TO_PATH } from "./lib/nav";
 import "./lib/window-events";
-import { History, Identity, Jobs, ProcessInstances, Tasks, Tenants } from "./screens";
+import { History, Identity, Tenants } from "./screens";
 import {
   TweakButton,
   TweakRadio,
@@ -229,15 +229,6 @@ function App() {
   // switch entirely.
   let Screen: React.ReactNode = null;
   switch (view) {
-    case "instances":
-      Screen = <ProcessInstances onOpenInspector={openInspector} />;
-      break;
-    case "jobs":
-      Screen = <Jobs onOpenInspector={openInspector} />;
-      break;
-    case "tasks":
-      Screen = <Tasks onOpenInspector={openInspector} />;
-      break;
     case "history":
       Screen = <History onOpenInspector={openInspector} />;
       break;

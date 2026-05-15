@@ -749,28 +749,13 @@ const StartProcessDialog = ({ definition, busy, onCancel, onStart }: StartProces
 
 // ── Process Instances ─────────────────────────────────────────────
 export const ProcessInstances = ({ onOpenInspector }: ScreenProps) => {
+  const navigate = useNavigate();
   const instances = useApi(
     () => api.listProcessInstances({ size: 200, sort: "startTime", order: "desc" }),
     [],
   );
   const list = (instances.data?.data || []) as RuntimeInstance[];
-  const [selectedId, setSelectedId] = React.useState<string | null>(null);
-  React.useEffect(() => {
-    if (!selectedId && list[0]) setSelectedId(list[0].id);
-  }, [list, selectedId]);
-  const sel = (list.find((p) => p.id === selectedId) || null) as RuntimeInstance | null;
-  const vars = useApi(
-    () => (sel ? api.getProcessInstanceVariables(sel.id) : Promise.resolve([])),
-    [sel?.id],
-  );
-
-  const cancel = async (id: string) => {
-    const reason = prompt("Cancel reason?");
-    if (reason == null) return;
-    await api.deleteProcessInstance(id, reason || "user-cancelled");
-    instances.reload();
-    setSelectedId(null);
-  };
+  const openDetail = (id: string) => navigate({ to: "/instances/$id", params: { id } });
 
   return (
     <div className="page" style={{ paddingBottom: 24 }}>
@@ -780,184 +765,86 @@ export const ProcessInstances = ({ onOpenInspector }: ScreenProps) => {
         endpoints={DATA.endpoints.instances}
         onOpenInspector={onOpenInspector}
         actions={
-          <button className="btn" onClick={instances.reload}>
+          <button type="button" className="btn" onClick={instances.reload}>
             <Icon name="refresh" size={13} />
             Refresh
           </button>
         }
       />
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 400px", gap: 16 }}>
-        <div className="tbl-wrap">
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Business key</th>
-                <th>Definition</th>
-                <th>Activity</th>
-                <th>Started by</th>
-                <th>Started</th>
-                <th>State</th>
-              </tr>
-            </thead>
-            <tbody>
-              {instances.loading && <EmptyRow cols={6} msg="Loading…" />}
-              {instances.error && (
-                <EmptyRow cols={6} msg={String(instances.error.message || instances.error)} />
-              )}
-              {!instances.loading && !instances.error && list.length === 0 && (
-                <EmptyRow cols={6} msg="No running process instances." />
-              )}
-              {list.map((p) => (
-                <tr
-                  key={p.id}
-                  data-selected={p.id === selectedId ? "1" : "0"}
-                  onClick={() => setSelectedId(p.id)}
-                >
-                  <td className="mono">{p.businessKey || p.id}</td>
-                  <td>
-                    {(p.processDefinitionName as string | undefined) || p.processDefinitionKey}
-                  </td>
-                  <td className="soft">{(p.activityId as string | undefined) || "—"}</td>
-                  <td className="mono mute">
-                    {(p.startUserId as string | undefined) || <span className="mute">—</span>}
-                  </td>
-                  <td className="mute mono">{fmtTime(p.startTime)}</td>
-                  <td>
-                    <span className="badge" data-tone={stateOf(p) === "active" ? "ok" : "warn"}>
-                      <span className="dot" />
-                      {stateOf(p)}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="panel">
-          {!sel && (
-            <div className="empty" style={{ padding: 24 }}>
-              Select an instance.
-            </div>
-          )}
-          {sel && (
-            <>
-              <div className="panel-hd">
-                <span className="panel-title">{sel.businessKey || sel.id}</span>
-                <span className="mono mute" style={{ marginLeft: "auto", fontSize: 11 }}>
-                  {sel.id}
-                </span>
-              </div>
-              <div className="panel-body">
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 10,
-                    marginBottom: 14,
-                  }}
-                >
-                  <Info
-                    label="Definition"
-                    value={
-                      (sel.processDefinitionName as string | undefined) || sel.processDefinitionKey
-                    }
-                  />
-                  <Info label="Started" value={fmtTime(sel.startTime)} />
-                  <Info
-                    label="Started by"
-                    value={(sel.startUserId as string | undefined) || "—"}
-                    mono
-                  />
-                  <Info
-                    label="Activity"
-                    value={(sel.activityId as string | undefined) || "—"}
-                    mono
-                  />
-                </div>
-                <div className="drawer-sect">
-                  Variables
-                  <span
-                    className="mono mute"
-                    style={{ textTransform: "none", fontSize: 10, letterSpacing: 0, marginLeft: 6 }}
-                  >
-                    GET /runtime/process-instances/{sel.id}/variables
+      <div className="tbl-wrap">
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>Business key</th>
+              <th>Definition</th>
+              <th>Activity</th>
+              <th>Started by</th>
+              <th>Started</th>
+              <th>State</th>
+            </tr>
+          </thead>
+          <tbody>
+            {instances.loading && <EmptyRow cols={6} msg="Loading…" />}
+            {instances.error && (
+              <EmptyRow cols={6} msg={String(instances.error.message || instances.error)} />
+            )}
+            {!instances.loading && !instances.error && list.length === 0 && (
+              <EmptyRow cols={6} msg="No running process instances." />
+            )}
+            {list.map((p) => (
+              <tr
+                key={p.id}
+                style={{ cursor: "pointer" }}
+                tabIndex={0}
+                onClick={() => openDetail(p.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") openDetail(p.id);
+                }}
+              >
+                <td className="mono">{p.businessKey || p.id}</td>
+                <td>{(p.processDefinitionName as string | undefined) || p.processDefinitionKey}</td>
+                <td className="soft">{(p.activityId as string | undefined) || "—"}</td>
+                <td className="mono mute">
+                  {(p.startUserId as string | undefined) || <span className="mute">—</span>}
+                </td>
+                <td className="mute mono">{fmtTime(p.startTime)}</td>
+                <td>
+                  <span className="badge" data-tone={stateOf(p) === "active" ? "ok" : "warn"}>
+                    <span className="dot" />
+                    {stateOf(p)}
                   </span>
-                </div>
-                {vars.loading && (
-                  <div className="empty" style={{ padding: 14 }}>
-                    Loading…
-                  </div>
-                )}
-                {vars.error && <ErrorBox error={vars.error} />}
-                {vars.data && (
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 6 }}>
-                    {(vars.data || []).length === 0 && <div className="mute">No variables.</div>}
-                    {(vars.data || []).map((v) => (
-                      <div
-                        key={v.name}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          padding: "6px 10px",
-                          background: "var(--bg-sunken)",
-                          border: "1px solid var(--line)",
-                          borderRadius: 6,
-                        }}
-                      >
-                        <span className="mono" style={{ fontSize: 11.5, color: "var(--fg-soft)" }}>
-                          {v.name}
-                        </span>
-                        <span className="mono" style={{ fontSize: 11.5 }}>
-                          {typeof v.value === "string" ? `"${v.value}"` : String(v.value)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="drawer-sect">Actions</div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button
-                    className="btn"
-                    data-size="sm"
-                    data-variant="danger"
-                    onClick={() => cancel(sel.id)}
-                  >
-                    <Icon name="x" size={11} />
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 };
 
-interface InfoProps {
-  label: string;
-  value: React.ReactNode;
-  mono?: boolean;
+// ── Jobs ──────────────────────────────────────────────────────────
+
+export type JobsType = "executable" | "timer" | "deadletter";
+
+interface JobsScreenProps extends ScreenProps {
+  initialType?: JobsType | undefined;
+  onTypeChange?: ((t: JobsType) => void) | undefined;
 }
 
-const Info = ({ label, value, mono }: InfoProps) => (
-  <div>
-    <div className="text-xs mute" style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}>
-      {label}
-    </div>
-    <div className={mono ? "mono mt-2" : "mt-2"} style={{ fontSize: 13 }}>
-      {value}
-    </div>
-  </div>
-);
-
-// ── Jobs ──────────────────────────────────────────────────────────
-export const Jobs = ({ onOpenInspector }: ScreenProps) => {
-  const [tab, setTab] = React.useState<"jobs" | "timers" | "deadletter">("jobs");
+export const Jobs = ({ onOpenInspector, initialType, onTypeChange }: JobsScreenProps) => {
+  const [tab, setTab] = React.useState<JobsType>(initialType ?? "executable");
+  // Keep local state in sync if the URL changes externally (back button).
+  React.useEffect(() => {
+    if (initialType && initialType !== tab) setTab(initialType);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialType]);
+  const setType = (t: JobsType) => {
+    setTab(t);
+    onTypeChange?.(t);
+  };
   const fetcher = () => {
-    if (tab === "timers") return api.listTimerJobs({ size: 200 });
+    if (tab === "timer") return api.listTimerJobs({ size: 200 });
     if (tab === "deadletter") return api.listDeadLetterJobs({ size: 200 });
     return api.listJobs({ size: 200 });
   };
@@ -988,23 +875,26 @@ export const Jobs = ({ onOpenInspector }: ScreenProps) => {
         <div className="tbl-toolbar">
           <div className="seg-row">
             <button
+              type="button"
               className="seg-btn"
-              data-on={tab === "jobs" ? "1" : "0"}
-              onClick={() => setTab("jobs")}
+              data-on={tab === "executable" ? "1" : "0"}
+              onClick={() => setType("executable")}
             >
               Jobs
             </button>
             <button
+              type="button"
               className="seg-btn"
-              data-on={tab === "timers" ? "1" : "0"}
-              onClick={() => setTab("timers")}
+              data-on={tab === "timer" ? "1" : "0"}
+              onClick={() => setType("timer")}
             >
               Timers
             </button>
             <button
+              type="button"
               className="seg-btn"
               data-on={tab === "deadletter" ? "1" : "0"}
-              onClick={() => setTab("deadletter")}
+              onClick={() => setType("deadletter")}
             >
               Dead-letter
             </button>
@@ -1081,59 +971,37 @@ export const Jobs = ({ onOpenInspector }: ScreenProps) => {
 };
 
 type RuntimeTask = Loose<import("./api").FlowableTask>;
-type FormFieldEnumValue = string | { id?: string; name?: string };
-type FormField = {
-  id: string;
-  name?: string;
-  required?: boolean;
-  type: string;
-  value?: string;
-  enumValues?: FormFieldEnumValue[];
-};
-type TaskForm = { formKey?: string; formProperties?: FormField[] } | null;
 
 // ── Tasks ──────────────────────────────────────────────────────────
-export const Tasks = ({ onOpenInspector }: ScreenProps) => {
-  const [filter, setFilter] = React.useState<"all" | "mine" | "unassigned">("all");
+
+export type TasksAssignee = "me" | "all" | "unassigned";
+
+interface TasksScreenProps extends ScreenProps {
+  initialAssignee?: TasksAssignee | undefined;
+  onAssigneeChange?: ((a: TasksAssignee) => void) | undefined;
+}
+
+export const Tasks = ({ onOpenInspector, initialAssignee, onAssigneeChange }: TasksScreenProps) => {
+  const navigate = useNavigate();
+  const [filter, setFilter] = React.useState<TasksAssignee>(initialAssignee ?? "all");
+  React.useEffect(() => {
+    if (initialAssignee && initialAssignee !== filter) setFilter(initialAssignee);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialAssignee]);
+  const setAssignee = (a: TasksAssignee) => {
+    setFilter(a);
+    onAssigneeChange?.(a);
+  };
   const fetcher = () => {
     const cfg = api.config();
-    if (filter === "mine" && cfg.username)
+    if (filter === "me" && cfg.username)
       return api.listTasks({ assignee: cfg.username, size: 200 });
     if (filter === "unassigned") return api.listTasks({ unassigned: true, size: 200 });
     return api.listTasks({ size: 200 });
   };
   const tasks = useApi(fetcher, [filter]);
   const list = (tasks.data?.data || []) as RuntimeTask[];
-  const [selectedId, setSelectedId] = React.useState<string | null>(null);
-  React.useEffect(() => {
-    if (!selectedId && list[0]) setSelectedId(list[0].id);
-    if (selectedId && !list.find((t) => t.id === selectedId)) setSelectedId(list[0]?.id || null);
-  }, [list, selectedId]);
-  const sel = (list.find((t) => t.id === selectedId) || null) as RuntimeTask | null;
-
-  const form = useApi<TaskForm>(
-    () =>
-      sel
-        ? (api.getTaskForm(sel.id).catch(() => null) as Promise<TaskForm>)
-        : Promise.resolve(null),
-    [sel?.id],
-  );
-  const taskVars = useApi(
-    () => (sel ? api.getTaskVariables(sel.id) : Promise.resolve([])),
-    [sel?.id],
-  );
-
-  const claim = async () => {
-    if (!sel) return;
-    const cfg = api.config();
-    await api.taskAction(sel.id, "claim", { assignee: cfg.username });
-    tasks.reload();
-  };
-  const complete = async () => {
-    if (!sel) return;
-    await api.taskAction(sel.id, "complete");
-    tasks.reload();
-  };
+  const openDetail = (id: string) => navigate({ to: "/tasks/$id", params: { id } });
 
   return (
     <div className="page" style={{ padding: "24px 28px" }}>
@@ -1143,258 +1011,110 @@ export const Tasks = ({ onOpenInspector }: ScreenProps) => {
         endpoints={DATA.endpoints.tasks}
         onOpenInspector={onOpenInspector}
         actions={
-          <button className="btn" onClick={tasks.reload}>
+          <button type="button" className="btn" onClick={tasks.reload}>
             <Icon name="refresh" size={13} />
             Refresh
           </button>
         }
       />
-      <div className="split-tasks">
-        <div className="panel">
-          <div
-            className="panel-hd"
-            style={{ flexDirection: "column", alignItems: "stretch", padding: 0 }}
-          >
-            <div
-              className="tbl-toolbar"
-              style={{ margin: 0, borderBottom: 0, padding: "10px 12px" }}
+      <div className="panel">
+        <div className="panel-hd">
+          <div className="seg-row">
+            <button
+              type="button"
+              className="seg-btn"
+              data-on={filter === "me" ? "1" : "0"}
+              onClick={() => setAssignee("me")}
             >
-              <div className="seg-row">
-                <button
-                  className="seg-btn"
-                  data-on={filter === "mine" ? "1" : "0"}
-                  onClick={() => setFilter("mine")}
-                >
-                  Assigned to me
-                </button>
-                <button
-                  className="seg-btn"
-                  data-on={filter === "unassigned" ? "1" : "0"}
-                  onClick={() => setFilter("unassigned")}
-                >
-                  Unassigned
-                </button>
-                <button
-                  className="seg-btn"
-                  data-on={filter === "all" ? "1" : "0"}
-                  onClick={() => setFilter("all")}
-                >
-                  All
-                </button>
-              </div>
-            </div>
+              Mine
+            </button>
+            <button
+              type="button"
+              className="seg-btn"
+              data-on={filter === "unassigned" ? "1" : "0"}
+              onClick={() => setAssignee("unassigned")}
+            >
+              Unassigned
+            </button>
+            <button
+              type="button"
+              className="seg-btn"
+              data-on={filter === "all" ? "1" : "0"}
+              onClick={() => setAssignee("all")}
+            >
+              All
+            </button>
           </div>
-          <div style={{ flex: 1, overflowY: "auto" }}>
-            {tasks.loading && (
-              <div className="empty" style={{ padding: 20 }}>
-                Loading…
-              </div>
-            )}
-            {tasks.error && <ErrorBox error={tasks.error} />}
-            {!tasks.loading && !tasks.error && list.length === 0 && (
-              <div className="empty" style={{ padding: 20 }}>
-                No tasks for this filter.
-              </div>
-            )}
-            {list.map((t) => (
-              <div
-                key={t.id}
-                onClick={() => setSelectedId(t.id)}
-                style={{
-                  padding: "12px 14px",
-                  borderBottom: "1px solid var(--line)",
-                  cursor: "pointer",
-                  background: t.id === selectedId ? "var(--accent-soft)" : "transparent",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 500,
-                      flex: 1,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {t.name || t.id}
-                  </div>
-                  {t.dueDate && (
-                    <span className="badge" data-tone="neutral" style={{ fontSize: 10 }}>
-                      {fmtDue(t.dueDate)}
-                    </span>
-                  )}
-                </div>
-                <div style={{ fontSize: 11.5, color: "var(--fg-mute)", display: "flex", gap: 8 }}>
-                  <span>
-                    {(t.processDefinitionName as string | undefined) ||
-                      (t.processDefinitionKey as string | undefined) ||
-                      "—"}
-                  </span>
-                  <span>·</span>
-                  <span className="mono">
-                    {t.assignee ||
-                      (t.candidateGroup ? `group:${t.candidateGroup as string}` : "unclaimed")}
-                  </span>
-                </div>
-                <div
-                  style={{ fontSize: 10.5, color: "var(--fg-mute)", marginTop: 3 }}
-                  className="mono"
-                >
-                  {t.id} · created {fmtTime(t.createTime)}
-                </div>
-              </div>
-            ))}
-          </div>
+          <span className="mute mono text-xs" style={{ marginLeft: "auto" }}>
+            {list.length} of {tasks.data?.total ?? 0}
+          </span>
         </div>
-
-        <div className="panel">
-          {!sel && (
-            <div className="empty" style={{ padding: 24 }}>
-              Select a task.
+        <div className="panel-body" style={{ padding: 0 }}>
+          {tasks.loading && (
+            <div className="empty" style={{ padding: 20 }}>
+              Loading…
             </div>
           )}
-          {sel && (
-            <>
-              <div className="panel-hd">
-                <span className="panel-title">{sel.name || sel.id}</span>
-                <span className="mono mute" style={{ marginLeft: "auto", fontSize: 11 }}>
-                  {sel.id}
+          {tasks.error && <ErrorBox error={tasks.error} />}
+          {!tasks.loading && !tasks.error && list.length === 0 && (
+            <div className="empty" style={{ padding: 20 }}>
+              No tasks for this filter.
+            </div>
+          )}
+          {list.map((t) => (
+            <div
+              key={t.id}
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: card is the row's nav affordance; Enter triggers it via onKeyDown.
+              tabIndex={0}
+              onClick={() => openDetail(t.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") openDetail(t.id);
+              }}
+              style={{
+                padding: "12px 14px",
+                borderBottom: "1px solid var(--line)",
+                cursor: "pointer",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 500,
+                    flex: 1,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {t.name || t.id}
+                </div>
+                {t.dueDate && (
+                  <span className="badge" data-tone="neutral" style={{ fontSize: 10 }}>
+                    {fmtDue(t.dueDate)}
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: 11.5, color: "var(--fg-mute)", display: "flex", gap: 8 }}>
+                <span>
+                  {(t.processDefinitionName as string | undefined) ||
+                    (t.processDefinitionKey as string | undefined) ||
+                    "—"}
+                </span>
+                <span>·</span>
+                <span className="mono">
+                  {t.assignee ||
+                    (t.candidateGroup ? `group:${t.candidateGroup as string}` : "unclaimed")}
                 </span>
               </div>
-              <div className="panel-body">
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(4, 1fr)",
-                    gap: 10,
-                    marginBottom: 18,
-                  }}
-                >
-                  <Info
-                    label="Process"
-                    value={
-                      (sel.processDefinitionName as string | undefined) ||
-                      (sel.processDefinitionKey as string | undefined) ||
-                      "—"
-                    }
-                  />
-                  <Info label="Instance" value={sel.processInstanceId || "—"} mono />
-                  <Info label="Assignee" value={sel.assignee || "—"} mono />
-                  <Info label="Due" value={sel.dueDate ? fmtDue(sel.dueDate) : "—"} mono />
-                </div>
-
-                <div className="drawer-sect">
-                  Form
-                  <span
-                    className="mono mute"
-                    style={{ textTransform: "none", fontSize: 10, letterSpacing: 0, marginLeft: 6 }}
-                  >
-                    GET /form/form-data?taskId={sel.id}
-                  </span>
-                </div>
-                {form.loading && (
-                  <div className="empty" style={{ padding: 14 }}>
-                    Loading…
-                  </div>
-                )}
-                {!form.loading && !form.data && (
-                  <div className="mute" style={{ padding: "8px 0" }}>
-                    No form attached to this task.
-                  </div>
-                )}
-                {form.data && (
-                  <div style={{ maxWidth: 560 }}>
-                    <div className="mono text-xs mute" style={{ marginBottom: 8 }}>
-                      formKey: {form.data.formKey || "—"}
-                    </div>
-                    {(form.data.formProperties || []).map((f) => (
-                      <div className="form-row" key={f.id}>
-                        <label>
-                          {f.name || f.id} {f.required && <span className="req">*</span>}
-                          <span className="mono">{f.type}</span>
-                        </label>
-                        {f.type === "enum" && Array.isArray(f.enumValues) && (
-                          <div className="seg-row">
-                            {f.enumValues.map((v) => {
-                              const key = typeof v === "string" ? v : v.id || v.name || "";
-                              const label = typeof v === "string" ? v : v.name || v.id || "";
-                              return (
-                                <button key={key} className="seg-btn">
-                                  {label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                        {f.type !== "enum" && (
-                          <input className="input" defaultValue={f.value || ""} />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 8,
-                    marginTop: 18,
-                    paddingTop: 14,
-                    borderTop: "1px solid var(--line)",
-                  }}
-                >
-                  {!sel.assignee && (
-                    <button className="btn" data-variant="primary" onClick={claim}>
-                      Claim
-                    </button>
-                  )}
-                  <button
-                    className="btn"
-                    data-variant={sel.assignee ? "primary" : "ghost"}
-                    onClick={complete}
-                  >
-                    Complete
-                  </button>
-                </div>
-
-                <div className="drawer-sect">Variables in scope</div>
-                {taskVars.loading && (
-                  <div className="empty" style={{ padding: 14 }}>
-                    Loading…
-                  </div>
-                )}
-                {taskVars.data && (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
-                    {(taskVars.data || []).length === 0 && (
-                      <div className="mute">No variables.</div>
-                    )}
-                    {(taskVars.data || []).map((v) => (
-                      <div
-                        key={v.name}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          padding: "6px 10px",
-                          background: "var(--bg-sunken)",
-                          border: "1px solid var(--line)",
-                          borderRadius: 6,
-                        }}
-                      >
-                        <span className="mono" style={{ fontSize: 11.5, color: "var(--fg-soft)" }}>
-                          {v.name}
-                        </span>
-                        <span className="mono" style={{ fontSize: 11.5 }}>
-                          {typeof v.value === "string" ? `"${v.value}"` : String(v.value)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <div
+                style={{ fontSize: 10.5, color: "var(--fg-mute)", marginTop: 3 }}
+                className="mono"
+              >
+                {t.id} · created {fmtTime(t.createTime)}
               </div>
-            </>
-          )}
+            </div>
+          ))}
         </div>
       </div>
     </div>

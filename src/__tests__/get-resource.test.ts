@@ -87,3 +87,52 @@ describe("api.getProcessDefinition", () => {
     expect(url).toBe(`${BASE}/repository/process-definitions/loan:1:abc`);
   });
 });
+
+describe("api.getProcessInstance", () => {
+  it("issues GET /runtime/process-instances/{id}", async () => {
+    const payload = {
+      id: "pi-1",
+      processDefinitionId: "loan:1:abc",
+      processDefinitionKey: "loan",
+      startTime: "2026-05-15T12:00:00.000Z",
+    };
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, json: payload }));
+
+    const result = await api.getProcessInstance("pi-1");
+    expect(result).toEqual(payload);
+
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${BASE}/runtime/process-instances/pi-1`);
+  });
+});
+
+describe("api.getTask", () => {
+  it("issues GET /runtime/tasks/{id}", async () => {
+    const payload = {
+      id: "task-1",
+      name: "Approve loan",
+      priority: 50,
+      createTime: "2026-05-15T12:00:00.000Z",
+    };
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, json: payload }));
+
+    const result = await api.getTask("task-1");
+    expect(result).toEqual(payload);
+
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${BASE}/runtime/tasks/task-1`);
+  });
+});
+
+describe("api.getJob", () => {
+  it("issues GET /management/jobs/{id}", async () => {
+    const payload = { id: "job-1", retries: 3 };
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, json: payload }));
+
+    const result = await api.getJob("job-1");
+    expect(result).toEqual(payload);
+
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${BASE}/management/jobs/job-1`);
+  });
+});

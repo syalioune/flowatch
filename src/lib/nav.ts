@@ -31,6 +31,9 @@ export const ROUTED_VIEWS = new Set<string>([
   "dmn",
   "deployments",
   "definitions",
+  "instances",
+  "tasks",
+  "jobs",
 ]);
 
 /** Fire-and-forget request to open the API Inspector drawer. */
