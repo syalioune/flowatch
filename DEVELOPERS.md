@@ -300,6 +300,25 @@ Required checks (configured in `.github/protection/required_checks.json`):
 
 All GitHub Actions used in workflows are SHA-pinned (per NFR-26), and Dependabot bumps the SHAs weekly.
 
+### Dependabot
+
+Flowatch uses Dependabot ([config](.github/dependabot.yml)) to keep three dependency surfaces current:
+
+| Ecosystem        | Tracks                                  | Cadence    | PR commit prefix |
+|------------------|-----------------------------------------|------------|------------------|
+| `github-actions` | SHA-pinned `uses:` lines in workflows   | Mon weekly | `ci`             |
+| `npm`            | `package.json` deps (3 groupings)       | Mon weekly | `chore`          |
+| `docker-compose` | Images in `docker-compose.yml`          | Mon weekly | `chore`          |
+
+PRs target the `develop` branch and are gated by the four required CI checks (`CI / check`, `CI / unit`, `CI / e2e`, `CI / build`) before they can merge.
+
+**Reviewing Dependabot PRs:**
+
+- For `github-actions` and `npm` PRs: if all four checks are green, the bump is safe to merge. Squash-merge into `develop`.
+- For `docker-compose` PRs that bump `flowable/flowable-rest`: a major-version bump (e.g. 7.x → 8.x) requires a compat re-audit per [ADR-012](https://github.com/syalioune/flowatch-bmad/blob/main/_bmad-output/planning-artifacts/architecture.md#adr-012). Run the audit ([docs/compat.md](docs/compat.md)) before merging; minor / patch bumps within the 7.x line are safe to merge on green CI.
+
+**SHA-pin discipline:** every `uses:` line in workflow YAML must be a 40-char commit SHA followed by `# vX.Y.Z` comment. Floating tags (`@v6`, `@main`) violate NFR-26 and break Dependabot's diff display.
+
 ---
 
 ## 9) Release practices
