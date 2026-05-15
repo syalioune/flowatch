@@ -24,7 +24,7 @@ export const PATH_TO_VIEW: Record<string, string> = Object.fromEntries(
   Object.entries(VIEW_TO_PATH).map(([v, p]) => [p, v]),
 );
 
-/** Views whose route file exists today. Grows as Stories 3.3-3.5 land. */
+/** Views whose route file exists today. Story 3.5 completes the migration. */
 export const ROUTED_VIEWS = new Set<string>([
   "dashboard",
   "bpmn",
@@ -34,6 +34,9 @@ export const ROUTED_VIEWS = new Set<string>([
   "instances",
   "tasks",
   "jobs",
+  "history",
+  "identity",
+  "tenants",
 ]);
 
 /** Fire-and-forget request to open the API Inspector drawer. */

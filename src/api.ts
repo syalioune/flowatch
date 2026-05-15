@@ -444,8 +444,10 @@ const listHistoricTasks = (params?: QueryParams) =>
 // ── Identity ─────────────────────────────────────────────────────────────
 const listUsers = (params?: QueryParams) =>
   request<FlowablePage<FlowableUser>>("GET", "/identity/users", { params });
+const getUser = (id: string) => request<FlowableUser>("GET", `/identity/users/${id}`);
 const listGroups = (params?: QueryParams) =>
   request<FlowablePage<FlowableGroup>>("GET", "/identity/groups", { params });
+const getGroup = (id: string) => request<FlowableGroup>("GET", `/identity/groups/${id}`);
 const getUserGroups = (userId: string) =>
   request<FlowablePage<FlowableGroup>>("GET", `/identity/users/${userId}/groups`);
 const addUserToGroup = (userId: string, groupId: string) =>
@@ -600,7 +602,9 @@ export const api = {
   listHistoricTasks,
   // Identity
   listUsers,
+  getUser,
   listGroups,
+  getGroup,
   getUserGroups,
   addUserToGroup,
   listTenants,

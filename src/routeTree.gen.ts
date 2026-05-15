@@ -9,22 +9,37 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from "./routes/__root"
+import { Route as TenantsRouteImport } from "./routes/tenants"
 import { Route as JobsRouteImport } from "./routes/jobs"
+import { Route as HistoryRouteImport } from "./routes/history"
 import { Route as DmnRouteImport } from "./routes/dmn"
 import { Route as BpmnRouteImport } from "./routes/bpmn"
 import { Route as IndexRouteImport } from "./routes/index"
 import { Route as TasksIndexRouteImport } from "./routes/tasks/index"
 import { Route as InstancesIndexRouteImport } from "./routes/instances/index"
+import { Route as IdentityIndexRouteImport } from "./routes/identity/index"
 import { Route as DeploymentsIndexRouteImport } from "./routes/deployments/index"
 import { Route as DefinitionsIndexRouteImport } from "./routes/definitions/index"
 import { Route as TasksIdRouteImport } from "./routes/tasks/$id"
 import { Route as InstancesIdRouteImport } from "./routes/instances/$id"
 import { Route as DeploymentsIdRouteImport } from "./routes/deployments/$id"
 import { Route as DefinitionsIdRouteImport } from "./routes/definitions/$id"
+import { Route as IdentityUsersIdRouteImport } from "./routes/identity/users/$id"
+import { Route as IdentityGroupsIdRouteImport } from "./routes/identity/groups/$id"
 
+const TenantsRoute = TenantsRouteImport.update({
+  id: "/tenants",
+  path: "/tenants",
+  getParentRoute: () => rootRouteImport,
+} as any)
 const JobsRoute = JobsRouteImport.update({
   id: "/jobs",
   path: "/jobs",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HistoryRoute = HistoryRouteImport.update({
+  id: "/history",
+  path: "/history",
   getParentRoute: () => rootRouteImport,
 } as any)
 const DmnRoute = DmnRouteImport.update({
@@ -50,6 +65,11 @@ const TasksIndexRoute = TasksIndexRouteImport.update({
 const InstancesIndexRoute = InstancesIndexRouteImport.update({
   id: "/instances/",
   path: "/instances/",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IdentityIndexRoute = IdentityIndexRouteImport.update({
+  id: "/identity/",
+  path: "/identity/",
   getParentRoute: () => rootRouteImport,
 } as any)
 const DeploymentsIndexRoute = DeploymentsIndexRouteImport.update({
@@ -82,49 +102,74 @@ const DefinitionsIdRoute = DefinitionsIdRouteImport.update({
   path: "/definitions/$id",
   getParentRoute: () => rootRouteImport,
 } as any)
+const IdentityUsersIdRoute = IdentityUsersIdRouteImport.update({
+  id: "/identity/users/$id",
+  path: "/identity/users/$id",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IdentityGroupsIdRoute = IdentityGroupsIdRouteImport.update({
+  id: "/identity/groups/$id",
+  path: "/identity/groups/$id",
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
+  "/history": typeof HistoryRoute
   "/jobs": typeof JobsRoute
+  "/tenants": typeof TenantsRoute
   "/definitions/$id": typeof DefinitionsIdRoute
   "/deployments/$id": typeof DeploymentsIdRoute
   "/instances/$id": typeof InstancesIdRoute
   "/tasks/$id": typeof TasksIdRoute
   "/definitions/": typeof DefinitionsIndexRoute
   "/deployments/": typeof DeploymentsIndexRoute
+  "/identity/": typeof IdentityIndexRoute
   "/instances/": typeof InstancesIndexRoute
   "/tasks/": typeof TasksIndexRoute
+  "/identity/groups/$id": typeof IdentityGroupsIdRoute
+  "/identity/users/$id": typeof IdentityUsersIdRoute
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
+  "/history": typeof HistoryRoute
   "/jobs": typeof JobsRoute
+  "/tenants": typeof TenantsRoute
   "/definitions/$id": typeof DefinitionsIdRoute
   "/deployments/$id": typeof DeploymentsIdRoute
   "/instances/$id": typeof InstancesIdRoute
   "/tasks/$id": typeof TasksIdRoute
   "/definitions": typeof DefinitionsIndexRoute
   "/deployments": typeof DeploymentsIndexRoute
+  "/identity": typeof IdentityIndexRoute
   "/instances": typeof InstancesIndexRoute
   "/tasks": typeof TasksIndexRoute
+  "/identity/groups/$id": typeof IdentityGroupsIdRoute
+  "/identity/users/$id": typeof IdentityUsersIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   "/": typeof IndexRoute
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
+  "/history": typeof HistoryRoute
   "/jobs": typeof JobsRoute
+  "/tenants": typeof TenantsRoute
   "/definitions/$id": typeof DefinitionsIdRoute
   "/deployments/$id": typeof DeploymentsIdRoute
   "/instances/$id": typeof InstancesIdRoute
   "/tasks/$id": typeof TasksIdRoute
   "/definitions/": typeof DefinitionsIndexRoute
   "/deployments/": typeof DeploymentsIndexRoute
+  "/identity/": typeof IdentityIndexRoute
   "/instances/": typeof InstancesIndexRoute
   "/tasks/": typeof TasksIndexRoute
+  "/identity/groups/$id": typeof IdentityGroupsIdRoute
+  "/identity/users/$id": typeof IdentityUsersIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -132,67 +177,101 @@ export interface FileRouteTypes {
     | "/"
     | "/bpmn"
     | "/dmn"
+    | "/history"
     | "/jobs"
+    | "/tenants"
     | "/definitions/$id"
     | "/deployments/$id"
     | "/instances/$id"
     | "/tasks/$id"
     | "/definitions/"
     | "/deployments/"
+    | "/identity/"
     | "/instances/"
     | "/tasks/"
+    | "/identity/groups/$id"
+    | "/identity/users/$id"
   fileRoutesByTo: FileRoutesByTo
   to:
     | "/"
     | "/bpmn"
     | "/dmn"
+    | "/history"
     | "/jobs"
+    | "/tenants"
     | "/definitions/$id"
     | "/deployments/$id"
     | "/instances/$id"
     | "/tasks/$id"
     | "/definitions"
     | "/deployments"
+    | "/identity"
     | "/instances"
     | "/tasks"
+    | "/identity/groups/$id"
+    | "/identity/users/$id"
   id:
     | "__root__"
     | "/"
     | "/bpmn"
     | "/dmn"
+    | "/history"
     | "/jobs"
+    | "/tenants"
     | "/definitions/$id"
     | "/deployments/$id"
     | "/instances/$id"
     | "/tasks/$id"
     | "/definitions/"
     | "/deployments/"
+    | "/identity/"
     | "/instances/"
     | "/tasks/"
+    | "/identity/groups/$id"
+    | "/identity/users/$id"
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BpmnRoute: typeof BpmnRoute
   DmnRoute: typeof DmnRoute
+  HistoryRoute: typeof HistoryRoute
   JobsRoute: typeof JobsRoute
+  TenantsRoute: typeof TenantsRoute
   DefinitionsIdRoute: typeof DefinitionsIdRoute
   DeploymentsIdRoute: typeof DeploymentsIdRoute
   InstancesIdRoute: typeof InstancesIdRoute
   TasksIdRoute: typeof TasksIdRoute
   DefinitionsIndexRoute: typeof DefinitionsIndexRoute
   DeploymentsIndexRoute: typeof DeploymentsIndexRoute
+  IdentityIndexRoute: typeof IdentityIndexRoute
   InstancesIndexRoute: typeof InstancesIndexRoute
   TasksIndexRoute: typeof TasksIndexRoute
+  IdentityGroupsIdRoute: typeof IdentityGroupsIdRoute
+  IdentityUsersIdRoute: typeof IdentityUsersIdRoute
 }
 
 declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
+    "/tenants": {
+      id: "/tenants"
+      path: "/tenants"
+      fullPath: "/tenants"
+      preLoaderRoute: typeof TenantsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     "/jobs": {
       id: "/jobs"
       path: "/jobs"
       fullPath: "/jobs"
       preLoaderRoute: typeof JobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/history": {
+      id: "/history"
+      path: "/history"
+      fullPath: "/history"
+      preLoaderRoute: typeof HistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/dmn": {
@@ -228,6 +307,13 @@ declare module "@tanstack/react-router" {
       path: "/instances"
       fullPath: "/instances/"
       preLoaderRoute: typeof InstancesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/identity/": {
+      id: "/identity/"
+      path: "/identity"
+      fullPath: "/identity/"
+      preLoaderRoute: typeof IdentityIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/deployments/": {
@@ -272,6 +358,20 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof DefinitionsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    "/identity/users/$id": {
+      id: "/identity/users/$id"
+      path: "/identity/users/$id"
+      fullPath: "/identity/users/$id"
+      preLoaderRoute: typeof IdentityUsersIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/identity/groups/$id": {
+      id: "/identity/groups/$id"
+      path: "/identity/groups/$id"
+      fullPath: "/identity/groups/$id"
+      preLoaderRoute: typeof IdentityGroupsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -279,15 +379,20 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BpmnRoute: BpmnRoute,
   DmnRoute: DmnRoute,
+  HistoryRoute: HistoryRoute,
   JobsRoute: JobsRoute,
+  TenantsRoute: TenantsRoute,
   DefinitionsIdRoute: DefinitionsIdRoute,
   DeploymentsIdRoute: DeploymentsIdRoute,
   InstancesIdRoute: InstancesIdRoute,
   TasksIdRoute: TasksIdRoute,
   DefinitionsIndexRoute: DefinitionsIndexRoute,
   DeploymentsIndexRoute: DeploymentsIndexRoute,
+  IdentityIndexRoute: IdentityIndexRoute,
   InstancesIndexRoute: InstancesIndexRoute,
   TasksIndexRoute: TasksIndexRoute,
+  IdentityGroupsIdRoute: IdentityGroupsIdRoute,
+  IdentityUsersIdRoute: IdentityUsersIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

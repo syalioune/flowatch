@@ -5,7 +5,8 @@ import { ApiInspector, SettingsModal, Sidebar, Toaster, Topbar } from "./compone
 import DATA from "./data";
 import { PATH_TO_VIEW, ROUTED_VIEWS, VIEW_TO_PATH } from "./lib/nav";
 import "./lib/window-events";
-import { History, Identity, Tenants } from "./screens";
+// Every screen is now routed; the legacy switch in <main> is empty.
+// Story 3.6 deletes the switch + view/setView state.
 import {
   TweakButton,
   TweakRadio,
@@ -192,10 +193,9 @@ function App() {
     };
   }, []);
 
-  const openInspector = () => {
-    setInspectorOpen(true);
-  };
-
+  // openInspector is no longer needed inside App (every screen now goes through
+  // its route wrapper, which dispatches the `app:open-inspector` window event).
+  // The listener installed above still wires the event back to setInspectorOpen.
   const handleTweaks = () => {
     window.postMessage({ type: "__activate_edit_mode" }, window.origin);
   };
@@ -227,20 +227,9 @@ function App() {
   // Outlet renders /, /bpmn, /dmn — those screens were removed from this switch.
   // The remaining cases are migrated by Stories 3.3-3.5; Story 3.6 deletes the
   // switch entirely.
-  let Screen: React.ReactNode = null;
-  switch (view) {
-    case "history":
-      Screen = <History onOpenInspector={openInspector} />;
-      break;
-    case "identity":
-      Screen = <Identity onOpenInspector={openInspector} />;
-      break;
-    case "tenants":
-      Screen = <Tenants onOpenInspector={openInspector} tenants={tenants.filter((x) => x.id)} />;
-      break;
-    default:
-      Screen = null;
-  }
+  // Legacy switch is empty after Story 3.5 — every screen is routed.
+  // Story 3.6 deletes `view`/`setView`, the switch, and the {Screen} slot.
+  const Screen: React.ReactNode = null;
 
   return (
     <div className="app">
