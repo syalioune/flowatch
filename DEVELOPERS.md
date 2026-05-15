@@ -249,6 +249,12 @@ auto-skips on non-Linux hosts (`test.skip(process.platform !== "linux", ...)`).
 
 **Live-API discipline (PRD NFR-5):** E2E tests run against a real Dockerized Flowable. No mocking the engine in test code. If a test needs deterministic data, deploy a fixture process to a fresh Postgres before the run.
 
+### Routing
+
+TanStack Router (per ADR-004) is wired with file-based routing under `src/routes/`. The Vite plugin generates `src/routeTree.gen.ts` on every dev/build invocation. **The generated tree is committed to git** so fresh checkouts work without running the dev server first; the plugin overwrites it on the next start, so re-stage if you see a diff after `npm run dev`. Don't edit `routeTree.gen.ts` by hand — Biome ignores it (`!src/routeTree.gen.ts` in `biome.json`).
+
+The TanStack Router devtools panel renders bottom-right in dev only (`import.meta.env.DEV` gate + lazy import). It's tree-shaken from production bundles.
+
 ---
 
 ## 6) Code quality

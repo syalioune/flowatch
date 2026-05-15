@@ -1,3 +1,4 @@
+import { Outlet } from "@tanstack/react-router";
 import React from "react";
 import { api } from "./api";
 import { ApiInspector, SettingsModal, Sidebar, Toaster, Topbar } from "./components";
@@ -258,7 +259,13 @@ function App() {
         onSettings={() => setSettingsOpen(true)}
         onTweaks={handleTweaks}
       />
-      <main className="main">{Screen}</main>
+      <main className="main">
+        <Outlet />
+        {/* Legacy view-state switch. Stories 3.2-3.5 migrate screens to
+            routes one by one, deleting cases from the switch as they go.
+            Story 3.6 removes the switch entirely. */}
+        {Screen}
+      </main>
 
       <ApiInspector
         open={inspectorOpen}
