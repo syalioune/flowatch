@@ -89,6 +89,10 @@ jobs:
         id: filesize
         run: bash scripts/ci/check-file-size.sh
 
+      - name: Verify README badges in sync with docs/compat.md
+        id: badges
+        run: node scripts/release/update-readme-badges.mjs --check
+
       - name: Summary
         if: always()
         run: |
@@ -100,6 +104,7 @@ jobs:
             echo "- License allow-list: ${{ steps.licenses.outcome }}"
             echo "- NOTICE freshness: ${{ steps.notice.outcome }}"
             echo "- File-size limit: ${{ steps.filesize.outcome }}"
+            echo "- README badges: ${{ steps.badges.outcome }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
   unit:
