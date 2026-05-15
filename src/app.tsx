@@ -1,11 +1,11 @@
-import { Outlet } from "@tanstack/react-router";
+import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import React from "react";
 import { api } from "./api";
 import { ApiInspector, SettingsModal, Sidebar, Toaster, Topbar } from "./components";
 import DATA from "./data";
-import { BpmnModeler, DmnModeler } from "./modeler";
+import { PATH_TO_VIEW, ROUTED_VIEWS, VIEW_TO_PATH } from "./lib/nav";
+import "./lib/window-events";
 import {
-  Dashboard,
   Deployments,
   History,
   Identity,
@@ -92,9 +92,23 @@ interface AppConnectionState {
 const DEFAULT_TENANT: Tenant = { id: "", name: "All tenants" };
 
 function App() {
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const [view, setView] = React.useState<ViewKey>("dashboard");
-  const navTo = React.useCallback((v: string) => setView(v as ViewKey), []);
+  // Initial view is empty: the Outlet drives Dashboard / BPMN / DMN. The
+  // legacy {Screen} below only fires when the user navigates to an unrouted
+  // screen via the sidebar / Quick jump (Stories 3.3-3.5 migrate the rest).
+  const [view, setView] = React.useState<ViewKey>("" as ViewKey);
+  const navTo = React.useCallback(
+    (v: string) => {
+      if (ROUTED_VIEWS.has(v) && VIEW_TO_PATH[v]) {
+        navigate({ to: VIEW_TO_PATH[v] });
+      } else {
+        setView(v as ViewKey);
+      }
+    },
+    [navigate],
+  );
   const [inspectorOpen, setInspectorOpen] = React.useState(false);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [tenants, setTenants] = React.useState<Tenant[]>([DEFAULT_TENANT]);
@@ -174,6 +188,19 @@ function App() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
+  // Route components dispatch app:open-inspector / app:set-view (see src/lib/nav.ts).
+  // The Story 3.6 cleanup deletes app:set-view together with the legacy switch.
+  React.useEffect(() => {
+    const onOpen = () => setInspectorOpen(true);
+    const onSet = (e: WindowEventMap["app:set-view"]) => setView(e.detail as ViewKey);
+    window.addEventListener("app:open-inspector", onOpen);
+    window.addEventListener("app:set-view", onSet);
+    return () => {
+      window.removeEventListener("app:open-inspector", onOpen);
+      window.removeEventListener("app:set-view", onSet);
+    };
+  }, []);
+
   const openInspector = () => {
     setInspectorOpen(true);
   };
@@ -191,26 +218,23 @@ function App() {
     api.setConfig({ tenantId: next.id });
   };
 
+  const routedView = PATH_TO_VIEW[pathname];
+  const effectiveView = routedView ?? view;
   const endpointFn = (
     ENDPOINT_BY_VIEW as Record<
       string,
       (() => ReturnType<typeof DATA.endpoints.dashboard.slice>) | undefined
     >
-  )[view];
+  )[effectiveView];
   const endpoints = (endpointFn || (() => []))();
-  const screenTitle = (VIEW_TITLE as Record<string, string>)[view] || view;
+  const screenTitle =
+    (VIEW_TITLE as Record<string, string>)[effectiveView] || effectiveView || "Dashboard";
 
-  let Screen = null;
+  // Outlet renders /, /bpmn, /dmn — those screens were removed from this switch.
+  // The remaining cases are migrated by Stories 3.3-3.5; Story 3.6 deletes the
+  // switch entirely.
+  let Screen: React.ReactNode = null;
   switch (view) {
-    case "dashboard":
-      Screen = <Dashboard onNav={navTo} onOpenInspector={openInspector} />;
-      break;
-    case "bpmn":
-      Screen = <BpmnModeler onOpenInspector={openInspector} />;
-      break;
-    case "dmn":
-      Screen = <DmnModeler onOpenInspector={openInspector} />;
-      break;
     case "deployments":
       Screen = <Deployments onOpenInspector={openInspector} />;
       break;
@@ -236,13 +260,13 @@ function App() {
       Screen = <Tenants onOpenInspector={openInspector} tenants={tenants.filter((x) => x.id)} />;
       break;
     default:
-      Screen = <Dashboard onNav={navTo} onOpenInspector={openInspector} />;
+      Screen = null;
   }
 
   return (
     <div className="app">
       <Sidebar
-        active={view}
+        active={effectiveView}
         onNav={navTo}
         connection={conn}
         counts={navCounts}
@@ -324,8 +348,8 @@ function App() {
               <button
                 key={k}
                 className="seg-btn"
-                data-on={view === k ? "1" : "0"}
-                onClick={() => setView(k as ViewKey)}
+                data-on={effectiveView === k ? "1" : "0"}
+                onClick={() => navTo(k)}
                 style={{ fontSize: 11, padding: "5px 8px" }}
               >
                 {v}

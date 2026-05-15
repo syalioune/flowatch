@@ -1,6 +1,8 @@
+import { Link } from "@tanstack/react-router";
 import React from "react";
 import { API_LOG, type ApiLogEntry, api, type FlowableConfig } from "./api";
 import type { EndpointHint } from "./data";
+import { ROUTED_VIEWS, VIEW_TO_PATH } from "./lib/nav";
 
 interface ApiLogEvent extends CustomEvent<ApiLogEntry> {}
 interface AppToastEvent
@@ -308,6 +310,34 @@ export const Sidebar = ({ active, onNav, connection, onConnClick, counts }: Side
           <div className="nav-label">{g.group}</div>
           {g.items.map((it) => {
             const count = counts?.[it.id];
+            const inner = (
+              <>
+                <Icon name={it.icon} />
+                <span>{it.label}</span>
+                {count != null && <span className="nav-count">{count}</span>}
+              </>
+            );
+            if (ROUTED_VIEWS.has(it.id) && VIEW_TO_PATH[it.id]) {
+              const to = VIEW_TO_PATH[it.id] as string;
+              // biome-ignore lint/suspicious/noExplicitAny: TanStack Router types
+              //   activeProps/inactiveProps against the generated route tree's
+              //   LinkProps; pass-through of data-attributes works at runtime
+              //   but the type doesn't allow them. Story 3.6 removes this cast.
+              const activeProps = { "data-active": "1" } as any;
+              // biome-ignore lint/suspicious/noExplicitAny: same as above
+              const inactiveProps = { "data-active": "0" } as any;
+              return (
+                <Link
+                  key={it.id}
+                  to={to}
+                  className="nav-item"
+                  activeProps={activeProps}
+                  inactiveProps={inactiveProps}
+                >
+                  {inner}
+                </Link>
+              );
+            }
             return (
               <div
                 key={it.id}
@@ -315,9 +345,7 @@ export const Sidebar = ({ active, onNav, connection, onConnClick, counts }: Side
                 data-active={active === it.id ? "1" : "0"}
                 onClick={() => onNav(it.id)}
               >
-                <Icon name={it.icon} />
-                <span>{it.label}</span>
-                {count != null && <span className="nav-count">{count}</span>}
+                {inner}
               </div>
             );
           })}
