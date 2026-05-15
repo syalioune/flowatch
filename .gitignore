@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.local
+.DS_Store
+*.log
+.venv
+
+# BMAD artefacts live in a private companion repo (syalioune/flowatch-bmad)
+# and are symlinked here by setup-dev.sh. Both the symlinks themselves and
+# anything that resolves through them must stay out of the public repo.
+_bmad
+_bmad-output
