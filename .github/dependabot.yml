@@ -1,0 +1,97 @@
+# Dependabot configuration — automated dependency bumps.
+#
+# Three ecosystems are configured:
+#   - github-actions: SHA-pinned `uses:` lines in .github/workflows/*.yml
+#   - npm:            package.json dependencies + devDependencies (grouped)
+#   - docker-compose: Docker images referenced in docker-compose.yml
+#
+# Why SHA-pin GitHub Actions (and why Dependabot is the maintenance path):
+#   - PRD NFR-26 / FR-F10 mandate full-length commit SHA pins (no floating tags
+#     like `@v6` or `@main`) to defend against compromised-tag supply-chain
+#     attacks. See _bmad-output/planning-artifacts/prd.md#nfr-26.
+#   - The trailing `# vX.Y.Z` comment on each `uses:` line is LOAD-BEARING:
+#     Dependabot reads it to surface the human-readable version in bump PRs.
+#     Never strip that comment when authoring workflows.
+#
+# Cadence:
+#   - Weekly Monday. One batched review session per week keeps signal/noise
+#     ratio sane vs. daily PRs. PRs target `develop` (the integration branch
+#     per DEVELOPERS.md §3); the maintainer merges after CI green.
+#
+# Flowable Docker image bumps:
+#   - The flowable/flowable-rest image is pinned in docker-compose.yml. Major
+#     version bumps (7.x → 8.x) trigger a compat re-audit per ADR-012
+#     (_bmad-output/planning-artifacts/architecture.md#adr-012). Dependabot
+#     opens the PR; the maintainer runs the audit (docs/compat.md) before
+#     merging. Do NOT enable auto-merge for the docker-compose ecosystem.
+version: 2
+updates:
+  # GitHub Actions versions (SHA-pinned per PRD NFR-26; Dependabot bumps the SHAs).
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop          # PRs target the integration branch (DEVELOPERS.md §3)
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - "type:chore"
+      - "area:ci-cd"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+
+  # npm dependencies (Flowatch is a single-package project at repo root).
+  - package-ecosystem: npm
+    directory: /
+    target-branch: develop          # PRs target the integration branch (DEVELOPERS.md §3)
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - "type:chore"
+      - "area:tooling"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      # Group bpmn.io toolkit updates — they're tightly coupled.
+      bpmn-io:
+        patterns:
+          - "bpmn-js*"
+          - "dmn-js*"
+          - "@bpmn-io/*"
+      # Group test toolchain so vitest+playwright bumps arrive together.
+      test-toolchain:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "@playwright/*"
+          - "playwright"
+          - "@testing-library/*"
+      # Group lint/format updates.
+      lint-format:
+        patterns:
+          - "@biomejs/*"
+          - "biome"
+
+  # Docker images referenced from docker-compose.yml (postgres, flowable, nginx).
+  # See top-of-file note: Flowable major-version bumps require ADR-012 compat audit.
+  - package-ecosystem: docker-compose
+    directory: /
+    target-branch: develop          # PRs target the integration branch (DEVELOPERS.md §3)
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - "type:chore"
+      - "area:infra"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    # IMPORTANT: Flowable major-version bumps (7.x → 8.x) require a compat re-audit
+    # per ADR-012 (_bmad-output/planning-artifacts/architecture.md#adr-012). Dependabot
+    # opens the PR; the maintainer runs `docs/compat.md` re-audit before merging.
+    # Do NOT enable auto-merge for this ecosystem.
+    # NOTE: ecosystem identifier is `docker-compose` (the newer parser for
+    # docker-compose.yml files). If GitHub rejects the identifier at validation
+    # time, fall back to `docker` and adjust this comment.
