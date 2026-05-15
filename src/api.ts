@@ -54,10 +54,7 @@ export interface ApiLogEntry {
   error?: string;
 }
 
-export type QueryParams = Record<
-  string,
-  string | number | boolean | null | undefined
->;
+export type QueryParams = Record<string, string | number | boolean | null | undefined>;
 
 export interface RequestOpts {
   params?: QueryParams | undefined;
@@ -313,8 +310,8 @@ async function request<T = unknown>(
     const data: T = raw
       ? ((await res.text()) as unknown as T)
       : res.headers.get("content-type")?.includes("application/json")
-          ? ((await res.json()) as T)
-          : ((await res.text()) as unknown as T);
+        ? ((await res.json()) as T)
+        : ((await res.text()) as unknown as T);
     logCall(entry);
     return data;
   } catch (err) {
@@ -333,15 +330,21 @@ const listDeployments = (params?: QueryParams) =>
 const createDeployment = (form: unknown) =>
   request<FlowableDeployment>("POST", "/repository/deployments", { body: form });
 const deleteDeployment = (id: string, cascade?: boolean) =>
-  request<void>("DELETE", `/repository/deployments/${id}`,
-    cascade ? { params: { cascade: true } } : {});
+  request<void>(
+    "DELETE",
+    `/repository/deployments/${id}`,
+    cascade ? { params: { cascade: true } } : {},
+  );
 const listDeploymentResources = (id: string) =>
   request<FlowableResource[]>("GET", `/repository/deployments/${id}/resources`);
 const listProcessDefinitions = (params?: QueryParams) =>
-  request<FlowablePage<FlowableProcessDefinition>>("GET", "/repository/process-definitions", { params });
+  request<FlowablePage<FlowableProcessDefinition>>("GET", "/repository/process-definitions", {
+    params,
+  });
 const suspendProcessDefinition = (id: string, suspend: boolean) =>
-  request<FlowableProcessDefinition>("PUT", `/repository/process-definitions/${id}`,
-    { body: { action: suspend ? "suspend" : "activate" } });
+  request<FlowableProcessDefinition>("PUT", `/repository/process-definitions/${id}`, {
+    body: { action: suspend ? "suspend" : "activate" },
+  });
 const getProcessDefinitionResource = (id: string): Promise<string> =>
   request<string>("GET", `/repository/process-definitions/${id}/resourcedata`, { raw: true });
 
@@ -351,15 +354,17 @@ const listProcessInstances = (params?: QueryParams) =>
 const startProcessInstance = (body: Record<string, unknown>) =>
   request<FlowableProcessInstance>("POST", "/runtime/process-instances", { body });
 const deleteProcessInstance = (id: string, reason?: string) =>
-  request<void>("DELETE", `/runtime/process-instances/${id}`,
-    reason ? { params: { deleteReason: reason } } : {});
+  request<void>(
+    "DELETE",
+    `/runtime/process-instances/${id}`,
+    reason ? { params: { deleteReason: reason } } : {},
+  );
 const getProcessInstanceVariables = (id: string) =>
   request<FlowableVariable[]>("GET", `/runtime/process-instances/${id}/variables`);
 const listTasks = (params?: QueryParams) =>
   request<FlowablePage<FlowableTask>>("GET", "/runtime/tasks", { params });
 const taskAction = (taskId: string, action: string, body?: Record<string, unknown>) =>
-  request<FlowableTask>("POST", `/runtime/tasks/${taskId}`,
-    { body: { action, ...(body ?? {}) } });
+  request<FlowableTask>("POST", `/runtime/tasks/${taskId}`, { body: { action, ...(body ?? {}) } });
 const getTaskVariables = (taskId: string) =>
   request<FlowableVariable[]>("GET", `/runtime/tasks/${taskId}/variables`);
 
@@ -379,20 +384,29 @@ const listDeadLetterJobs = (params?: QueryParams) =>
 const executeJob = (id: string) =>
   request<void>("POST", `/management/jobs/${id}`, { body: { action: "execute" } });
 const moveDeadLetterJob = (id: string) =>
-  request<FlowableJob>("POST", `/management/deadletter-jobs/${id}`,
-    { body: { action: "move" } });
+  request<FlowableJob>("POST", `/management/deadletter-jobs/${id}`, { body: { action: "move" } });
 const jobStacktrace = (id: string): Promise<string> =>
   request<string>("GET", `/management/jobs/${id}/exception-stacktrace`, { raw: true });
 
 // ── History ──────────────────────────────────────────────────────────────
 const listHistoricInstances = (params?: QueryParams) =>
-  request<FlowablePage<FlowableHistoricProcessInstance>>("GET", "/history/historic-process-instances", { params });
+  request<FlowablePage<FlowableHistoricProcessInstance>>(
+    "GET",
+    "/history/historic-process-instances",
+    { params },
+  );
 const listHistoricActivities = (params?: QueryParams) =>
-  request<FlowablePage<FlowableHistoricActivity>>("GET", "/history/historic-activity-instances", { params });
+  request<FlowablePage<FlowableHistoricActivity>>("GET", "/history/historic-activity-instances", {
+    params,
+  });
 const listHistoricVariables = (params?: QueryParams) =>
-  request<FlowablePage<FlowableHistoricVariable>>("GET", "/history/historic-variable-instances", { params });
+  request<FlowablePage<FlowableHistoricVariable>>("GET", "/history/historic-variable-instances", {
+    params,
+  });
 const listHistoricTasks = (params?: QueryParams) =>
-  request<FlowablePage<FlowableHistoricTask>>("GET", "/history/historic-task-instances", { params });
+  request<FlowablePage<FlowableHistoricTask>>("GET", "/history/historic-task-instances", {
+    params,
+  });
 
 // ── Identity ─────────────────────────────────────────────────────────────
 const listUsers = (params?: QueryParams) =>
@@ -417,18 +431,22 @@ const listTenants = async (): Promise<{ data: FlowableTenant[] }> => {
 
 // ── DMN (mounted under /flowable-rest/dmn-api, not /service) ─────────────
 const listDecisions = (params?: QueryParams) =>
-  request<FlowablePage<FlowableDecision>>("GET", "/dmn-repository/decisions",
-    { params, base: dmnBase() });
+  request<FlowablePage<FlowableDecision>>("GET", "/dmn-repository/decisions", {
+    params,
+    base: dmnBase(),
+  });
 const listDmnDeployments = (params?: QueryParams) =>
-  request<FlowablePage<FlowableDeployment>>("GET", "/dmn-repository/deployments",
-    { params, base: dmnBase() });
+  request<FlowablePage<FlowableDeployment>>("GET", "/dmn-repository/deployments", {
+    params,
+    base: dmnBase(),
+  });
 const executeDecision = (body: Record<string, unknown>) =>
-  request<FlowableDecisionResult>("POST", "/dmn-rule/execute",
-    { body, base: dmnBase() });
+  request<FlowableDecisionResult>("POST", "/dmn-rule/execute", { body, base: dmnBase() });
 const getDmnResource = (deploymentId: string, resourceId: string): Promise<string> =>
-  request<string>("GET",
-    `/dmn-repository/deployments/${deploymentId}/resourcedata/${resourceId}`,
-    { raw: true, base: dmnBase() });
+  request<string>("GET", `/dmn-repository/deployments/${deploymentId}/resourcedata/${resourceId}`, {
+    raw: true,
+    base: dmnBase(),
+  });
 
 // ── Deployment helpers (multipart upload) ────────────────────────────────
 // Flowable expects multipart/form-data, not the JSON-with-base64 shape we used
@@ -490,8 +508,7 @@ const uploadDeployment = async (
 const deployBpmn = (name: string, xml: string) =>
   uploadDeployment(name, xml, "application/xml", { deploymentName: name });
 const deployDmn = (name: string, xml: string) =>
-  uploadDeployment(name, xml, "application/xml",
-    { deploymentName: name, base: dmnBase() });
+  uploadDeployment(name, xml, "application/xml", { deploymentName: name, base: dmnBase() });
 
 const ping = () => request<FlowableEngineInfo>("GET", "/management/engine");
 
@@ -513,23 +530,49 @@ export const api = {
   },
   log: (): ApiLogEntry[] => [...API_LOG],
   // BPMN repository
-  listDeployments, createDeployment, deleteDeployment, listDeploymentResources,
-  listProcessDefinitions, suspendProcessDefinition, getProcessDefinitionResource,
+  listDeployments,
+  createDeployment,
+  deleteDeployment,
+  listDeploymentResources,
+  listProcessDefinitions,
+  suspendProcessDefinition,
+  getProcessDefinitionResource,
   // Runtime
-  listProcessInstances, startProcessInstance, deleteProcessInstance,
-  getProcessInstanceVariables, listTasks, taskAction, getTaskVariables,
+  listProcessInstances,
+  startProcessInstance,
+  deleteProcessInstance,
+  getProcessInstanceVariables,
+  listTasks,
+  taskAction,
+  getTaskVariables,
   // Form
-  getTaskForm, submitTaskForm,
+  getTaskForm,
+  submitTaskForm,
   // Management
-  listJobs, listTimerJobs, listDeadLetterJobs, executeJob, moveDeadLetterJob,
+  listJobs,
+  listTimerJobs,
+  listDeadLetterJobs,
+  executeJob,
+  moveDeadLetterJob,
   jobStacktrace,
   // History
-  listHistoricInstances, listHistoricActivities, listHistoricVariables,
+  listHistoricInstances,
+  listHistoricActivities,
+  listHistoricVariables,
   listHistoricTasks,
   // Identity
-  listUsers, listGroups, getUserGroups, addUserToGroup, listTenants,
+  listUsers,
+  listGroups,
+  getUserGroups,
+  addUserToGroup,
+  listTenants,
   // DMN
-  listDecisions, listDmnDeployments, executeDecision, getDmnResource,
-  deployBpmn, deployDmn,
-  ping, runRaw,
+  listDecisions,
+  listDmnDeployments,
+  executeDecision,
+  getDmnResource,
+  deployBpmn,
+  deployDmn,
+  ping,
+  runRaw,
 };
