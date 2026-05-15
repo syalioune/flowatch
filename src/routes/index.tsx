@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Dashboard } from "../screens";
 

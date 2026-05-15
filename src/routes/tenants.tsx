@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createFileRoute } from "@tanstack/react-router";
 import { api } from "../api";
 import { ErrorBox } from "../lib/error-box";

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Generic data hook — calls `fn` on mount + when any dependency changes.
  * Tracks loading / data / error state in one place so screens stay readable.

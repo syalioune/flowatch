@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { api } from "../../api";
 import { ProcessInstanceDetail } from "../../components/ProcessInstanceDetail";

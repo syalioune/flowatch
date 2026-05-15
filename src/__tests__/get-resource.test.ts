@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Vitest unit tests for the single-resource GETs added in Story 3.3:
  *   - api.getDeployment(id)         → GET /repository/deployments/{id}
