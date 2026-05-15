@@ -1,0 +1,152 @@
+# Placeholder CI pipeline matching ADR-010 (architecture.md §3).
+#
+# Five jobs are wired so branch-protection contexts
+# (.github/protection/required_checks.json) can be enforced on `main` from
+# day one. Each job currently echoes its intent; real implementations land
+# during milestone 0.0.1 (Tech Foundation):
+#
+#   check : ADR-007 Biome v2 + ADR-001 tsc --noEmit          → epic 1
+#   unit  : ADR-008 Vitest unit + component tests            → epic 2
+#   e2e   : ADR-008 Playwright vs. live flowable-rest:7.2.0  → epic 2
+#   build : ADR-002 Vite production build + artifact upload  → epic 4
+#   pages : ADR-010 deploy artifact to GitHub Pages (main)   → epic 4
+#
+# When wiring a real implementation, KEEP the job id (and the `name:` if
+# set) — the four required-check contexts `CI / check`, `CI / unit`,
+# `CI / e2e`, `CI / build` are hard-coded in branch protection.
+#
+# All third-party actions are pinned to a full-length commit SHA per
+# NFR-26 (and the repo's "Require actions to be pinned to a full-length
+# commit SHA" setting). Dependabot's `github-actions` ecosystem bumps the
+# SHAs weekly (see .github/dependabot.yml) and keeps the trailing `# vX.Y.Z`
+# comment in sync — never strip that comment, it documents the human-
+# readable version pin matches.
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Biome (lint + format check)
+        id: biome
+        run: npx biome ci .
+
+      - name: TypeScript (tsc --noEmit)
+        id: tsc
+        run: npm run typecheck
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### check"
+            echo ""
+            echo "- Biome: ${{ steps.biome.outcome }}"
+            echo "- tsc --noEmit: ${{ steps.tsc.outcome }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  unit:
+    name: unit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium (for vitest browser tier)
+        run: npx playwright install --with-deps chromium
+
+      - name: Vitest (unit + browser tiers)
+        run: npm run test:all -- --reporter=default --reporter=junit --outputFile.junit=./test-results/junit.xml
+
+      - name: Upload JUnit report on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unit-junit-${{ github.run_id }}
+          path: ./test-results/junit.xml
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ -f ./test-results/junit.xml ]; then
+            tests=$(grep -oE 'tests="[0-9]+"' ./test-results/junit.xml | head -1 | grep -oE '[0-9]+')
+            failures=$(grep -oE 'failures="[0-9]+"' ./test-results/junit.xml | head -1 | grep -oE '[0-9]+')
+            errors=$(grep -oE 'errors="[0-9]+"' ./test-results/junit.xml | head -1 | grep -oE '[0-9]+')
+            {
+              echo "### unit"
+              echo ""
+              echo "- Tests: ${tests:-?}"
+              echo "- Failures: ${failures:-?}"
+              echo "- Errors: ${errors:-?}"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### unit (no JUnit report — Vitest may have crashed before write)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Placeholder — Playwright E2E against live Flowable
+        run: echo "TBD (epic 2) — docker compose up -d && playwright test — see ADR-008"
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Placeholder — Vite production build + artifact upload
+        run: echo "TBD (epic 4) — npm ci && npm run build && actions/upload-artifact — see ADR-002, ADR-010"
+
+  pages:
+    name: pages
+    needs: [check, unit, e2e, build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+    steps:
+      - name: Placeholder — deploy artifact to gh-pages
+        run: echo "TBD (epic 4) — actions/download-artifact + actions/deploy-pages — see ADR-010"
