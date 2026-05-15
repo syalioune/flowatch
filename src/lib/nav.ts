@@ -25,7 +25,13 @@ export const PATH_TO_VIEW: Record<string, string> = Object.fromEntries(
 );
 
 /** Views whose route file exists today. Grows as Stories 3.3-3.5 land. */
-export const ROUTED_VIEWS = new Set<string>(["dashboard", "bpmn", "dmn"]);
+export const ROUTED_VIEWS = new Set<string>([
+  "dashboard",
+  "bpmn",
+  "dmn",
+  "deployments",
+  "definitions",
+]);
 
 /** Fire-and-forget request to open the API Inspector drawer. */
 export function openInspector(): void {

@@ -5,16 +5,7 @@ import { ApiInspector, SettingsModal, Sidebar, Toaster, Topbar } from "./compone
 import DATA from "./data";
 import { PATH_TO_VIEW, ROUTED_VIEWS, VIEW_TO_PATH } from "./lib/nav";
 import "./lib/window-events";
-import {
-  Deployments,
-  History,
-  Identity,
-  Jobs,
-  ProcessDefinitions,
-  ProcessInstances,
-  Tasks,
-  Tenants,
-} from "./screens";
+import { History, Identity, Jobs, ProcessInstances, Tasks, Tenants } from "./screens";
 import {
   TweakButton,
   TweakRadio,
@@ -218,7 +209,10 @@ function App() {
     api.setConfig({ tenantId: next.id });
   };
 
-  const routedView = PATH_TO_VIEW[pathname];
+  // Match exact "/deployments" first, then fall through to first-segment lookup
+  // for detail routes like "/deployments/abc-123" → "deployments".
+  const firstSegment = "/" + pathname.split("/")[1];
+  const routedView = PATH_TO_VIEW[pathname] ?? PATH_TO_VIEW[firstSegment];
   const effectiveView = routedView ?? view;
   const endpointFn = (
     ENDPOINT_BY_VIEW as Record<
@@ -235,12 +229,6 @@ function App() {
   // switch entirely.
   let Screen: React.ReactNode = null;
   switch (view) {
-    case "deployments":
-      Screen = <Deployments onOpenInspector={openInspector} />;
-      break;
-    case "definitions":
-      Screen = <ProcessDefinitions onOpenInspector={openInspector} onNav={navTo} />;
-      break;
     case "instances":
       Screen = <ProcessInstances onOpenInspector={openInspector} />;
       break;

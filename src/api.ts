@@ -352,6 +352,8 @@ async function request<T = unknown>(
 // ── Repository (BPMN) ─────────────────────────────────────────────────────
 const listDeployments = (params?: QueryParams) =>
   request<FlowablePage<FlowableDeployment>>("GET", "/repository/deployments", { params });
+const getDeployment = (id: string) =>
+  request<FlowableDeployment>("GET", `/repository/deployments/${id}`);
 const createDeployment = (form: unknown) =>
   request<FlowableDeployment>("POST", "/repository/deployments", { body: form });
 const deleteDeployment = (id: string, cascade?: boolean) =>
@@ -366,6 +368,8 @@ const listProcessDefinitions = (params?: QueryParams) =>
   request<FlowablePage<FlowableProcessDefinition>>("GET", "/repository/process-definitions", {
     params,
   });
+const getProcessDefinition = (id: string) =>
+  request<FlowableProcessDefinition>("GET", `/repository/process-definitions/${id}`);
 const suspendProcessDefinition = (id: string, suspend: boolean) =>
   request<FlowableProcessDefinition>("PUT", `/repository/process-definitions/${id}`, {
     body: { action: suspend ? "suspend" : "activate" },
@@ -556,10 +560,12 @@ export const api = {
   log: (): ApiLogEntry[] => [...API_LOG],
   // BPMN repository
   listDeployments,
+  getDeployment,
   createDeployment,
   deleteDeployment,
   listDeploymentResources,
   listProcessDefinitions,
+  getProcessDefinition,
   suspendProcessDefinition,
   getProcessDefinitionResource,
   // Runtime
