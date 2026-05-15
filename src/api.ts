@@ -380,6 +380,8 @@ const getProcessDefinitionResource = (id: string): Promise<string> =>
 // ── Runtime ───────────────────────────────────────────────────────────────
 const listProcessInstances = (params?: QueryParams) =>
   request<FlowablePage<FlowableProcessInstance>>("GET", "/runtime/process-instances", { params });
+const getProcessInstance = (id: string) =>
+  request<FlowableProcessInstance>("GET", `/runtime/process-instances/${id}`);
 const startProcessInstance = (body: Record<string, unknown>) =>
   request<FlowableProcessInstance>("POST", "/runtime/process-instances", { body });
 const deleteProcessInstance = (id: string, reason?: string) =>
@@ -392,6 +394,7 @@ const getProcessInstanceVariables = (id: string) =>
   request<FlowableVariable[]>("GET", `/runtime/process-instances/${id}/variables`);
 const listTasks = (params?: QueryParams) =>
   request<FlowablePage<FlowableTask>>("GET", "/runtime/tasks", { params });
+const getTask = (id: string) => request<FlowableTask>("GET", `/runtime/tasks/${id}`);
 const taskAction = (taskId: string, action: string, body?: Record<string, unknown>) =>
   request<FlowableTask>("POST", `/runtime/tasks/${taskId}`, { body: { action, ...(body ?? {}) } });
 const getTaskVariables = (taskId: string) =>
@@ -406,6 +409,7 @@ const submitTaskForm = (taskId: string, properties: unknown) =>
 // ── Management ───────────────────────────────────────────────────────────
 const listJobs = (params?: QueryParams) =>
   request<FlowablePage<FlowableJob>>("GET", "/management/jobs", { params });
+const getJob = (id: string) => request<FlowableJob>("GET", `/management/jobs/${id}`);
 const listTimerJobs = (params?: QueryParams) =>
   request<FlowablePage<FlowableJob>>("GET", "/management/timer-jobs", { params });
 const listDeadLetterJobs = (params?: QueryParams) =>
@@ -570,10 +574,12 @@ export const api = {
   getProcessDefinitionResource,
   // Runtime
   listProcessInstances,
+  getProcessInstance,
   startProcessInstance,
   deleteProcessInstance,
   getProcessInstanceVariables,
   listTasks,
+  getTask,
   taskAction,
   getTaskVariables,
   // Form
@@ -581,6 +587,7 @@ export const api = {
   submitTaskForm,
   // Management
   listJobs,
+  getJob,
   listTimerJobs,
   listDeadLetterJobs,
   executeJob,
