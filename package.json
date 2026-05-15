@@ -21,7 +21,9 @@
     "release": "semantic-release",
     "prepare": "husky",
     "release:preview": "node scripts/release/preview-fast.mjs",
-    "release:preview:full": "node scripts/release/preview.mjs"
+    "release:preview:full": "node scripts/release/preview.mjs",
+    "badges:update": "node scripts/release/update-readme-badges.mjs",
+    "badges:check": "node scripts/release/update-readme-badges.mjs --check"
   },
   "dependencies": {
     "@tanstack/react-router": "^1.169.2",
