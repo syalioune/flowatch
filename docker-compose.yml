@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: flowable
+      POSTGRES_USER: flowable
+      POSTGRES_PASSWORD: flowable
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flowable"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  flowable:
+    image: flowable/flowable-rest:7.2.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flowable
+      SPRING_DATASOURCE_USERNAME: flowable
+      SPRING_DATASOURCE_PASSWORD: flowable
+      FLOWABLE_REST_APP_ADMIN_USER_ID: rest-admin
+      FLOWABLE_REST_APP_ADMIN_PASSWORD: test
+      FLOWABLE_REST_APP_ADMIN_FIRST_NAME: REST
+      FLOWABLE_REST_APP_ADMIN_LAST_NAME: Admin
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://rest-admin:test@localhost:8080/flowable-rest/service/management/engine || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:8080"
+    environment:
+      ALLOWED_ORIGIN: ${ALLOWED_ORIGIN:-http://localhost:5173}
+      # Restrict envsubst to ALLOWED_ORIGIN so nginx's own $host/$remote_addr/etc. are preserved.
+      NGINX_ENVSUBST_FILTER: ALLOWED_ORIGIN
+    volumes:
+      - ./docker/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+    depends_on:
+      flowable:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
