@@ -1,9 +1,22 @@
 import BpmnModelerClass from "bpmn-js/lib/Modeler";
+// @migration-any: dmn-js has no shipped .d.ts; the default export is treated as
+// a constructor and all event-bus / DI container interactions are `any`. ADR-001
+// explicitly allows this for the modeler wrappers. Future: file an upstream issue.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// @ts-expect-error — dmn-js/lib/Modeler has no type declarations
 import DmnModelerClass from "dmn-js/lib/Modeler";
 import React from "react";
-import { api } from "./api";
-import { Icon } from "./components.jsx";
-import DATA from "./data.js";
+import { api, type FlowableProcessDefinition } from "./api";
+import { Icon } from "./components";
+import DATA from "./data";
+
+// @migration-any: bpmn-js/dmn-js DI container, event-bus payloads, and BO
+// shapes are dynamic. Per ADR-001 consequences, this file is the allowed
+// `any` zone — every cast below is documented at use site.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyModeler = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyEl = any;
 
 // Minimal blank BPMN starter — used when the user hasn't selected an existing
 // process definition to edit. The real LOAN_BPMN_XML below is kept as a richer
@@ -179,11 +192,11 @@ const LOAN_DMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
 </definitions>`;
 
 // ─── Element type helpers ───────────────────────────────────────────
-const bpmnKind = (el) => {
+const bpmnKind = (el: AnyEl): string => {
   if (!el || !el.type) return "—";
-  return el.type.replace(/^bpmn:/, "");
+  return (el.type as string).replace(/^bpmn:/, "");
 };
-const bpmnIconClass = (el) => {
+const bpmnIconClass = (el: AnyEl): string => {
   const t = bpmnKind(el);
   if (t === "StartEvent") return "bpmn-icon-start-event-none";
   if (t === "EndEvent") return "bpmn-icon-end-event-none";
@@ -197,17 +210,21 @@ const bpmnIconClass = (el) => {
   return "bpmn-icon-task";
 };
 
+interface ModelerProps {
+  onOpenInspector?: (e: { method: string; path: string; desc: string }) => void;
+}
+
 // ─── BPMN modeler (real bpmn-js) ───────────────────────────────────
-export const BpmnModeler = ({ onOpenInspector }) => {
-  const containerRef = React.useRef(null);
-  const modelerRef = React.useRef(null);
-  const [selected, setSelected] = React.useState(null);
-  const [elements, setElements] = React.useState([]);
+export const BpmnModeler = ({ onOpenInspector }: ModelerProps) => {
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const modelerRef = React.useRef<AnyModeler | null>(null);
+  const [selected, setSelected] = React.useState<AnyEl | null>(null);
+  const [elements, setElements] = React.useState<AnyEl[]>([]);
   const [dirty, setDirty] = React.useState(false);
-  const [error, setError] = React.useState(null);
+  const [error, setError] = React.useState<string | null>(null);
   const [version, setVersion] = React.useState(0);
-  const [definitions, setDefinitions] = React.useState([]);
-  const [activeDef, setActiveDef] = React.useState(null);
+  const [definitions, setDefinitions] = React.useState<FlowableProcessDefinition[]>([]);
+  const [activeDef, setActiveDef] = React.useState<FlowableProcessDefinition | null>(null);
   const [filename, setFilename] = React.useState("loan-approval.bpmn20.xml");
   const eps = DATA.endpoints.bpmnModeler;
 
@@ -220,10 +237,11 @@ export const BpmnModeler = ({ onOpenInspector }) => {
   }, []);
 
   React.useEffect(() => {
-    let m;
+    let m: AnyModeler;
     try {
+      // @migration-any: bpmn-js constructor accepts `container: HTMLElement`.
       m = new BpmnModelerClass({
-        container: containerRef.current,
+        container: containerRef.current as HTMLElement,
         keyboard: { bindTo: window },
       });
     } catch (e) {
@@ -239,10 +257,10 @@ export const BpmnModeler = ({ onOpenInspector }) => {
         } catch {}
         refreshOutline();
       })
-      .catch((e) => setError(String(e.message || e)));
+      .catch((e: Error) => setError(String(e.message || e)));
 
     const bus = m.get("eventBus");
-    const onSel = (e) => {
+    const onSel = (e: AnyEl) => {
       const els = e.newSelection || [];
       setSelected(els.length === 1 ? els[0] : null);
       setVersion((v) => v + 1);
@@ -259,7 +277,7 @@ export const BpmnModeler = ({ onOpenInspector }) => {
       try {
         const reg = m.get("elementRegistry");
         const all = reg.filter(
-          (el) =>
+          (el: AnyEl) =>
             el.businessObject &&
             el.type !== "label" &&
             el.type !== "bpmn:Process" &&
@@ -278,11 +296,12 @@ export const BpmnModeler = ({ onOpenInspector }) => {
     };
   }, []);
 
-  const loadDefinition = async (id) => {
+  const loadDefinition = async (id: string) => {
     if (!id) {
       setActiveDef(null);
       const m = modelerRef.current;
-      if (m) await m.importXML(BLANK_BPMN_XML).catch((e) => setError(String(e.message || e)));
+      if (m)
+        await m.importXML(BLANK_BPMN_XML).catch((e: Error) => setError(String(e.message || e)));
       setDirty(false);
       setFilename("new-process.bpmn20.xml");
       return;
@@ -302,25 +321,25 @@ export const BpmnModeler = ({ onOpenInspector }) => {
         setError(null);
       }
     } catch (e) {
-      setError(String(e.message || e));
+      setError(String((e as Error)?.message || e));
     }
   };
 
-  const updateName = (val) => {
+  const updateName = (val: string) => {
     const m = modelerRef.current;
     if (!m || !selected) return;
     m.get("modeling").updateProperties(selected, { name: val });
   };
-  const updateExtAttr = (attr, val) => {
+  const updateExtAttr = (attr: string, val: unknown) => {
     const m = modelerRef.current;
     if (!m || !selected) return;
     const modeling = m.get("modeling");
-    const props = {};
+    const props: Record<string, unknown> = {};
     props[attr] = val;
     try {
       modeling.updateProperties(selected, props);
     } catch {
-      selected.businessObject[attr] = val;
+      (selected.businessObject as Record<string, unknown>)[attr] = val;
       setVersion((v) => v + 1);
     }
   };
@@ -353,16 +372,16 @@ export const BpmnModeler = ({ onOpenInspector }) => {
         .then((r) => setDefinitions(r.data || []))
         .catch(() => {});
     } catch (e) {
-      setError(`Deploy failed: ${e.message || e}`);
+      setError(`Deploy failed: ${(e as Error)?.message || e}`);
     }
   };
 
-  const zoom = (dir) => {
+  const zoom = (dir: number | "fit") => {
     const m = modelerRef.current;
     if (!m) return;
     const canvas = m.get("canvas");
     if (dir === "fit") canvas.zoom("fit-viewport", "auto");
-    else canvas.zoom(canvas.zoom() * (dir > 0 ? 1.15 : 1 / 1.15));
+    else canvas.zoom(canvas.zoom() * ((dir as number) > 0 ? 1.15 : 1 / 1.15));
   };
 
   const sel = selected;
@@ -418,7 +437,9 @@ export const BpmnModeler = ({ onOpenInspector }) => {
           className="btn"
           data-size="sm"
           data-variant="ghost"
-          onClick={() => onOpenInspector && onOpenInspector(eps[0])}
+          onClick={() => {
+            if (onOpenInspector && eps[0]) onOpenInspector(eps[0]);
+          }}
         >
           <Icon name="api" size={13} />
           REST
@@ -691,19 +712,29 @@ POST /runtime/process-instances`}
 };
 
 // ─── DMN modeler (real dmn-js) ─────────────────────────────────────
-export const DmnModeler = ({ onOpenInspector }) => {
-  const containerRef = React.useRef(null);
-  const modelerRef = React.useRef(null);
-  const [view, setView] = React.useState("table");
-  const [error, setError] = React.useState(null);
-  const [testInputs, setTestInputs] = React.useState({
+type DmnDecision = import("./api").FlowableDecision;
+type DmnDecisionResult = import("./api").FlowableDecisionResult & {
+  resultVariables?: Record<string, unknown>;
+  ruleFired?: number[];
+};
+
+export const DmnModeler = ({ onOpenInspector }: ModelerProps) => {
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const modelerRef = React.useRef<AnyModeler | null>(null);
+  const [view, setView] = React.useState<"drd" | "table">("table");
+  const [error, setError] = React.useState<string | null>(null);
+  const [testInputs, setTestInputs] = React.useState<{
+    creditScore: number;
+    income: number;
+    employmentStatus: string;
+  }>({
     creditScore: 742,
     income: 86000,
     employmentStatus: "employed",
   });
-  const [testResult, setTestResult] = React.useState(null);
+  const [testResult, setTestResult] = React.useState<DmnDecisionResult | null>(null);
   const [running, setRunning] = React.useState(false);
-  const [decisions, setDecisions] = React.useState([]);
+  const [decisions, setDecisions] = React.useState<DmnDecision[]>([]);
   const [decisionsAvailable, setDecisionsAvailable] = React.useState(true);
   const filename = "loan-eligibility.dmn";
   const eps = DATA.endpoints.dmnModeler;
@@ -716,10 +747,10 @@ export const DmnModeler = ({ onOpenInspector }) => {
   }, []);
 
   React.useEffect(() => {
-    let m;
+    let m: AnyModeler;
     try {
       m = new DmnModelerClass({
-        container: containerRef.current,
+        container: containerRef.current as HTMLElement,
         keyboard: { bindTo: window },
       });
     } catch (e) {
@@ -731,11 +762,11 @@ export const DmnModeler = ({ onOpenInspector }) => {
       .then(() => {
         try {
           const views = m.getViews();
-          const drdView = views.find((v) => v.type === "drd");
+          const drdView = views.find((v: AnyEl) => v.type === "drd");
           if (drdView) m.open(drdView);
           setView("drd");
           setTimeout(() => {
-            const elig = views.find((v) => v.element && v.element.id === "loanEligibility");
+            const elig = views.find((v: AnyEl) => v.element && v.element.id === "loanEligibility");
             if (elig) {
               m.open(elig);
               setView("table");
@@ -745,7 +776,7 @@ export const DmnModeler = ({ onOpenInspector }) => {
           console.warn(e);
         }
       })
-      .catch((e) => setError(String(e.message || e)));
+      .catch((e: Error) => setError(String(e.message || e)));
     return () => {
       try {
         m.destroy();
@@ -754,20 +785,20 @@ export const DmnModeler = ({ onOpenInspector }) => {
     };
   }, []);
 
-  const switchView = (which) => {
+  const switchView = (which: "drd" | "table") => {
     const m = modelerRef.current;
     if (!m) return;
     const views = m.getViews();
     if (which === "drd") {
-      const v = views.find((x) => x.type === "drd");
+      const v = views.find((x: AnyEl) => x.type === "drd");
       if (v) {
         m.open(v);
         setView("drd");
       }
     } else {
       const v =
-        views.find((x) => x.element && x.element.id === "loanEligibility") ||
-        views.find((x) => x.type === "decisionTable");
+        views.find((x: AnyEl) => x.element && x.element.id === "loanEligibility") ||
+        views.find((x: AnyEl) => x.type === "decisionTable");
       if (v) {
         m.open(v);
         setView("table");
@@ -798,17 +829,17 @@ export const DmnModeler = ({ onOpenInspector }) => {
         .then((r) => setDecisions(r.data || []))
         .catch(() => {});
     } catch (e) {
-      setError(`Deploy failed: ${e.message || e}`);
+      setError(`Deploy failed: ${(e as Error)?.message || e}`);
     }
   };
 
   const runTest = async () => {
     setRunning(true);
     try {
-      const r = await api.executeDecision({
+      const r = (await api.executeDecision({
         decisionKey: "loanEligibility",
         variables: testInputs,
-      });
+      })) as DmnDecisionResult;
       setTestResult(r);
     } finally {
       setRunning(false);
@@ -862,7 +893,9 @@ export const DmnModeler = ({ onOpenInspector }) => {
           className="btn"
           data-size="sm"
           data-variant="ghost"
-          onClick={() => onOpenInspector && onOpenInspector(eps[0])}
+          onClick={() => {
+            if (onOpenInspector && eps[0]) onOpenInspector(eps[0]);
+          }}
         >
           <Icon name="api" size={13} />
           REST
@@ -991,7 +1024,7 @@ target   Flowable 7 REST API`}
   );
 };
 
-function download(name, content, type) {
+function download(name: string, content: BlobPart, type: string): void {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
