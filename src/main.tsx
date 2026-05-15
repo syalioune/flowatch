@@ -2,6 +2,8 @@
 
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import ReactDOM from "react-dom/client";
+// Self-hosted IBM Plex faces must register before any layout-affecting CSS.
+import "./styles/fonts.css";
 import "./lib/route-meta";
 import { routeTree } from "./routeTree.gen";
 import "./styles.css";
