@@ -398,6 +398,17 @@ a {
   flex: 1;
 }
 
+/* Build identity surfaced by Vite-injected globals (Story 6.5, NFR-20). */
+.build-info {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--fg-mute);
+  letter-spacing: 0.02em;
+  padding: 0 9px;
+  line-height: 1.5;
+  user-select: text;
+}
+
 /* ── Topbar bits ─────────────────────────────────────────────────── */
 .tenant-switch {
   display: flex;

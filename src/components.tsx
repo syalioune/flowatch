@@ -357,6 +357,9 @@ export const Sidebar = ({ connection, onConnClick, counts }: SidebarProps) => (
         <span className="conn-host">{connection.host}</span>
         <Icon name="settings" size={12} />
       </button>
+      <span className="build-info">
+        build {__BUILD_SHA__} · tested vs Flowable {__FLOWABLE_TESTED_VERSION__}
+      </span>
     </div>
   </aside>
 );
@@ -581,9 +584,11 @@ export const SettingsModal = ({ open, onClose }: SettingsModalProps) => {
 };
 
 function AboutTab() {
-  const version = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.0.0";
-  const buildSha = typeof __BUILD_SHA__ !== "undefined" ? __BUILD_SHA__ : "dev";
-  const flowableTested = "7.2.0";
+  // Vite injects these via define() — see vite.config.ts. Sourced from
+  // package.json, git rev-parse, and docs/compat.md frontmatter respectively.
+  const version = __APP_VERSION__;
+  const buildSha = __BUILD_SHA__;
+  const flowableTested = __FLOWABLE_TESTED_VERSION__;
   return (
     <div className="about-tab">
       <h2 className="about-name">Flowatch</h2>
