@@ -2,6 +2,7 @@
 
 import { Link } from "@tanstack/react-router";
 import React from "react";
+import noticeContent from "../NOTICE?raw";
 import { API_LOG, type ApiLogEntry, api, type FlowableConfig } from "./api";
 import { type RouteEndpoint, useRouteMeta } from "./lib/route-meta";
 
@@ -439,10 +440,13 @@ interface SettingsModalProps {
 
 type PingResult = { ok: true; name?: string; version?: string } | { ok: false; error: string };
 
+type SettingsTab = "connection" | "about";
+
 export const SettingsModal = ({ open, onClose }: SettingsModalProps) => {
   const [cfg, setCfg] = React.useState<FlowableConfig>(api.config());
   const [pinging, setPinging] = React.useState(false);
   const [pingRes, setPingRes] = React.useState<PingResult | null>(null);
+  const [tab, setTab] = React.useState<SettingsTab>("connection");
   if (!open) return null;
   const save = () => {
     api.setConfig(cfg);
@@ -463,86 +467,150 @@ export const SettingsModal = ({ open, onClose }: SettingsModalProps) => {
   };
   return (
     <div className="modal-back" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 580 }}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 620 }}>
         <div className="modal-hd">
-          <h3>Engine connection</h3>
-          <button className="icon-btn" onClick={onClose} style={{ marginLeft: "auto" }}>
+          <h3>Settings</h3>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onClose}
+            style={{ marginLeft: "auto" }}
+          >
             <Icon name="x" size={14} />
           </button>
         </div>
-        <div className="modal-bd">
-          <div className="form-row">
-            <label>
-              Base URL <span className="mono">REST service root</span>
-            </label>
-            <input
-              className="input"
-              value={cfg.baseUrl}
-              onChange={(e) => setCfg({ ...cfg, baseUrl: e.target.value })}
-            />
-            <div className="mute text-xs">
-              Default OSS path:{" "}
-              <span className="mono">http://localhost:8080/flowable-rest/service</span>
-            </div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div className="form-row">
-              <label>Username</label>
-              <input
-                className="input"
-                value={cfg.username}
-                onChange={(e) => setCfg({ ...cfg, username: e.target.value })}
-              />
-            </div>
-            <div className="form-row">
-              <label>Password</label>
-              <input
-                className="input"
-                type="password"
-                value={cfg.password}
-                onChange={(e) => setCfg({ ...cfg, password: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="form-row">
-            <label>
-              Tenant ID <span className="mono">optional</span>
-            </label>
-            <input
-              className="input"
-              value={cfg.tenantId}
-              placeholder="leave blank for default"
-              onChange={(e) => setCfg({ ...cfg, tenantId: e.target.value })}
-            />
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
-            <button className="btn" onClick={test} disabled={pinging}>
-              {pinging ? "Pinging…" : "Test connection"}
-            </button>
-            {pingRes && pingRes.ok && (
-              <span className="badge" data-tone="ok">
-                {pingRes.name} {pingRes.version}
-              </span>
-            )}
-            {pingRes && !pingRes.ok && (
-              <span className="badge" data-tone="bad">
-                {pingRes.error}
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="modal-ft">
-          <button className="btn" onClick={onClose}>
-            Cancel
+        <div className="tabs" style={{ margin: "0 18px" }}>
+          <button
+            type="button"
+            className="tab"
+            data-active={tab === "connection" ? "1" : "0"}
+            onClick={() => setTab("connection")}
+          >
+            Connection
           </button>
-          <button className="btn" data-variant="primary" onClick={save}>
-            Save
+          <button
+            type="button"
+            className="tab"
+            data-active={tab === "about" ? "1" : "0"}
+            onClick={() => setTab("about")}
+          >
+            About
           </button>
         </div>
+        {tab === "connection" && (
+          <>
+            <div className="modal-bd">
+              <div className="form-row">
+                <label>
+                  Base URL <span className="mono">REST service root</span>
+                </label>
+                <input
+                  className="input"
+                  value={cfg.baseUrl}
+                  onChange={(e) => setCfg({ ...cfg, baseUrl: e.target.value })}
+                />
+                <div className="mute text-xs">
+                  Default OSS path:{" "}
+                  <span className="mono">http://localhost:8080/flowable-rest/service</span>
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div className="form-row">
+                  <label>Username</label>
+                  <input
+                    className="input"
+                    value={cfg.username}
+                    onChange={(e) => setCfg({ ...cfg, username: e.target.value })}
+                  />
+                </div>
+                <div className="form-row">
+                  <label>Password</label>
+                  <input
+                    className="input"
+                    type="password"
+                    value={cfg.password}
+                    onChange={(e) => setCfg({ ...cfg, password: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="form-row">
+                <label>
+                  Tenant ID <span className="mono">optional</span>
+                </label>
+                <input
+                  className="input"
+                  value={cfg.tenantId}
+                  placeholder="leave blank for default"
+                  onChange={(e) => setCfg({ ...cfg, tenantId: e.target.value })}
+                />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+                <button type="button" className="btn" onClick={test} disabled={pinging}>
+                  {pinging ? "Pinging…" : "Test connection"}
+                </button>
+                {pingRes?.ok && (
+                  <span className="badge" data-tone="ok">
+                    {pingRes.name} {pingRes.version}
+                  </span>
+                )}
+                {pingRes && !pingRes.ok && (
+                  <span className="badge" data-tone="bad">
+                    {pingRes.error}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="modal-ft">
+              <button type="button" className="btn" onClick={onClose}>
+                Cancel
+              </button>
+              <button type="button" className="btn" data-variant="primary" onClick={save}>
+                Save
+              </button>
+            </div>
+          </>
+        )}
+        {tab === "about" && (
+          <div className="modal-bd">
+            <AboutTab />
+          </div>
+        )}
       </div>
     </div>
   );
 };
+
+function AboutTab() {
+  const version = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.0.0";
+  const buildSha = typeof __BUILD_SHA__ !== "undefined" ? __BUILD_SHA__ : "dev";
+  const flowableTested = "7.2.0";
+  return (
+    <div className="about-tab">
+      <h2 className="about-name">Flowatch</h2>
+      <p className="about-version mono">version {version}</p>
+      <p className="about-build mono">
+        build {buildSha} · tested vs Flowable {flowableTested}
+      </p>
+      <p className="about-license">
+        Licensed under{" "}
+        <a
+          href="https://www.apache.org/licenses/LICENSE-2.0"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Apache License 2.0
+        </a>
+        .
+      </p>
+      <p className="about-attribution">
+        Flowatch wraps the official Flowable REST API and embeds bpmn-js and dmn-js, both under MIT
+        from the bpmn.io team.
+      </p>
+      <h3 className="about-credits-heading">Dependency credits</h3>
+      <pre className="about-credits">{noticeContent}</pre>
+    </div>
+  );
+}
 
 const buildFetchSnippet = (cfg: FlowableConfig, ep: RouteEndpoint): string => {
   const u = `${cfg.baseUrl.replace(/\/$/, "")}${ep.path}`;

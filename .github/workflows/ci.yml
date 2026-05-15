@@ -65,6 +65,26 @@ jobs:
         id: tsc
         run: npm run typecheck
 
+      # bpmn-js / dmn-js declare "SEE LICENSE IN LICENSE" in package.json
+      # (their LICENSE file is MIT — manually verified). isbot@5.x is
+      # Unlicense (public-domain dedication, Apache-2.0-compatible but
+      # outside the strict allow-list per NFR-29). Excluded by name; bumps
+      # require re-verifying the underlying LICENSE files.
+      - name: Verify dependency licenses
+        id: licenses
+        run: |
+          npx license-checker-rseidelsohn \
+            --production \
+            --onlyAllow 'Apache-2.0;MIT;BSD-2-Clause;BSD-3-Clause;ISC;CC0-1.0' \
+            --excludePrivatePackages \
+            --excludePackagesStartingWith 'bpmn-js;dmn-js' \
+            --excludePackages 'isbot@5.1.40' \
+            --summary
+
+      - name: Verify NOTICE freshness
+        id: notice
+        run: node scripts/release/generate-notice.mjs --check
+
       - name: Summary
         if: always()
         run: |
@@ -73,6 +93,8 @@ jobs:
             echo ""
             echo "- Biome: ${{ steps.biome.outcome }}"
             echo "- tsc --noEmit: ${{ steps.tsc.outcome }}"
+            echo "- License allow-list: ${{ steps.licenses.outcome }}"
+            echo "- NOTICE freshness: ${{ steps.notice.outcome }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
   unit:
