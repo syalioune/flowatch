@@ -5,7 +5,14 @@ const isCI = !!process.env.CI;
 export default defineConfig({
   testDir: "./e2e",
   timeout: 60_000,
-  expect: { timeout: 10_000 },
+  expect: {
+    timeout: 10_000,
+    toHaveScreenshot: {
+      maxDiffPixels: 400,
+      animations: "disabled",
+      caret: "hide",
+    },
+  },
   fullyParallel: false,
   retries: isCI ? 2 : 0,
   workers: 1,

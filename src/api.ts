@@ -247,6 +247,31 @@ const logCall = (entry: ApiLogEntry): void => {
   window.dispatchEvent(new CustomEvent<ApiLogEntry>("api:log", { detail: entry }));
 };
 
+// Dev-only seed hook: lets Playwright visual tests inject deterministic API_LOG
+// entries without going through the real request() funnel. Guarded by Vite's
+// DEV flag so production bundles never expose it. (Story 2.4 / Path B.)
+if (import.meta.env.DEV && typeof window !== "undefined") {
+  const w = window as unknown as {
+    __flowatchSeedApiLog?: (entries: ApiLogEntry[]) => void;
+    __flowatchClearApiLog?: () => void;
+  };
+  w.__flowatchSeedApiLog = (entries) => {
+    for (const entry of entries) {
+      API_LOG.unshift(entry);
+      if (API_LOG.length > MAX_LOG) API_LOG.length = MAX_LOG;
+      window.dispatchEvent(new CustomEvent<ApiLogEntry>("api:log", { detail: entry }));
+    }
+  };
+  w.__flowatchClearApiLog = () => {
+    API_LOG.length = 0;
+    window.dispatchEvent(
+      new CustomEvent<ApiLogEntry>("api:log", {
+        detail: { id: "", method: "GET", path: "", url: "", status: 0, ms: 0, at: "" },
+      }),
+    );
+  };
+}
+
 const qs = (params?: QueryParams): string => {
   if (!params) return "";
   const usp = new URLSearchParams();
