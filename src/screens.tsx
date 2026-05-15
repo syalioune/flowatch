@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+// size-exempt: pending split into per-screen modules per NFR-21 (deferred refactor; tracked as a separate story).
 
 import { useNavigate } from "@tanstack/react-router";
 import React from "react";

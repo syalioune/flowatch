@@ -85,6 +85,10 @@ jobs:
         id: notice
         run: node scripts/release/generate-notice.mjs --check
 
+      - name: Verify source file sizes (NFR-21, ≤ 50 KB)
+        id: filesize
+        run: bash scripts/ci/check-file-size.sh
+
       - name: Summary
         if: always()
         run: |
@@ -95,6 +99,7 @@ jobs:
             echo "- tsc --noEmit: ${{ steps.tsc.outcome }}"
             echo "- License allow-list: ${{ steps.licenses.outcome }}"
             echo "- NOTICE freshness: ${{ steps.notice.outcome }}"
+            echo "- File-size limit: ${{ steps.filesize.outcome }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
   unit:
