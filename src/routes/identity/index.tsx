@@ -1,6 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
-import { openInspector } from "../../lib/nav";
 import { Identity, type IdentityTab } from "../../screens";
 
 const identitySearch = z.object({
@@ -9,6 +8,14 @@ const identitySearch = z.object({
 
 export const Route = createFileRoute("/identity/")({
   validateSearch: identitySearch,
+  staticData: {
+    title: "Identity",
+    endpoints: [
+      { method: "GET", path: "/identity/users", desc: "List users" },
+      { method: "GET", path: "/identity/groups", desc: "List groups" },
+      { method: "POST", path: "/identity/users/{id}/groups", desc: "Add to group" },
+    ],
+  },
   component: IdentityRoute,
 });
 
@@ -19,7 +26,6 @@ function IdentityRoute() {
     <Identity
       initialTab={tab as IdentityTab}
       onTabChange={(v) => navigate({ search: (prev) => ({ ...prev, tab: v }) })}
-      onOpenInspector={openInspector}
     />
   );
 }

@@ -8,7 +8,10 @@ import DmnModelerClass from "dmn-js/lib/Modeler";
 import React from "react";
 import { api, type FlowableProcessDefinition } from "./api";
 import { Icon } from "./components";
-import DATA from "./data";
+
+const openInspector = () => {
+  window.dispatchEvent(new CustomEvent<void>("app:open-inspector"));
+};
 
 // @migration-any: bpmn-js/dmn-js DI container, event-bus payloads, and BO
 // shapes are dynamic. Per ADR-001 consequences, this file is the allowed
@@ -210,17 +213,13 @@ const bpmnIconClass = (el: AnyEl): string => {
   return "bpmn-icon-task";
 };
 
-interface ModelerProps {
-  onOpenInspector?: (e: { method: string; path: string; desc: string }) => void;
-}
-
-interface BpmnModelerProps extends ModelerProps {
+interface BpmnModelerProps {
   /** Deep-link: pre-select this definition and trigger its XML load on mount. */
   initialDefinitionId?: string | undefined;
 }
 
 // ─── BPMN modeler (real bpmn-js) ───────────────────────────────────
-export const BpmnModeler = ({ onOpenInspector, initialDefinitionId }: BpmnModelerProps) => {
+export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const modelerRef = React.useRef<AnyModeler | null>(null);
   const [selected, setSelected] = React.useState<AnyEl | null>(null);
@@ -231,7 +230,6 @@ export const BpmnModeler = ({ onOpenInspector, initialDefinitionId }: BpmnModele
   const [definitions, setDefinitions] = React.useState<FlowableProcessDefinition[]>([]);
   const [activeDef, setActiveDef] = React.useState<FlowableProcessDefinition | null>(null);
   const [filename, setFilename] = React.useState("loan-approval.bpmn20.xml");
-  const eps = DATA.endpoints.bpmnModeler;
 
   // Load list of deployed process definitions for the loader dropdown.
   React.useEffect(() => {
@@ -385,9 +383,6 @@ export const BpmnModeler = ({ onOpenInspector, initialDefinitionId }: BpmnModele
       const { xml } = await m.saveXML({ format: true });
       await api.deployBpmn(filename, xml);
       setDirty(false);
-      if (onOpenInspector)
-        onOpenInspector({ method: "POST", path: "/repository/deployments", desc: "Deploy BPMN" });
-      // refresh definition list
       api
         .listProcessDefinitions({ size: 200, sort: "name" })
         .then((r) => setDefinitions(r.data || []))
@@ -454,14 +449,7 @@ export const BpmnModeler = ({ onOpenInspector, initialDefinitionId }: BpmnModele
           <Icon name="download" size={13} />
           Export SVG
         </button>
-        <button
-          className="btn"
-          data-size="sm"
-          data-variant="ghost"
-          onClick={() => {
-            if (onOpenInspector && eps[0]) onOpenInspector(eps[0]);
-          }}
-        >
+        <button className="btn" data-size="sm" data-variant="ghost" onClick={openInspector}>
           <Icon name="api" size={13} />
           REST
         </button>
@@ -739,7 +727,7 @@ type DmnDecisionResult = import("./api").FlowableDecisionResult & {
   ruleFired?: number[];
 };
 
-export const DmnModeler = ({ onOpenInspector }: ModelerProps) => {
+export const DmnModeler = () => {
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const modelerRef = React.useRef<AnyModeler | null>(null);
   const [view, setView] = React.useState<"drd" | "table">("table");
@@ -758,7 +746,6 @@ export const DmnModeler = ({ onOpenInspector }: ModelerProps) => {
   const [decisions, setDecisions] = React.useState<DmnDecision[]>([]);
   const [decisionsAvailable, setDecisionsAvailable] = React.useState(true);
   const filename = "loan-eligibility.dmn";
-  const eps = DATA.endpoints.dmnModeler;
 
   React.useEffect(() => {
     api
@@ -839,12 +826,6 @@ export const DmnModeler = ({ onOpenInspector }: ModelerProps) => {
     try {
       const { xml } = await m.saveXML({ format: true });
       await api.deployDmn(filename, xml);
-      if (onOpenInspector)
-        onOpenInspector({
-          method: "POST",
-          path: "/dmn-repository/deployments",
-          desc: "Deploy DMN",
-        });
       api
         .listDecisions({ size: 200 })
         .then((r) => setDecisions(r.data || []))
@@ -910,14 +891,7 @@ export const DmnModeler = ({ onOpenInspector }: ModelerProps) => {
           <Icon name="download" size={13} />
           Export
         </button>
-        <button
-          className="btn"
-          data-size="sm"
-          data-variant="ghost"
-          onClick={() => {
-            if (onOpenInspector && eps[0]) onOpenInspector(eps[0]);
-          }}
-        >
+        <button className="btn" data-size="sm" data-variant="ghost" onClick={openInspector}>
           <Icon name="api" size={13} />
           REST
         </button>

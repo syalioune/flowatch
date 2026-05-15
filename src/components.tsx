@@ -1,8 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import React from "react";
 import { API_LOG, type ApiLogEntry, api, type FlowableConfig } from "./api";
-import type { EndpointHint } from "./data";
-import { ROUTED_VIEWS, VIEW_TO_PATH } from "./lib/nav";
+import { type RouteEndpoint, useRouteMeta } from "./lib/route-meta";
 
 interface ApiLogEvent extends CustomEvent<ApiLogEntry> {}
 interface AppToastEvent
@@ -237,8 +236,8 @@ export const EndpointChip = ({ method, path, onClick }: EndpointChipProps) => (
 );
 
 interface EndpointRowProps {
-  items: EndpointHint[];
-  onOpenInspector?: ((e: EndpointHint) => void) | undefined;
+  items: ReadonlyArray<RouteEndpoint>;
+  onOpenInspector?: ((e: RouteEndpoint) => void) | undefined;
 }
 
 export const EndpointRow = ({ items, onOpenInspector }: EndpointRowProps) => (
@@ -254,36 +253,54 @@ export const EndpointRow = ({ items, onOpenInspector }: EndpointRowProps) => (
   </div>
 );
 
-const NAV = [
-  { group: "Overview", items: [{ id: "dashboard", label: "Dashboard", icon: "dashboard" }] },
+/** Fire-and-forget: open the API Inspector drawer from anywhere. */
+const openInspector = () => {
+  window.dispatchEvent(new CustomEvent<void>("app:open-inspector"));
+};
+
+interface NavItem {
+  path: string;
+  label: string;
+  icon: string;
+  /** Key into the `counts` map (only set for items that show a count badge). */
+  countsKey?: "tasks" | "jobs";
+}
+
+interface NavGroup {
+  group: string;
+  items: NavItem[];
+}
+
+const NAV: NavGroup[] = [
+  { group: "Overview", items: [{ path: "/", label: "Dashboard", icon: "dashboard" }] },
   {
     group: "Modeler",
     items: [
-      { id: "bpmn", label: "BPMN", icon: "bpmn" },
-      { id: "dmn", label: "DMN", icon: "dmn" },
+      { path: "/bpmn", label: "BPMN", icon: "bpmn" },
+      { path: "/dmn", label: "DMN", icon: "dmn" },
     ],
   },
   {
     group: "Operate",
     items: [
-      { id: "tasks", label: "Tasks", icon: "task" },
-      { id: "instances", label: "Process instances", icon: "instance" },
-      { id: "jobs", label: "Jobs", icon: "job" },
-      { id: "history", label: "History", icon: "history" },
+      { path: "/tasks", label: "Tasks", icon: "task", countsKey: "tasks" },
+      { path: "/instances", label: "Process instances", icon: "instance" },
+      { path: "/jobs", label: "Jobs", icon: "job", countsKey: "jobs" },
+      { path: "/history", label: "History", icon: "history" },
     ],
   },
   {
     group: "Repository",
     items: [
-      { id: "deployments", label: "Deployments", icon: "deploy" },
-      { id: "definitions", label: "Process definitions", icon: "def" },
+      { path: "/deployments", label: "Deployments", icon: "deploy" },
+      { path: "/definitions", label: "Process definitions", icon: "def" },
     ],
   },
   {
     group: "Admin",
     items: [
-      { id: "identity", label: "Users & groups", icon: "identity" },
-      { id: "tenants", label: "Tenants", icon: "tenant" },
+      { path: "/identity", label: "Users & groups", icon: "identity" },
+      { path: "/tenants", label: "Tenants", icon: "tenant" },
     ],
   },
 ];
@@ -294,14 +311,17 @@ interface ConnectionState {
 }
 
 interface SidebarProps {
-  active: string;
-  onNav: (id: string) => void;
   connection: ConnectionState;
   onConnClick: () => void;
-  counts?: Record<string, number | null | undefined>;
+  counts?: Partial<Record<"tasks" | "jobs", number | null | undefined>>;
 }
 
-export const Sidebar = ({ active, onNav, connection, onConnClick, counts }: SidebarProps) => (
+// biome-ignore lint/suspicious/noExplicitAny: TanStack Router's LinkProps doesn't expose data-* pass-through.
+const ACTIVE_PROPS = { "data-active": "1" } as any;
+// biome-ignore lint/suspicious/noExplicitAny: TanStack Router's LinkProps doesn't expose data-* pass-through.
+const INACTIVE_PROPS = { "data-active": "0" } as any;
+
+export const Sidebar = ({ connection, onConnClick, counts }: SidebarProps) => (
   <aside className="sidebar">
     <Logo />
     <nav className="nav">
@@ -309,41 +329,20 @@ export const Sidebar = ({ active, onNav, connection, onConnClick, counts }: Side
         <div key={g.group} className="nav-group">
           <div className="nav-label">{g.group}</div>
           {g.items.map((it) => {
-            const count = counts?.[it.id];
-            const inner = (
-              <>
+            const count = it.countsKey ? counts?.[it.countsKey] : undefined;
+            return (
+              <Link
+                key={it.path}
+                to={it.path}
+                className="nav-item"
+                activeProps={ACTIVE_PROPS}
+                inactiveProps={INACTIVE_PROPS}
+                activeOptions={{ exact: it.path === "/" }}
+              >
                 <Icon name={it.icon} />
                 <span>{it.label}</span>
                 {count != null && <span className="nav-count">{count}</span>}
-              </>
-            );
-            if (ROUTED_VIEWS.has(it.id) && VIEW_TO_PATH[it.id]) {
-              const to = VIEW_TO_PATH[it.id] as string;
-              // biome-ignore lint/suspicious/noExplicitAny: TanStack Router's LinkProps doesn't expose data-* pass-through; Story 3.6 cleanup.
-              const activeProps = { "data-active": "1" } as any;
-              // biome-ignore lint/suspicious/noExplicitAny: TanStack Router's LinkProps doesn't expose data-* pass-through; Story 3.6 cleanup.
-              const inactiveProps = { "data-active": "0" } as any;
-              return (
-                <Link
-                  key={it.id}
-                  to={to}
-                  className="nav-item"
-                  activeProps={activeProps}
-                  inactiveProps={inactiveProps}
-                >
-                  {inner}
-                </Link>
-              );
-            }
-            return (
-              <div
-                key={it.id}
-                className="nav-item"
-                data-active={active === it.id ? "1" : "0"}
-                onClick={() => onNav(it.id)}
-              >
-                {inner}
-              </div>
+              </Link>
             );
           })}
         </div>
@@ -543,7 +542,7 @@ export const SettingsModal = ({ open, onClose }: SettingsModalProps) => {
   );
 };
 
-const buildFetchSnippet = (cfg: FlowableConfig, ep: EndpointHint): string => {
+const buildFetchSnippet = (cfg: FlowableConfig, ep: RouteEndpoint): string => {
   const u = `${cfg.baseUrl.replace(/\/$/, "")}${ep.path}`;
   return `// ${ep.desc || ""}
 const auth = btoa("${cfg.username}:••••");
@@ -570,7 +569,7 @@ const res = await fetch(
 const data = await res.json();`;
 };
 
-const buildCurlSnippet = (cfg: FlowableConfig, ep: EndpointHint): string => {
+const buildCurlSnippet = (cfg: FlowableConfig, ep: RouteEndpoint): string => {
   const u = `${cfg.baseUrl.replace(/\/$/, "")}${ep.path}`;
   return `curl -u ${cfg.username}:•••• \\
   -X ${ep.method} \\
@@ -581,7 +580,7 @@ const buildCurlSnippet = (cfg: FlowableConfig, ep: EndpointHint): string => {
 interface ApiInspectorProps {
   open: boolean;
   onClose: () => void;
-  screenEndpoints?: EndpointHint[];
+  screenEndpoints?: ReadonlyArray<RouteEndpoint>;
   screenTitle: string;
 }
 
@@ -601,7 +600,7 @@ export const ApiInspector = ({
   const [running, setRunning] = React.useState(false);
   const [result, setResult] = React.useState<InspectorResult | null>(null);
   const cfg = api.config();
-  const firstEp: EndpointHint = (screenEndpoints && screenEndpoints[0]) || {
+  const firstEp: RouteEndpoint = (screenEndpoints && screenEndpoints[0]) || {
     method: "GET",
     path: "/",
     desc: "",
@@ -829,31 +828,32 @@ export const ApiInspector = ({
 interface PageHeadProps {
   title: string;
   subtitle?: React.ReactNode;
-  endpoints?: EndpointHint[];
   actions?: React.ReactNode;
-  onOpenInspector?: ((e: EndpointHint) => void) | undefined;
 }
 
-export const PageHead = ({
-  title,
-  subtitle,
-  endpoints,
-  actions,
-  onOpenInspector,
-}: PageHeadProps) => (
-  <div className="page-head">
-    <div>
-      <h1 className="page-title">{title}</h1>
-      {subtitle && <div className="page-sub">{subtitle}</div>}
-      {endpoints && (
-        <div style={{ marginTop: 10 }}>
-          <EndpointRow items={endpoints} onOpenInspector={onOpenInspector} />
-        </div>
-      )}
+/**
+ * Page header. Endpoint chips and the inspector-open handler are derived from
+ * the active route's `staticData` (see src/lib/route-meta.ts) — callers only
+ * pass display copy. Story 3.6 removed the old `endpoints` and
+ * `onOpenInspector` props.
+ */
+export const PageHead = ({ title, subtitle, actions }: PageHeadProps) => {
+  const meta = useRouteMeta();
+  return (
+    <div className="page-head">
+      <div>
+        <h1 className="page-title">{title}</h1>
+        {subtitle && <div className="page-sub">{subtitle}</div>}
+        {meta.endpoints.length > 0 && (
+          <div style={{ marginTop: 10 }}>
+            <EndpointRow items={meta.endpoints} onOpenInspector={openInspector} />
+          </div>
+        )}
+      </div>
+      {actions && <div className="page-actions">{actions}</div>}
     </div>
-    {actions && <div className="page-actions">{actions}</div>}
-  </div>
-);
+  );
+};
 
 interface ToastDetail {
   kind?: string;

@@ -11,18 +11,16 @@
 import { Link } from "@tanstack/react-router";
 import { api, type FlowableUser } from "../api";
 import { Icon, PageHead } from "../components";
-import DATA from "../data";
 import { ErrorBox } from "../lib/error-box";
 import { useApi } from "../lib/useApi";
 
 interface Props {
   user: FlowableUser;
-  onOpenInspector?: () => void;
 }
 
 type UserWide = FlowableUser & { displayName?: string };
 
-export function UserDetail({ user, onOpenInspector }: Props) {
+export function UserDetail({ user }: Props) {
   const memberships = useApi(() => api.getUserGroups(user.id), [user.id]);
   const u = user as UserWide;
   const initials = `${(u.firstName || "?")[0]}${(u.lastName || "?")[0]}`;
@@ -31,8 +29,6 @@ export function UserDetail({ user, onOpenInspector }: Props) {
       <PageHead
         title={`${u.firstName || ""} ${u.lastName || ""}`.trim() || u.id}
         subtitle={u.displayName ?? undefined}
-        endpoints={DATA.endpoints.identity}
-        onOpenInspector={onOpenInspector ? () => onOpenInspector() : undefined}
         actions={
           <Link to="/identity" className="btn" data-variant="ghost">
             <Icon name="chevron" size={12} />

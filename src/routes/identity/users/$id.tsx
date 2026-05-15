@@ -2,10 +2,16 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { api } from "../../../api";
 import { UserDetail } from "../../../components/UserDetail";
 import { ErrorBox } from "../../../lib/error-box";
-import { openInspector } from "../../../lib/nav";
 
 export const Route = createFileRoute("/identity/users/$id")({
   loader: ({ params }) => api.getUser(params.id),
+  staticData: {
+    title: "User detail",
+    endpoints: [
+      { method: "GET", path: "/identity/users/{id}", desc: "Get user" },
+      { method: "GET", path: "/identity/users/{id}/groups", desc: "User groups" },
+    ],
+  },
   component: UserDetailRoute,
   errorComponent: ({ error }) => (
     <div className="page">
@@ -28,5 +34,5 @@ export const Route = createFileRoute("/identity/users/$id")({
 
 function UserDetailRoute() {
   const user = Route.useLoaderData();
-  return <UserDetail user={user} onOpenInspector={openInspector} />;
+  return <UserDetail user={user} />;
 }

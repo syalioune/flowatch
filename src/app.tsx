@@ -1,12 +1,9 @@
-import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Outlet, useNavigate } from "@tanstack/react-router";
 import React from "react";
 import { api } from "./api";
 import { ApiInspector, SettingsModal, Sidebar, Toaster, Topbar } from "./components";
-import DATA from "./data";
-import { PATH_TO_VIEW, ROUTED_VIEWS, VIEW_TO_PATH } from "./lib/nav";
+import { useRouteMeta } from "./lib/route-meta";
 import "./lib/window-events";
-// Every screen is now routed; the legacy switch in <main> is empty.
-// Story 3.6 deletes the switch + view/setView state.
 import {
   TweakButton,
   TweakRadio,
@@ -31,46 +28,19 @@ const ACCENT_PALETTES = {
   magenta: { name: "Magenta", light: "oklch(54% 0.20 340)", dark: "oklch(72% 0.20 340)" },
 };
 
-const ENDPOINT_BY_VIEW = {
-  dashboard: () => DATA.endpoints.dashboard,
-  bpmn: () => DATA.endpoints.bpmnModeler,
-  dmn: () => DATA.endpoints.dmnModeler,
-  deployments: () => DATA.endpoints.deployments,
-  definitions: () => DATA.endpoints.definitions,
-  instances: () => DATA.endpoints.instances,
-  jobs: () => DATA.endpoints.jobs,
-  tasks: () => DATA.endpoints.tasks,
-  history: () => DATA.endpoints.history,
-  identity: () => DATA.endpoints.identity,
-  tenants: () => DATA.endpoints.tenants,
-};
-
-const VIEW_TITLE = {
-  dashboard: "Dashboard",
-  bpmn: "BPMN modeler",
-  dmn: "DMN modeler",
-  deployments: "Deployments",
-  definitions: "Process definitions",
-  instances: "Process instances",
-  jobs: "Jobs",
-  tasks: "Tasks",
-  history: "History",
-  identity: "Identity",
-  tenants: "Tenants",
-};
-
-type ViewKey =
-  | "dashboard"
-  | "bpmn"
-  | "dmn"
-  | "deployments"
-  | "definitions"
-  | "instances"
-  | "jobs"
-  | "tasks"
-  | "history"
-  | "identity"
-  | "tenants";
+const QUICK_JUMP: ReadonlyArray<{ label: string; path: string }> = [
+  { label: "Dashboard", path: "/" },
+  { label: "BPMN modeler", path: "/bpmn" },
+  { label: "DMN modeler", path: "/dmn" },
+  { label: "Deployments", path: "/deployments" },
+  { label: "Process definitions", path: "/definitions" },
+  { label: "Process instances", path: "/instances" },
+  { label: "Jobs", path: "/jobs" },
+  { label: "Tasks", path: "/tasks" },
+  { label: "History", path: "/history" },
+  { label: "Identity", path: "/identity" },
+  { label: "Tenants", path: "/tenants" },
+];
 
 interface Tenant {
   id: string;
@@ -84,23 +54,8 @@ interface AppConnectionState {
 const DEFAULT_TENANT: Tenant = { id: "", name: "All tenants" };
 
 function App() {
-  const navigate = useNavigate();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  // Initial view is empty: the Outlet drives Dashboard / BPMN / DMN. The
-  // legacy {Screen} below only fires when the user navigates to an unrouted
-  // screen via the sidebar / Quick jump (Stories 3.3-3.5 migrate the rest).
-  const [view, setView] = React.useState<ViewKey>("" as ViewKey);
-  const navTo = React.useCallback(
-    (v: string) => {
-      if (ROUTED_VIEWS.has(v) && VIEW_TO_PATH[v]) {
-        navigate({ to: VIEW_TO_PATH[v] });
-      } else {
-        setView(v as ViewKey);
-      }
-    },
-    [navigate],
-  );
+  const meta = useRouteMeta();
   const [inspectorOpen, setInspectorOpen] = React.useState(false);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [tenants, setTenants] = React.useState<Tenant[]>([DEFAULT_TENANT]);
@@ -109,7 +64,13 @@ function App() {
     state: "pending",
     host: "connecting…",
   });
-  const [navCounts, setNavCounts] = React.useState<Record<string, number | null>>({});
+  const [navCounts, setNavCounts] = React.useState<
+    Partial<Record<"tasks" | "jobs", number | null>>
+  >({});
+
+  React.useEffect(() => {
+    document.title = meta.title ? `${meta.title} · Flowatch` : "Flowatch";
+  }, [meta.title]);
 
   React.useEffect(() => {
     document.documentElement.dataset.look = t.look as string;
@@ -166,9 +127,8 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [view, tenant.id]);
+  }, [tenant.id]);
 
-  // Ctrl+Shift+T keyboard shortcut for TweaksPanel
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key === "T") {
@@ -180,22 +140,12 @@ function App() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // Route components dispatch app:open-inspector / app:set-view (see src/lib/nav.ts).
-  // The Story 3.6 cleanup deletes app:set-view together with the legacy switch.
   React.useEffect(() => {
     const onOpen = () => setInspectorOpen(true);
-    const onSet = (e: WindowEventMap["app:set-view"]) => setView(e.detail as ViewKey);
     window.addEventListener("app:open-inspector", onOpen);
-    window.addEventListener("app:set-view", onSet);
-    return () => {
-      window.removeEventListener("app:open-inspector", onOpen);
-      window.removeEventListener("app:set-view", onSet);
-    };
+    return () => window.removeEventListener("app:open-inspector", onOpen);
   }, []);
 
-  // openInspector is no longer needed inside App (every screen now goes through
-  // its route wrapper, which dispatches the `app:open-inspector` window event).
-  // The listener installed above still wires the event back to setInspectorOpen.
   const handleTweaks = () => {
     window.postMessage({ type: "__activate_edit_mode" }, window.origin);
   };
@@ -209,37 +159,9 @@ function App() {
     api.setConfig({ tenantId: next.id });
   };
 
-  // Match exact "/deployments" first, then fall through to first-segment lookup
-  // for detail routes like "/deployments/abc-123" → "deployments".
-  const firstSegment = "/" + pathname.split("/")[1];
-  const routedView = PATH_TO_VIEW[pathname] ?? PATH_TO_VIEW[firstSegment];
-  const effectiveView = routedView ?? view;
-  const endpointFn = (
-    ENDPOINT_BY_VIEW as Record<
-      string,
-      (() => ReturnType<typeof DATA.endpoints.dashboard.slice>) | undefined
-    >
-  )[effectiveView];
-  const endpoints = (endpointFn || (() => []))();
-  const screenTitle =
-    (VIEW_TITLE as Record<string, string>)[effectiveView] || effectiveView || "Dashboard";
-
-  // Outlet renders /, /bpmn, /dmn — those screens were removed from this switch.
-  // The remaining cases are migrated by Stories 3.3-3.5; Story 3.6 deletes the
-  // switch entirely.
-  // Legacy switch is empty after Story 3.5 — every screen is routed.
-  // Story 3.6 deletes `view`/`setView`, the switch, and the {Screen} slot.
-  const Screen: React.ReactNode = null;
-
   return (
     <div className="app">
-      <Sidebar
-        active={effectiveView}
-        onNav={navTo}
-        connection={conn}
-        counts={navCounts}
-        onConnClick={() => setSettingsOpen(true)}
-      />
+      <Sidebar connection={conn} counts={navCounts} onConnClick={() => setSettingsOpen(true)} />
       <Topbar
         tenant={tenant}
         tenants={tenants}
@@ -253,17 +175,13 @@ function App() {
       />
       <main className="main">
         <Outlet />
-        {/* Legacy view-state switch. Stories 3.2-3.5 migrate screens to
-            routes one by one, deleting cases from the switch as they go.
-            Story 3.6 removes the switch entirely. */}
-        {Screen}
       </main>
 
       <ApiInspector
         open={inspectorOpen}
         onClose={() => setInspectorOpen(false)}
-        screenEndpoints={endpoints}
-        screenTitle={screenTitle}
+        screenEndpoints={meta.endpoints}
+        screenTitle={meta.title}
       />
 
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
@@ -311,19 +229,7 @@ function App() {
           />
         </TweakSection>
         <TweakSection label="Quick jump">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-            {Object.entries(VIEW_TITLE).map(([k, v]) => (
-              <button
-                key={k}
-                className="seg-btn"
-                data-on={effectiveView === k ? "1" : "0"}
-                onClick={() => navTo(k)}
-                style={{ fontSize: 11, padding: "5px 8px" }}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
+          <QuickJumpRow />
         </TweakSection>
         <TweakSection label="API">
           <TweakButton label="Open Inspector" onClick={() => setInspectorOpen(true)} />
@@ -334,6 +240,25 @@ function App() {
           />
         </TweakSection>
       </TweaksPanel>
+    </div>
+  );
+}
+
+function QuickJumpRow() {
+  const navigate = useNavigate();
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+      {QUICK_JUMP.map((q) => (
+        <button
+          key={q.path}
+          type="button"
+          className="seg-btn"
+          onClick={() => navigate({ to: q.path })}
+          style={{ fontSize: 11, padding: "5px 8px" }}
+        >
+          {q.label}
+        </button>
+      ))}
     </div>
   );
 }

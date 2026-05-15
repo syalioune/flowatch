@@ -7,7 +7,6 @@ import {
   type FlowableProcessInstance,
 } from "./api";
 import { fmtDue, fmtTime, Icon, PageHead, toast } from "./components";
-import DATA, { type EndpointHint } from "./data";
 import { ErrorBox } from "./lib/error-box";
 import { useApi } from "./lib/useApi";
 
@@ -31,13 +30,10 @@ interface StartProcessPayload {
   variables?: Array<{ name: string; type: string; value: unknown }>;
 }
 
-interface ScreenProps {
-  onOpenInspector?: ((e: EndpointHint) => void) | undefined;
-}
-interface NavScreenProps extends ScreenProps {
+interface NavScreenProps {
   onNav: (view: string) => void;
 }
-interface TenantsScreenProps extends ScreenProps {
+interface TenantsScreenProps {
   tenants?: { id: string; name: string }[];
 }
 
@@ -65,8 +61,7 @@ const stateOf = (pi: { suspended?: boolean; ended?: boolean }): string =>
   pi.suspended ? "suspended" : pi.ended ? "ended" : "active";
 
 // ── Dashboard ────────────────────────────────────────────────────────
-export const Dashboard = ({ onOpenInspector, onNav }: NavScreenProps) => {
-  const eps = DATA.endpoints.dashboard;
+export const Dashboard = ({ onNav }: NavScreenProps) => {
   const instances = useApi(
     () => api.listProcessInstances({ size: 8, sort: "startTime", order: "desc" }),
     [],
@@ -94,8 +89,6 @@ export const Dashboard = ({ onOpenInspector, onNav }: NavScreenProps) => {
       <PageHead
         title="Overview"
         subtitle="Engine health, runtime activity, and what needs your attention."
-        endpoints={eps}
-        onOpenInspector={onOpenInspector}
       />
       <div className="kpi-grid">
         <div className="kpi">
@@ -313,7 +306,7 @@ export const Dashboard = ({ onOpenInspector, onNav }: NavScreenProps) => {
 };
 
 // ── Deployments ───────────────────────────────────────────────────
-export const Deployments = ({ onOpenInspector }: ScreenProps) => {
+export const Deployments = () => {
   const navigate = useNavigate();
   const [filter, setFilter] = React.useState("");
   const deployments = useApi(
@@ -338,8 +331,6 @@ export const Deployments = ({ onOpenInspector }: ScreenProps) => {
       <PageHead
         title="Deployments"
         subtitle="Every BAR / BPMN / DMN deployed to this engine."
-        endpoints={DATA.endpoints.deployments}
-        onOpenInspector={onOpenInspector}
         actions={
           <>
             <button className="btn" onClick={deployments.reload}>
@@ -432,7 +423,7 @@ export const Deployments = ({ onOpenInspector }: ScreenProps) => {
 };
 
 // ── Process Definitions ─────────────────────────────────────────
-export const ProcessDefinitions = ({ onOpenInspector, onNav }: NavScreenProps) => {
+export const ProcessDefinitions = () => {
   const navigate = useNavigate();
   const [showSuspended, setShowSuspended] = React.useState(true);
   const [startingId, setStartingId] = React.useState<string | null>(null);
@@ -449,14 +440,12 @@ export const ProcessDefinitions = ({ onOpenInspector, onNav }: NavScreenProps) =
     setStartingId(d.id);
     try {
       const r = await api.startProcessInstance({ processDefinitionId: d.id, ...payload });
-      const action = onNav
-        ? { label: "View instances", onClick: () => onNav("instances") }
-        : undefined;
+      const action = { label: "View instances", onClick: () => navigate({ to: "/instances" }) };
       toast({
         kind: "ok",
         text: `Started ${d.name || d.key}`,
         ...(r?.id ? { sub: `instance ${r.id}` } : {}),
-        ...(action ? { action } : {}),
+        action,
       });
       setStartDialog(null);
     } catch (e) {
@@ -471,8 +460,6 @@ export const ProcessDefinitions = ({ onOpenInspector, onNav }: NavScreenProps) =
       <PageHead
         title="Process definitions"
         subtitle="Models that have been deployed. Click a row to inspect, suspend, or start an instance."
-        endpoints={DATA.endpoints.definitions}
-        onOpenInspector={onOpenInspector}
       />
       <div className="tbl-wrap">
         <div className="tbl-toolbar">
@@ -748,7 +735,7 @@ const StartProcessDialog = ({ definition, busy, onCancel, onStart }: StartProces
 };
 
 // ── Process Instances ─────────────────────────────────────────────
-export const ProcessInstances = ({ onOpenInspector }: ScreenProps) => {
+export const ProcessInstances = () => {
   const navigate = useNavigate();
   const instances = useApi(
     () => api.listProcessInstances({ size: 200, sort: "startTime", order: "desc" }),
@@ -762,8 +749,6 @@ export const ProcessInstances = ({ onOpenInspector }: ScreenProps) => {
       <PageHead
         title="Process instances"
         subtitle="Currently-running instances across all definitions."
-        endpoints={DATA.endpoints.instances}
-        onOpenInspector={onOpenInspector}
         actions={
           <button type="button" className="btn" onClick={instances.reload}>
             <Icon name="refresh" size={13} />
@@ -827,12 +812,12 @@ export const ProcessInstances = ({ onOpenInspector }: ScreenProps) => {
 
 export type JobsType = "executable" | "timer" | "deadletter";
 
-interface JobsScreenProps extends ScreenProps {
+interface JobsScreenProps {
   initialType?: JobsType | undefined;
   onTypeChange?: ((t: JobsType) => void) | undefined;
 }
 
-export const Jobs = ({ onOpenInspector, initialType, onTypeChange }: JobsScreenProps) => {
+export const Jobs = ({ initialType, onTypeChange }: JobsScreenProps) => {
   const [tab, setTab] = React.useState<JobsType>(initialType ?? "executable");
   // Keep local state in sync if the URL changes externally (back button).
   React.useEffect(() => {
@@ -862,8 +847,6 @@ export const Jobs = ({ onOpenInspector, initialType, onTypeChange }: JobsScreenP
       <PageHead
         title="Jobs"
         subtitle="Background work: timers, async continuations, and retry queues."
-        endpoints={DATA.endpoints.jobs}
-        onOpenInspector={onOpenInspector}
         actions={
           <button className="btn" onClick={jobs.reload}>
             <Icon name="refresh" size={13} />
@@ -976,12 +959,12 @@ type RuntimeTask = Loose<import("./api").FlowableTask>;
 
 export type TasksAssignee = "me" | "all" | "unassigned";
 
-interface TasksScreenProps extends ScreenProps {
+interface TasksScreenProps {
   initialAssignee?: TasksAssignee | undefined;
   onAssigneeChange?: ((a: TasksAssignee) => void) | undefined;
 }
 
-export const Tasks = ({ onOpenInspector, initialAssignee, onAssigneeChange }: TasksScreenProps) => {
+export const Tasks = ({ initialAssignee, onAssigneeChange }: TasksScreenProps) => {
   const navigate = useNavigate();
   const [filter, setFilter] = React.useState<TasksAssignee>(initialAssignee ?? "all");
   React.useEffect(() => {
@@ -1008,8 +991,6 @@ export const Tasks = ({ onOpenInspector, initialAssignee, onAssigneeChange }: Ta
       <PageHead
         title="Tasks"
         subtitle="Work assigned directly to you or available to claim."
-        endpoints={DATA.endpoints.tasks}
-        onOpenInspector={onOpenInspector}
         actions={
           <button type="button" className="btn" onClick={tasks.reload}>
             <Icon name="refresh" size={13} />
@@ -1129,12 +1110,12 @@ type EmptyPage<T> = { data: T[]; total?: number };
 // ── History ──────────────────────────────────────────────────────
 export type HistoryType = "instances" | "activities" | "variables" | "tasks";
 
-interface HistoryScreenProps extends ScreenProps {
+interface HistoryScreenProps {
   initialType?: HistoryType | undefined;
   onTypeChange?: ((t: HistoryType) => void) | undefined;
 }
 
-export const History = ({ onOpenInspector, initialType, onTypeChange }: HistoryScreenProps) => {
+export const History = ({ initialType, onTypeChange }: HistoryScreenProps) => {
   const [histType, setHistType] = React.useState<HistoryType>(initialType ?? "instances");
   React.useEffect(() => {
     if (initialType && initialType !== histType) setHistType(initialType);
@@ -1182,8 +1163,6 @@ export const History = ({ onOpenInspector, initialType, onTypeChange }: HistoryS
       <PageHead
         title="History"
         subtitle="Completed process instances, with audit trail and variable values at each step."
-        endpoints={DATA.endpoints.history}
-        onOpenInspector={onOpenInspector}
         actions={
           <button type="button" className="btn" onClick={completed.reload}>
             <Icon name="refresh" size={13} />
@@ -1507,12 +1486,12 @@ const HistoryFlatTable = ({ type }: { type: HistoryType }) => {
 
 export type IdentityTab = "users" | "groups";
 
-interface IdentityScreenProps extends ScreenProps {
+interface IdentityScreenProps {
   initialTab?: IdentityTab | undefined;
   onTabChange?: ((t: IdentityTab) => void) | undefined;
 }
 
-export const Identity = ({ onOpenInspector, initialTab, onTabChange }: IdentityScreenProps) => {
+export const Identity = ({ initialTab, onTabChange }: IdentityScreenProps) => {
   const navigate = useNavigate();
   const [tab, setTab] = React.useState<IdentityTab>(initialTab ?? "users");
   React.useEffect(() => {
@@ -1535,8 +1514,6 @@ export const Identity = ({ onOpenInspector, initialTab, onTabChange }: IdentityS
       <PageHead
         title="Users & groups"
         subtitle="Identity records used by candidate-user, candidate-group, and assignee bindings."
-        endpoints={DATA.endpoints.identity}
-        onOpenInspector={onOpenInspector}
         actions={
           <button
             type="button"
@@ -1687,14 +1664,12 @@ export const Identity = ({ onOpenInspector, initialTab, onTabChange }: IdentityS
 };
 
 // ── Tenants ─────────────────────────────────────────────────────
-export const Tenants = ({ onOpenInspector, tenants }: TenantsScreenProps) => {
+export const Tenants = ({ tenants }: TenantsScreenProps) => {
   return (
     <div className="page">
       <PageHead
         title="Tenants"
         subtitle="Logical isolation boundaries derived from deployment tenantIds (Flowable REST 7.2 has no /identity/tenants endpoint)."
-        endpoints={DATA.endpoints.tenants}
-        onOpenInspector={onOpenInspector}
       />
       {(tenants || []).length === 0 && (
         <div className="empty" style={{ padding: 30 }}>

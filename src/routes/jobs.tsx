@@ -1,6 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
-import { openInspector } from "../lib/nav";
 import { Jobs, type JobsType } from "../screens";
 
 const jobsSearch = z.object({
@@ -9,6 +8,14 @@ const jobsSearch = z.object({
 
 export const Route = createFileRoute("/jobs")({
   validateSearch: jobsSearch,
+  staticData: {
+    title: "Jobs",
+    endpoints: [
+      { method: "GET", path: "/management/jobs", desc: "List jobs" },
+      { method: "POST", path: "/management/jobs/{jobId}", desc: "Execute now / retry" },
+      { method: "GET", path: "/management/jobs/{jobId}/exception-stacktrace", desc: "Stacktrace" },
+    ],
+  },
   component: JobsRoute,
 });
 
@@ -19,7 +26,6 @@ function JobsRoute() {
     <Jobs
       initialType={type as JobsType}
       onTypeChange={(newType) => navigate({ search: (prev) => ({ ...prev, type: newType }) })}
-      onOpenInspector={openInspector}
     />
   );
 }

@@ -15,13 +15,11 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { api, type FlowableDeployment } from "../api";
 import { fmtTime, Icon, PageHead } from "../components";
-import DATA from "../data";
 import { ErrorBox } from "../lib/error-box";
 import { useApi } from "../lib/useApi";
 
 interface Props {
   deployment: FlowableDeployment;
-  onOpenInspector?: () => void;
 }
 
 type DeploymentWide = FlowableDeployment & {
@@ -29,7 +27,7 @@ type DeploymentWide = FlowableDeployment & {
   parentDeploymentId?: string;
 };
 
-export function DeploymentDetail({ deployment, onOpenInspector }: Props) {
+export function DeploymentDetail({ deployment }: Props) {
   const navigate = useNavigate();
   const resources = useApi(() => api.listDeploymentResources(deployment.id), [deployment.id]);
   const d = deployment as DeploymentWide;
@@ -45,8 +43,6 @@ export function DeploymentDetail({ deployment, onOpenInspector }: Props) {
       <PageHead
         title={d.name || d.id}
         subtitle={fmtTime(d.deploymentTime)}
-        endpoints={DATA.endpoints.deployments}
-        onOpenInspector={onOpenInspector ? () => onOpenInspector() : undefined}
         actions={
           <>
             <Link to="/deployments" className="btn" data-variant="ghost">

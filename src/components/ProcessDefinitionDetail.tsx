@@ -14,13 +14,11 @@
 import { Link } from "@tanstack/react-router";
 import { api, type FlowableProcessDefinition } from "../api";
 import { Icon, PageHead } from "../components";
-import DATA from "../data";
 import { ErrorBox } from "../lib/error-box";
 import { useApi } from "../lib/useApi";
 
 interface Props {
   definition: FlowableProcessDefinition;
-  onOpenInspector?: () => void;
   reload: () => void;
 }
 
@@ -28,7 +26,7 @@ type DefinitionWide = FlowableProcessDefinition & {
   description?: string | null;
 };
 
-export function ProcessDefinitionDetail({ definition, onOpenInspector, reload }: Props) {
+export function ProcessDefinitionDetail({ definition, reload }: Props) {
   const xml = useApi(() => api.getProcessDefinitionResource(definition.id), [definition.id]);
   const d = definition as DefinitionWide;
 
@@ -42,8 +40,6 @@ export function ProcessDefinitionDetail({ definition, onOpenInspector, reload }:
       <PageHead
         title={d.name || d.key}
         subtitle={`v${d.version}${d.tenantId ? ` · tenant: ${d.tenantId}` : ""}`}
-        endpoints={DATA.endpoints.definitions}
-        onOpenInspector={onOpenInspector ? () => onOpenInspector() : undefined}
         actions={
           <>
             <Link to="/definitions" className="btn" data-variant="ghost">
