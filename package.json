@@ -1,0 +1,38 @@
+{
+  "name": "flowatch",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Modern Flowable 7 REST GUI — BPMN/DMN modeler + runtime operations",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "release": "semantic-release",
+    "prepare": "husky",
+    "release:preview": "node scripts/release/preview-fast.mjs",
+    "release:preview:full": "node scripts/release/preview.mjs"
+  },
+  "dependencies": {
+    "bpmn-js": "^17.11.1",
+    "dmn-js": "^16.6.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "@semantic-release/commit-analyzer": "^12.0.0",
+    "@semantic-release/github": "^10.0.0",
+    "@semantic-release/release-notes-generator": "^12.0.0",
+    "@tsconfig/vite-react": "^7.0.2",
+    "@types/react": "^18.3.28",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.3.4",
+    "conventional-changelog-conventionalcommits": "^7.0.2",
+    "husky": "^9.1.7",
+    "semantic-release": "^24.2.7",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.8"
+  }
+}
