@@ -11,13 +11,11 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { api, type FlowableTask } from "../api";
 import { fmtDue, fmtTime, Icon, PageHead } from "../components";
-import DATA from "../data";
 import { ErrorBox } from "../lib/error-box";
 import { useApi } from "../lib/useApi";
 
 interface Props {
   task: FlowableTask;
-  onOpenInspector?: () => void;
   reload: () => void;
 }
 
@@ -40,7 +38,7 @@ interface FormField {
 }
 type TaskForm = { formKey?: string; formProperties?: FormField[] } | null;
 
-export function TaskDetail({ task, onOpenInspector, reload }: Props) {
+export function TaskDetail({ task, reload }: Props) {
   const navigate = useNavigate();
   const t = task as TaskWide;
 
@@ -71,8 +69,6 @@ export function TaskDetail({ task, onOpenInspector, reload }: Props) {
       <PageHead
         title={t.name || t.id}
         subtitle={`Created ${fmtTime(t.createTime)}${t.dueDate ? ` · due ${fmtDue(t.dueDate)}` : ""}`}
-        endpoints={DATA.endpoints.tasks}
-        onOpenInspector={onOpenInspector ? () => onOpenInspector() : undefined}
         actions={
           <>
             <Link to="/tasks" className="btn" data-variant="ghost">

@@ -2,10 +2,17 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { api } from "../../api";
 import { DeploymentDetail } from "../../components/DeploymentDetail";
 import { ErrorBox } from "../../lib/error-box";
-import { openInspector } from "../../lib/nav";
 
 export const Route = createFileRoute("/deployments/$id")({
   loader: ({ params }) => api.getDeployment(params.id),
+  staticData: {
+    title: "Deployment detail",
+    endpoints: [
+      { method: "GET", path: "/repository/deployments", desc: "List deployments" },
+      { method: "GET", path: "/repository/deployments/{deploymentId}", desc: "Get deployment" },
+      { method: "DELETE", path: "/repository/deployments/{deploymentId}", desc: "Remove" },
+    ],
+  },
   component: DeploymentDetailRoute,
   errorComponent: ({ error }) => (
     <div className="page">
@@ -28,5 +35,5 @@ export const Route = createFileRoute("/deployments/$id")({
 
 function DeploymentDetailRoute() {
   const deployment = Route.useLoaderData();
-  return <DeploymentDetail deployment={deployment} onOpenInspector={openInspector} />;
+  return <DeploymentDetail deployment={deployment} />;
 }

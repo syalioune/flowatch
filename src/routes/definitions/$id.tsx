@@ -2,10 +2,21 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { api } from "../../api";
 import { ProcessDefinitionDetail } from "../../components/ProcessDefinitionDetail";
 import { ErrorBox } from "../../lib/error-box";
-import { openInspector } from "../../lib/nav";
 
 export const Route = createFileRoute("/definitions/$id")({
   loader: ({ params }) => api.getProcessDefinition(params.id),
+  staticData: {
+    title: "Process definition detail",
+    endpoints: [
+      { method: "GET", path: "/repository/process-definitions", desc: "List process definitions" },
+      { method: "PUT", path: "/repository/process-definitions/{id}", desc: "Suspend / activate" },
+      {
+        method: "GET",
+        path: "/repository/process-definitions/{id}/resourcedata",
+        desc: "Fetch BPMN XML",
+      },
+    ],
+  },
   component: ProcessDefinitionDetailRoute,
   errorComponent: ({ error }) => (
     <div className="page">
@@ -29,11 +40,5 @@ export const Route = createFileRoute("/definitions/$id")({
 function ProcessDefinitionDetailRoute() {
   const definition = Route.useLoaderData();
   const router = useRouter();
-  return (
-    <ProcessDefinitionDetail
-      definition={definition}
-      onOpenInspector={openInspector}
-      reload={() => router.invalidate()}
-    />
-  );
+  return <ProcessDefinitionDetail definition={definition} reload={() => router.invalidate()} />;
 }

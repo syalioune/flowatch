@@ -1,6 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
-import { openInspector } from "../lib/nav";
 import { History, type HistoryType } from "../screens";
 
 const historySearch = z.object({
@@ -9,6 +8,22 @@ const historySearch = z.object({
 
 export const Route = createFileRoute("/history")({
   validateSearch: historySearch,
+  staticData: {
+    title: "History",
+    endpoints: [
+      { method: "GET", path: "/history/historic-process-instances", desc: "Completed instances" },
+      {
+        method: "GET",
+        path: "/history/historic-activity-instances?processInstanceId={id}",
+        desc: "Audit trail",
+      },
+      {
+        method: "GET",
+        path: "/history/historic-variable-instances?processInstanceId={id}",
+        desc: "Variables",
+      },
+    ],
+  },
   component: HistoryRoute,
 });
 
@@ -19,7 +34,6 @@ function HistoryRoute() {
     <History
       initialType={type as HistoryType}
       onTypeChange={(v) => navigate({ search: (prev) => ({ ...prev, type: v }) })}
-      onOpenInspector={openInspector}
     />
   );
 }

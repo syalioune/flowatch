@@ -1,6 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
-import { openInspector } from "../../lib/nav";
 import { Tasks, type TasksAssignee } from "../../screens";
 
 const tasksSearch = z.object({
@@ -9,6 +8,14 @@ const tasksSearch = z.object({
 
 export const Route = createFileRoute("/tasks/")({
   validateSearch: tasksSearch,
+  staticData: {
+    title: "Tasks",
+    endpoints: [
+      { method: "GET", path: "/runtime/tasks?assignee={user}", desc: "My tasks" },
+      { method: "POST", path: "/runtime/tasks/{taskId}", desc: "Claim / complete / delegate" },
+      { method: "GET", path: "/form/form-data?taskId={id}", desc: "Render form" },
+    ],
+  },
   component: TasksRoute,
 });
 
@@ -19,7 +26,6 @@ function TasksRoute() {
     <Tasks
       initialAssignee={assignee as TasksAssignee}
       onAssigneeChange={(v) => navigate({ search: (prev) => ({ ...prev, assignee: v }) })}
-      onOpenInspector={openInspector}
     />
   );
 }

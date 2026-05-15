@@ -2,10 +2,17 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { api } from "../../api";
 import { TaskDetail } from "../../components/TaskDetail";
 import { ErrorBox } from "../../lib/error-box";
-import { openInspector } from "../../lib/nav";
 
 export const Route = createFileRoute("/tasks/$id")({
   loader: ({ params }) => api.getTask(params.id),
+  staticData: {
+    title: "Task detail",
+    endpoints: [
+      { method: "GET", path: "/runtime/tasks/{id}", desc: "Get task" },
+      { method: "POST", path: "/runtime/tasks/{taskId}", desc: "Claim / complete / delegate" },
+      { method: "GET", path: "/form/form-data?taskId={id}", desc: "Render form" },
+    ],
+  },
   component: TaskDetailRoute,
   errorComponent: ({ error }) => (
     <div className="page">
@@ -29,7 +36,5 @@ export const Route = createFileRoute("/tasks/$id")({
 function TaskDetailRoute() {
   const task = Route.useLoaderData();
   const router = useRouter();
-  return (
-    <TaskDetail task={task} onOpenInspector={openInspector} reload={() => router.invalidate()} />
-  );
+  return <TaskDetail task={task} reload={() => router.invalidate()} />;
 }

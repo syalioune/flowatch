@@ -11,21 +11,17 @@
 import { Link } from "@tanstack/react-router";
 import type { FlowableGroup } from "../api";
 import { Icon, PageHead } from "../components";
-import DATA from "../data";
 
 interface Props {
   group: FlowableGroup;
-  onOpenInspector?: () => void;
 }
 
-export function GroupDetail({ group, onOpenInspector }: Props) {
+export function GroupDetail({ group }: Props) {
   const g = group;
   return (
     <div className="page">
       <PageHead
         title={g.name || g.id}
-        endpoints={DATA.endpoints.identity}
-        onOpenInspector={onOpenInspector ? () => onOpenInspector() : undefined}
         actions={
           <Link to="/identity" className="btn" data-variant="ghost">
             <Icon name="chevron" size={12} />

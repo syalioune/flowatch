@@ -14,13 +14,11 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { api, type FlowableProcessInstance } from "../api";
 import { fmtTime, Icon, PageHead } from "../components";
-import DATA from "../data";
 import { ErrorBox } from "../lib/error-box";
 import { useApi } from "../lib/useApi";
 
 interface Props {
   instance: FlowableProcessInstance;
-  onOpenInspector?: () => void;
 }
 
 type InstanceWide = FlowableProcessInstance & {
@@ -29,7 +27,7 @@ type InstanceWide = FlowableProcessInstance & {
   startUserId?: string;
 };
 
-export function ProcessInstanceDetail({ instance, onOpenInspector }: Props) {
+export function ProcessInstanceDetail({ instance }: Props) {
   const navigate = useNavigate();
   const variables = useApi(() => api.getProcessInstanceVariables(instance.id), [instance.id]);
   const p = instance as InstanceWide;
@@ -46,8 +44,6 @@ export function ProcessInstanceDetail({ instance, onOpenInspector }: Props) {
       <PageHead
         title={p.businessKey || p.id}
         subtitle={fmtTime(p.startTime)}
-        endpoints={DATA.endpoints.instances}
-        onOpenInspector={onOpenInspector ? () => onOpenInspector() : undefined}
         actions={
           <>
             <Link to="/instances" className="btn" data-variant="ghost">

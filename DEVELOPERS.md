@@ -326,13 +326,14 @@ Pre-1.0 posture: no compatibility guarantees between pre-1.0 releases. Breaking 
 
 ### Add a new screen
 
-Per PRD: three places in [src/app.jsx](src/app.jsx) historically (and the equivalent route file post-TanStack-Router-migration):
+Routes own their own metadata after the Story 3.6 cleanup — there's no central `VIEW_TITLE` or `ENDPOINT_BY_VIEW` to update any more.
 
-1. Add the route in the router config.
-2. Update `VIEW_TITLE` (or its TanStack-Router equivalent).
-3. Update `ENDPOINT_BY_VIEW` so the API Inspector chip rail picks up the screen's endpoint hints.
+1. Create the file under `src/routes/` (file-based routing — the Vite plugin regenerates `src/routeTree.gen.ts`). For list/detail pairs, use `index.tsx` + `$id.tsx`.
+2. Declare `staticData: { title, endpoints }` on the route. `<PageHead>` and the API Inspector both read this off the deepest active match via `useRouteMeta()` (`src/lib/route-meta.ts`).
+3. Add a sidebar entry only if the screen is top-level navigation: append to `NAV` in `src/components.tsx` with `{ path, label, icon, countsKey? }` — every nav item is a `<Link>`, no special-casing.
+4. Add the screen to the inline `QUICK_JUMP` list in `src/app.tsx` if you want it surfaced in the Tweaks panel's Quick-jump grid.
 
-Follow the `useApi(fn, deps)` pattern. Render four states explicitly: loading skeleton → ErrorBox (verbatim engine message) → "No records." → data.
+For data fetching follow the `useApi(fn, deps)` pattern. Render four states explicitly per pattern P-002: loading → ErrorBox (verbatim engine message) → "No records." → data. For detail routes that take a path param, prefer a route `loader` + `errorComponent` + `pendingComponent` and keep the visual component in `src/components/<Thing>Detail.tsx`.
 
 ### Add a new Flowable REST endpoint
 

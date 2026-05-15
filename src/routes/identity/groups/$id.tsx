@@ -2,10 +2,16 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { api } from "../../../api";
 import { GroupDetail } from "../../../components/GroupDetail";
 import { ErrorBox } from "../../../lib/error-box";
-import { openInspector } from "../../../lib/nav";
 
 export const Route = createFileRoute("/identity/groups/$id")({
   loader: ({ params }) => api.getGroup(params.id),
+  staticData: {
+    title: "Group detail",
+    endpoints: [
+      { method: "GET", path: "/identity/groups/{id}", desc: "Get group" },
+      { method: "GET", path: "/identity/groups/{id}/members", desc: "Group members" },
+    ],
+  },
   component: GroupDetailRoute,
   errorComponent: ({ error }) => (
     <div className="page">
@@ -28,5 +34,5 @@ export const Route = createFileRoute("/identity/groups/$id")({
 
 function GroupDetailRoute() {
   const group = Route.useLoaderData();
-  return <GroupDetail group={group} onOpenInspector={openInspector} />;
+  return <GroupDetail group={group} />;
 }
