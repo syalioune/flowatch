@@ -8,6 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "check": "biome check .",
     "release": "semantic-release",
     "prepare": "husky",
     "release:preview": "node scripts/release/preview-fast.mjs",
@@ -20,6 +23,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2",
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
     "@semantic-release/commit-analyzer": "^12.0.0",

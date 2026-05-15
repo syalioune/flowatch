@@ -1,9 +1,9 @@
-import React from 'react';
-import BpmnModelerClass from 'bpmn-js/lib/Modeler';
-import DmnModelerClass from 'dmn-js/lib/Modeler';
-import { Icon } from './components.jsx';
-import { api } from './api';
-import DATA from './data.js';
+import BpmnModelerClass from "bpmn-js/lib/Modeler";
+import DmnModelerClass from "dmn-js/lib/Modeler";
+import React from "react";
+import { api } from "./api";
+import { Icon } from "./components.jsx";
+import DATA from "./data.js";
 
 // Minimal blank BPMN starter — used when the user hasn't selected an existing
 // process definition to edit. The real LOAN_BPMN_XML below is kept as a richer
@@ -213,7 +213,8 @@ export const BpmnModeler = ({ onOpenInspector }) => {
 
   // Load list of deployed process definitions for the loader dropdown
   React.useEffect(() => {
-    api.listProcessDefinitions({ size: 200, sort: "name" })
+    api
+      .listProcessDefinitions({ size: 200, sort: "name" })
       .then((r) => setDefinitions(r.data || []))
       .catch(() => setDefinitions([]));
   }, []);
@@ -231,10 +232,14 @@ export const BpmnModeler = ({ onOpenInspector }) => {
     }
     modelerRef.current = m;
 
-    m.importXML(LOAN_BPMN_XML).then(() => {
-      try { m.get("canvas").zoom("fit-viewport", "auto"); } catch {}
-      refreshOutline();
-    }).catch((e) => setError(String(e.message || e)));
+    m.importXML(LOAN_BPMN_XML)
+      .then(() => {
+        try {
+          m.get("canvas").zoom("fit-viewport", "auto");
+        } catch {}
+        refreshOutline();
+      })
+      .catch((e) => setError(String(e.message || e)));
 
     const bus = m.get("eventBus");
     const onSel = (e) => {
@@ -253,13 +258,22 @@ export const BpmnModeler = ({ onOpenInspector }) => {
     function refreshOutline() {
       try {
         const reg = m.get("elementRegistry");
-        const all = reg.filter((el) => el.businessObject && el.type !== "label" && el.type !== "bpmn:Process" && el.type !== "bpmn:Collaboration" && el.parent);
+        const all = reg.filter(
+          (el) =>
+            el.businessObject &&
+            el.type !== "label" &&
+            el.type !== "bpmn:Process" &&
+            el.type !== "bpmn:Collaboration" &&
+            el.parent,
+        );
         setElements(all);
       } catch {}
     }
 
     return () => {
-      try { m.destroy(); } catch {}
+      try {
+        m.destroy();
+      } catch {}
       modelerRef.current = null;
     };
   }, []);
@@ -281,7 +295,9 @@ export const BpmnModeler = ({ onOpenInspector }) => {
       const m = modelerRef.current;
       if (m) {
         await m.importXML(xml);
-        try { m.get("canvas").zoom("fit-viewport", "auto"); } catch {}
+        try {
+          m.get("canvas").zoom("fit-viewport", "auto");
+        } catch {}
         setDirty(false);
         setError(null);
       }
@@ -301,30 +317,39 @@ export const BpmnModeler = ({ onOpenInspector }) => {
     const modeling = m.get("modeling");
     const props = {};
     props[attr] = val;
-    try { modeling.updateProperties(selected, props); }
-    catch { selected.businessObject[attr] = val; setVersion((v) => v + 1); }
+    try {
+      modeling.updateProperties(selected, props);
+    } catch {
+      selected.businessObject[attr] = val;
+      setVersion((v) => v + 1);
+    }
   };
 
   const saveXML = async () => {
-    const m = modelerRef.current; if (!m) return;
+    const m = modelerRef.current;
+    if (!m) return;
     const { xml } = await m.saveXML({ format: true });
     download(filename, xml, "application/xml");
     setDirty(false);
   };
   const saveSVG = async () => {
-    const m = modelerRef.current; if (!m) return;
+    const m = modelerRef.current;
+    if (!m) return;
     const { svg } = await m.saveSVG();
     download(filename.replace(/\.bpmn.*$/, ".svg"), svg, "image/svg+xml");
   };
   const deploy = async () => {
-    const m = modelerRef.current; if (!m) return;
+    const m = modelerRef.current;
+    if (!m) return;
     try {
       const { xml } = await m.saveXML({ format: true });
       await api.deployBpmn(filename, xml);
       setDirty(false);
-      if (onOpenInspector) onOpenInspector({ method: "POST", path: "/repository/deployments", desc: "Deploy BPMN" });
+      if (onOpenInspector)
+        onOpenInspector({ method: "POST", path: "/repository/deployments", desc: "Deploy BPMN" });
       // refresh definition list
-      api.listProcessDefinitions({ size: 200, sort: "name" })
+      api
+        .listProcessDefinitions({ size: 200, sort: "name" })
         .then((r) => setDefinitions(r.data || []))
         .catch(() => {});
     } catch (e) {
@@ -333,10 +358,11 @@ export const BpmnModeler = ({ onOpenInspector }) => {
   };
 
   const zoom = (dir) => {
-    const m = modelerRef.current; if (!m) return;
+    const m = modelerRef.current;
+    if (!m) return;
     const canvas = m.get("canvas");
     if (dir === "fit") canvas.zoom("fit-viewport", "auto");
-    else canvas.zoom(canvas.zoom() * (dir > 0 ? 1.15 : 1/1.15));
+    else canvas.zoom(canvas.zoom() * (dir > 0 ? 1.15 : 1 / 1.15));
   };
 
   const sel = selected;
@@ -349,44 +375,83 @@ export const BpmnModeler = ({ onOpenInspector }) => {
           <Icon name="bpmn" size={14} />
           <b>{filename}</b>
           {activeDef && (
-            <span style={{color:"var(--fg-mute)"}}>
+            <span style={{ color: "var(--fg-mute)" }}>
               · {activeDef.key} v{activeDef.version}
               {activeDef.tenantId ? ` · tenant: ${activeDef.tenantId}` : ""}
             </span>
           )}
-          {dirty && <span style={{color:"var(--warn)"}}>· unsaved</span>}
+          {dirty && <span style={{ color: "var(--warn)" }}>· unsaved</span>}
         </div>
         <div className="sep" />
-        <select className="select" data-size="sm"
-                value={activeDef?.id || ""}
-                onChange={(e) => loadDefinition(e.target.value)}
-                title="Load deployed definition">
+        <select
+          className="select"
+          data-size="sm"
+          value={activeDef?.id || ""}
+          onChange={(e) => loadDefinition(e.target.value)}
+          title="Load deployed definition"
+        >
           <option value="">— template (loan-approval) —</option>
           {definitions.map((d) => (
-            <option key={d.id} value={d.id}>{d.name || d.key} v{d.version}</option>
+            <option key={d.id} value={d.id}>
+              {d.name || d.key} v{d.version}
+            </option>
           ))}
         </select>
         <div className="sep" />
-        <button className="btn" data-size="sm" data-variant="ghost" onClick={saveXML}><Icon name="save" size={13}/>Save</button>
-        <button className="btn" data-size="sm" data-variant="ghost" onClick={deploy}><Icon name="upload" size={13}/>Deploy</button>
-        <button className="btn" data-size="sm" data-variant="ghost" onClick={saveXML}><Icon name="download" size={13}/>Export XML</button>
-        <button className="btn" data-size="sm" data-variant="ghost" onClick={saveSVG}><Icon name="download" size={13}/>Export SVG</button>
-        <button className="btn" data-size="sm" data-variant="ghost"
-                onClick={() => onOpenInspector && onOpenInspector(eps[0])}>
-          <Icon name="api" size={13}/>REST
+        <button className="btn" data-size="sm" data-variant="ghost" onClick={saveXML}>
+          <Icon name="save" size={13} />
+          Save
+        </button>
+        <button className="btn" data-size="sm" data-variant="ghost" onClick={deploy}>
+          <Icon name="upload" size={13} />
+          Deploy
+        </button>
+        <button className="btn" data-size="sm" data-variant="ghost" onClick={saveXML}>
+          <Icon name="download" size={13} />
+          Export XML
+        </button>
+        <button className="btn" data-size="sm" data-variant="ghost" onClick={saveSVG}>
+          <Icon name="download" size={13} />
+          Export SVG
+        </button>
+        <button
+          className="btn"
+          data-size="sm"
+          data-variant="ghost"
+          onClick={() => onOpenInspector && onOpenInspector(eps[0])}
+        >
+          <Icon name="api" size={13} />
+          REST
         </button>
         <div className="spacer" />
-        <div className="seg-row" style={{margin:0}}>
-          <button className="seg-btn" onClick={() => zoom(-1)} title="Zoom out">−</button>
-          <button className="seg-btn" onClick={() => zoom("fit")} title="Fit">⤢</button>
-          <button className="seg-btn" onClick={() => zoom(1)} title="Zoom in">+</button>
+        <div className="seg-row" style={{ margin: 0 }}>
+          <button className="seg-btn" onClick={() => zoom(-1)} title="Zoom out">
+            −
+          </button>
+          <button className="seg-btn" onClick={() => zoom("fit")} title="Fit">
+            ⤢
+          </button>
+          <button className="seg-btn" onClick={() => zoom(1)} title="Zoom in">
+            +
+          </button>
         </div>
       </div>
 
       <div className="mod-canvas">
-        <div ref={containerRef} className="bpmn-host" style={{width:"100%", height:"100%"}}/>
+        <div ref={containerRef} className="bpmn-host" style={{ width: "100%", height: "100%" }} />
         {error && (
-          <div style={{position:"absolute", inset:20, background:"var(--bg-elev)", border:"1px solid var(--bad)", padding:16, borderRadius:8, color:"var(--bad)"}} className="mono">
+          <div
+            style={{
+              position: "absolute",
+              inset: 20,
+              background: "var(--bg-elev)",
+              border: "1px solid var(--bad)",
+              padding: 16,
+              borderRadius: 8,
+              color: "var(--bad)",
+            }}
+            className="mono"
+          >
             {error}
           </div>
         )}
@@ -395,28 +460,59 @@ export const BpmnModeler = ({ onOpenInspector }) => {
       <div className="mod-props">
         <div className="panel-hd">
           <span className="panel-title">{sel ? "Properties" : "Outline"}</span>
-          {sel && <span className="mono" style={{marginLeft:"auto", fontSize:11, color:"var(--fg-mute)"}}>{bpmnKind(sel)}</span>}
+          {sel && (
+            <span
+              className="mono"
+              style={{ marginLeft: "auto", fontSize: 11, color: "var(--fg-mute)" }}
+            >
+              {bpmnKind(sel)}
+            </span>
+          )}
         </div>
-        <div style={{padding: sel ? 14 : 0, overflowY:"auto"}}>
+        <div style={{ padding: sel ? 14 : 0, overflowY: "auto" }}>
           {!sel && (
             <div className="mod-outline-tree">
-              <div className="out-row" style={{color:"var(--fg-mute)", paddingTop:8, paddingBottom:4}}>
-                <span className="mono" style={{fontSize:10, letterSpacing:"0.06em", textTransform:"uppercase"}}>elements · {elements.length}</span>
+              <div
+                className="out-row"
+                style={{ color: "var(--fg-mute)", paddingTop: 8, paddingBottom: 4 }}
+              >
+                <span
+                  className="mono"
+                  style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase" }}
+                >
+                  elements · {elements.length}
+                </span>
               </div>
               {elements.map((el) => (
-                <div key={el.id} className="out-row"
-                     onClick={() => modelerRef.current && modelerRef.current.get("selection").select(el)}>
-                  <span className={bpmnIconClass(el)} style={{fontSize:14, color:"var(--fg-soft)"}} />
-                  <span style={{flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
-                    {el.businessObject && el.businessObject.name || el.id}
+                <div
+                  key={el.id}
+                  className="out-row"
+                  onClick={() =>
+                    modelerRef.current && modelerRef.current.get("selection").select(el)
+                  }
+                >
+                  <span
+                    className={bpmnIconClass(el)}
+                    style={{ fontSize: 14, color: "var(--fg-soft)" }}
+                  />
+                  <span
+                    style={{
+                      flex: 1,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {(el.businessObject && el.businessObject.name) || el.id}
                   </span>
                   <span className="kind">{bpmnKind(el)}</span>
                 </div>
               ))}
-              <div style={{padding:"10px 14px"}}>
+              <div style={{ padding: "10px 14px" }}>
                 <div className="text-xs mute">
-                  Drag from the bpmn-js palette to add elements. Click any node to edit Flowable-specific attributes here.
-                  Use the dropdown above to load a deployed definition from the engine, or deploy this canvas as a new revision.
+                  Drag from the bpmn-js palette to add elements. Click any node to edit
+                  Flowable-specific attributes here. Use the dropdown above to load a deployed
+                  definition from the engine, or deploy this canvas as a new revision.
                 </div>
               </div>
             </div>
@@ -424,44 +520,75 @@ export const BpmnModeler = ({ onOpenInspector }) => {
           {sel && (
             <>
               <div className="form-row">
-                <label>Name <span className="mono">bpmn:name</span></label>
-                <input className="input" key={sel.id + ":name:" + version}
-                       defaultValue={(bo && bo.name) || ""}
-                       onBlur={(e) => updateName(e.target.value)} />
+                <label>
+                  Name <span className="mono">bpmn:name</span>
+                </label>
+                <input
+                  className="input"
+                  key={sel.id + ":name:" + version}
+                  defaultValue={(bo && bo.name) || ""}
+                  onBlur={(e) => updateName(e.target.value)}
+                />
               </div>
               <div className="form-row">
-                <label>ID <span className="mono">XML id</span></label>
-                <input className="input mono" value={sel.id} readOnly
-                       style={{fontFamily:"var(--font-mono)", opacity:0.7}} />
+                <label>
+                  ID <span className="mono">XML id</span>
+                </label>
+                <input
+                  className="input mono"
+                  value={sel.id}
+                  readOnly
+                  style={{ fontFamily: "var(--font-mono)", opacity: 0.7 }}
+                />
               </div>
 
               {bpmnKind(sel) === "UserTask" && (
                 <>
                   <div className="form-row">
-                    <label>Assignee <span className="mono">flowable:assignee</span></label>
-                    <input className="input mono" key={sel.id + ":asg:" + version}
-                           defaultValue={bo.assignee || ""}
-                           placeholder="${initiator}"
-                           onBlur={(e) => updateExtAttr("assignee", e.target.value)} />
+                    <label>
+                      Assignee <span className="mono">flowable:assignee</span>
+                    </label>
+                    <input
+                      className="input mono"
+                      key={sel.id + ":asg:" + version}
+                      defaultValue={bo.assignee || ""}
+                      placeholder="${initiator}"
+                      onBlur={(e) => updateExtAttr("assignee", e.target.value)}
+                    />
                   </div>
                   <div className="form-row">
-                    <label>Candidate groups <span className="mono">flowable:candidateGroups</span></label>
-                    <input className="input mono" key={sel.id + ":cg:" + version}
-                           defaultValue={bo.candidateGroups || ""}
-                           onBlur={(e) => updateExtAttr("candidateGroups", e.target.value)} />
+                    <label>
+                      Candidate groups <span className="mono">flowable:candidateGroups</span>
+                    </label>
+                    <input
+                      className="input mono"
+                      key={sel.id + ":cg:" + version}
+                      defaultValue={bo.candidateGroups || ""}
+                      onBlur={(e) => updateExtAttr("candidateGroups", e.target.value)}
+                    />
                   </div>
                   <div className="form-row">
-                    <label>Form key <span className="mono">flowable:formKey</span></label>
-                    <input className="input mono" key={sel.id + ":fk:" + version}
-                           defaultValue={bo.formKey || ""}
-                           onBlur={(e) => updateExtAttr("formKey", e.target.value)} />
+                    <label>
+                      Form key <span className="mono">flowable:formKey</span>
+                    </label>
+                    <input
+                      className="input mono"
+                      key={sel.id + ":fk:" + version}
+                      defaultValue={bo.formKey || ""}
+                      onBlur={(e) => updateExtAttr("formKey", e.target.value)}
+                    />
                   </div>
                   <div className="form-row">
-                    <label>Due date <span className="mono">flowable:dueDate · ISO</span></label>
-                    <input className="input mono" key={sel.id + ":dd:" + version}
-                           defaultValue={bo.dueDate || ""}
-                           placeholder="P2D"
-                           onBlur={(e) => updateExtAttr("dueDate", e.target.value)} />
+                    <label>
+                      Due date <span className="mono">flowable:dueDate · ISO</span>
+                    </label>
+                    <input
+                      className="input mono"
+                      key={sel.id + ":dd:" + version}
+                      defaultValue={bo.dueDate || ""}
+                      placeholder="P2D"
+                      onBlur={(e) => updateExtAttr("dueDate", e.target.value)}
+                    />
                   </div>
                 </>
               )}
@@ -476,17 +603,36 @@ export const BpmnModeler = ({ onOpenInspector }) => {
                     </select>
                   </div>
                   <div className="form-row">
-                    <label>Class <span className="mono">flowable:class</span></label>
-                    <input className="input mono" key={sel.id + ":cls:" + version}
-                           defaultValue={bo.class || ""}
-                           placeholder="com.acme…"
-                           onBlur={(e) => updateExtAttr("class", e.target.value)} />
+                    <label>
+                      Class <span className="mono">flowable:class</span>
+                    </label>
+                    <input
+                      className="input mono"
+                      key={sel.id + ":cls:" + version}
+                      defaultValue={bo.class || ""}
+                      placeholder="com.acme…"
+                      onBlur={(e) => updateExtAttr("class", e.target.value)}
+                    />
                   </div>
                   <div className="form-row">
-                    <label>Async <span className="mono">flowable:async</span></label>
+                    <label>
+                      Async <span className="mono">flowable:async</span>
+                    </label>
                     <div className="seg-row">
-                      <button className="seg-btn" data-on={!bo.async?"1":"0"} onClick={() => updateExtAttr("async", false)}>No</button>
-                      <button className="seg-btn" data-on={bo.async?"1":"0"} onClick={() => updateExtAttr("async", true)}>Yes</button>
+                      <button
+                        className="seg-btn"
+                        data-on={!bo.async ? "1" : "0"}
+                        onClick={() => updateExtAttr("async", false)}
+                      >
+                        No
+                      </button>
+                      <button
+                        className="seg-btn"
+                        data-on={bo.async ? "1" : "0"}
+                        onClick={() => updateExtAttr("async", true)}
+                      >
+                        Yes
+                      </button>
                     </div>
                   </div>
                 </>
@@ -494,10 +640,15 @@ export const BpmnModeler = ({ onOpenInspector }) => {
               {bpmnKind(sel) === "BusinessRuleTask" && (
                 <>
                   <div className="form-row">
-                    <label>Decision ref <span className="mono">flowable:decisionRef</span></label>
-                    <input className="input mono" key={sel.id + ":dr:" + version}
-                           defaultValue={bo.decisionRef || ""}
-                           onBlur={(e) => updateExtAttr("decisionRef", e.target.value)} />
+                    <label>
+                      Decision ref <span className="mono">flowable:decisionRef</span>
+                    </label>
+                    <input
+                      className="input mono"
+                      key={sel.id + ":dr:" + version}
+                      defaultValue={bo.decisionRef || ""}
+                      onBlur={(e) => updateExtAttr("decisionRef", e.target.value)}
+                    />
                   </div>
                   <div className="form-row">
                     <label>Result variable</label>
@@ -513,17 +664,21 @@ export const BpmnModeler = ({ onOpenInspector }) => {
               )}
               {bpmnKind(sel) === "SequenceFlow" && (
                 <div className="form-row">
-                  <label>Condition <span className="mono">bpmn:conditionExpression</span></label>
-                  <textarea className="textarea mono"
-                            key={sel.id + ":cond:" + version}
-                            defaultValue={(bo.conditionExpression && bo.conditionExpression.body) || ""}
-                            placeholder={"${decision == \"approve\"}"} />
+                  <label>
+                    Condition <span className="mono">bpmn:conditionExpression</span>
+                  </label>
+                  <textarea
+                    className="textarea mono"
+                    key={sel.id + ":cond:" + version}
+                    defaultValue={(bo.conditionExpression && bo.conditionExpression.body) || ""}
+                    placeholder={'${decision == "approve"}'}
+                  />
                 </div>
               )}
 
               <div className="drawer-sect">REST</div>
-              <div className="code" style={{whiteSpace:"pre-wrap"}}>
-{`GET  /repository/process-definitions/{id}/model
+              <div className="code" style={{ whiteSpace: "pre-wrap" }}>
+                {`GET  /repository/process-definitions/{id}/model
 GET  /runtime/process-instances?processDefinitionKey=loanApproval&activityId=${sel.id}
 POST /runtime/process-instances`}
               </div>
@@ -541,7 +696,11 @@ export const DmnModeler = ({ onOpenInspector }) => {
   const modelerRef = React.useRef(null);
   const [view, setView] = React.useState("table");
   const [error, setError] = React.useState(null);
-  const [testInputs, setTestInputs] = React.useState({ creditScore: 742, income: 86000, employmentStatus: "employed" });
+  const [testInputs, setTestInputs] = React.useState({
+    creditScore: 742,
+    income: 86000,
+    employmentStatus: "employed",
+  });
   const [testResult, setTestResult] = React.useState(null);
   const [running, setRunning] = React.useState(false);
   const [decisions, setDecisions] = React.useState([]);
@@ -550,7 +709,8 @@ export const DmnModeler = ({ onOpenInspector }) => {
   const eps = DATA.endpoints.dmnModeler;
 
   React.useEffect(() => {
-    api.listDecisions({ size: 200 })
+    api
+      .listDecisions({ size: 200 })
       .then((r) => setDecisions(r.data || []))
       .catch(() => setDecisionsAvailable(false));
   }, []);
@@ -562,48 +722,79 @@ export const DmnModeler = ({ onOpenInspector }) => {
         container: containerRef.current,
         keyboard: { bindTo: window },
       });
-    } catch (e) { setError(String(e)); return; }
+    } catch (e) {
+      setError(String(e));
+      return;
+    }
     modelerRef.current = m;
-    m.importXML(LOAN_DMN_XML).then(() => {
+    m.importXML(LOAN_DMN_XML)
+      .then(() => {
+        try {
+          const views = m.getViews();
+          const drdView = views.find((v) => v.type === "drd");
+          if (drdView) m.open(drdView);
+          setView("drd");
+          setTimeout(() => {
+            const elig = views.find((v) => v.element && v.element.id === "loanEligibility");
+            if (elig) {
+              m.open(elig);
+              setView("table");
+            }
+          }, 50);
+        } catch (e) {
+          console.warn(e);
+        }
+      })
+      .catch((e) => setError(String(e.message || e)));
+    return () => {
       try {
-        const views = m.getViews();
-        const drdView = views.find((v) => v.type === "drd");
-        if (drdView) m.open(drdView);
-        setView("drd");
-        setTimeout(() => {
-          const elig = views.find((v) => v.element && v.element.id === "loanEligibility");
-          if (elig) { m.open(elig); setView("table"); }
-        }, 50);
-      } catch (e) { console.warn(e); }
-    }).catch((e) => setError(String(e.message || e)));
-    return () => { try { m.destroy(); } catch {} modelerRef.current = null; };
+        m.destroy();
+      } catch {}
+      modelerRef.current = null;
+    };
   }, []);
 
   const switchView = (which) => {
-    const m = modelerRef.current; if (!m) return;
+    const m = modelerRef.current;
+    if (!m) return;
     const views = m.getViews();
     if (which === "drd") {
       const v = views.find((x) => x.type === "drd");
-      if (v) { m.open(v); setView("drd"); }
+      if (v) {
+        m.open(v);
+        setView("drd");
+      }
     } else {
-      const v = views.find((x) => x.element && x.element.id === "loanEligibility")
-             || views.find((x) => x.type === "decisionTable");
-      if (v) { m.open(v); setView("table"); }
+      const v =
+        views.find((x) => x.element && x.element.id === "loanEligibility") ||
+        views.find((x) => x.type === "decisionTable");
+      if (v) {
+        m.open(v);
+        setView("table");
+      }
     }
   };
 
   const saveXML = async () => {
-    const m = modelerRef.current; if (!m) return;
+    const m = modelerRef.current;
+    if (!m) return;
     const { xml } = await m.saveXML({ format: true });
     download(filename, xml, "application/xml");
   };
   const deploy = async () => {
-    const m = modelerRef.current; if (!m) return;
+    const m = modelerRef.current;
+    if (!m) return;
     try {
       const { xml } = await m.saveXML({ format: true });
       await api.deployDmn(filename, xml);
-      if (onOpenInspector) onOpenInspector({ method: "POST", path: "/dmn-repository/deployments", desc: "Deploy DMN" });
-      api.listDecisions({ size: 200 })
+      if (onOpenInspector)
+        onOpenInspector({
+          method: "POST",
+          path: "/dmn-repository/deployments",
+          desc: "Deploy DMN",
+        });
+      api
+        .listDecisions({ size: 200 })
         .then((r) => setDecisions(r.data || []))
         .catch(() => {});
     } catch (e) {
@@ -628,37 +819,72 @@ export const DmnModeler = ({ onOpenInspector }) => {
     <div className="modeler" data-engine="real">
       <div className="mod-toolbar">
         <div className="file-name">
-          <Icon name="dmn" size={14}/>
+          <Icon name="dmn" size={14} />
           <b>{filename}</b>
           {!decisionsAvailable && (
-            <span style={{color:"var(--warn)", fontSize:11}}>
-              · DMN engine unavailable
-            </span>
+            <span style={{ color: "var(--warn)", fontSize: 11 }}>· DMN engine unavailable</span>
           )}
           {decisionsAvailable && decisions.length > 0 && (
-            <span style={{color:"var(--fg-mute)"}}>· {decisions.length} deployed</span>
+            <span style={{ color: "var(--fg-mute)" }}>· {decisions.length} deployed</span>
           )}
         </div>
-        <div className="sep"/>
-        <div className="seg-row" style={{margin:0}}>
-          <button className="seg-btn" data-on={view==="table"?"1":"0"} onClick={() => switchView("table")}>Decision table</button>
-          <button className="seg-btn" data-on={view==="drd"?"1":"0"} onClick={() => switchView("drd")}>DRD</button>
+        <div className="sep" />
+        <div className="seg-row" style={{ margin: 0 }}>
+          <button
+            className="seg-btn"
+            data-on={view === "table" ? "1" : "0"}
+            onClick={() => switchView("table")}
+          >
+            Decision table
+          </button>
+          <button
+            className="seg-btn"
+            data-on={view === "drd" ? "1" : "0"}
+            onClick={() => switchView("drd")}
+          >
+            DRD
+          </button>
         </div>
-        <div className="sep"/>
-        <button className="btn" data-size="sm" data-variant="ghost" onClick={saveXML}><Icon name="save" size={13}/>Save</button>
-        <button className="btn" data-size="sm" data-variant="ghost" onClick={deploy}><Icon name="upload" size={13}/>Deploy</button>
-        <button className="btn" data-size="sm" data-variant="ghost" onClick={saveXML}><Icon name="download" size={13}/>Export</button>
-        <button className="btn" data-size="sm" data-variant="ghost"
-                onClick={() => onOpenInspector && onOpenInspector(eps[0])}>
-          <Icon name="api" size={13}/>REST
+        <div className="sep" />
+        <button className="btn" data-size="sm" data-variant="ghost" onClick={saveXML}>
+          <Icon name="save" size={13} />
+          Save
         </button>
-        <div className="spacer"/>
+        <button className="btn" data-size="sm" data-variant="ghost" onClick={deploy}>
+          <Icon name="upload" size={13} />
+          Deploy
+        </button>
+        <button className="btn" data-size="sm" data-variant="ghost" onClick={saveXML}>
+          <Icon name="download" size={13} />
+          Export
+        </button>
+        <button
+          className="btn"
+          data-size="sm"
+          data-variant="ghost"
+          onClick={() => onOpenInspector && onOpenInspector(eps[0])}
+        >
+          <Icon name="api" size={13} />
+          REST
+        </button>
+        <div className="spacer" />
       </div>
 
       <div className="mod-canvas">
-        <div ref={containerRef} className="dmn-host" style={{width:"100%", height:"100%"}}/>
+        <div ref={containerRef} className="dmn-host" style={{ width: "100%", height: "100%" }} />
         {error && (
-          <div style={{position:"absolute", inset:20, background:"var(--bg-elev)", border:"1px solid var(--bad)", padding:16, borderRadius:8, color:"var(--bad)"}} className="mono">
+          <div
+            style={{
+              position: "absolute",
+              inset: 20,
+              background: "var(--bg-elev)",
+              border: "1px solid var(--bad)",
+              padding: 16,
+              borderRadius: 8,
+              color: "var(--bad)",
+            }}
+            className="mono"
+          >
             {error}
           </div>
         )}
@@ -667,57 +893,95 @@ export const DmnModeler = ({ onOpenInspector }) => {
       <div className="mod-props">
         <div className="panel-hd">
           <span className="panel-title">Test runner</span>
-          <span className="mono" style={{marginLeft:"auto", fontSize:10, color:"var(--fg-mute)"}}>POST /dmn-rule/execute</span>
+          <span
+            className="mono"
+            style={{ marginLeft: "auto", fontSize: 10, color: "var(--fg-mute)" }}
+          >
+            POST /dmn-rule/execute
+          </span>
         </div>
-        <div style={{padding:14, overflowY:"auto"}}>
+        <div style={{ padding: 14, overflowY: "auto" }}>
           <div className="form-row">
             <label>Credit Score</label>
-            <input className="input mono" value={testInputs.creditScore}
-                   onChange={(e) => setTestInputs({...testInputs, creditScore: Number(e.target.value)})}/>
+            <input
+              className="input mono"
+              value={testInputs.creditScore}
+              onChange={(e) =>
+                setTestInputs({ ...testInputs, creditScore: Number(e.target.value) })
+              }
+            />
           </div>
           <div className="form-row">
             <label>Annual Income</label>
-            <input className="input mono" value={testInputs.income}
-                   onChange={(e) => setTestInputs({...testInputs, income: Number(e.target.value)})}/>
+            <input
+              className="input mono"
+              value={testInputs.income}
+              onChange={(e) => setTestInputs({ ...testInputs, income: Number(e.target.value) })}
+            />
           </div>
           <div className="form-row">
             <label>Employment</label>
-            <select className="select" value={testInputs.employmentStatus}
-                    onChange={(e) => setTestInputs({...testInputs, employmentStatus: e.target.value})}>
+            <select
+              className="select"
+              value={testInputs.employmentStatus}
+              onChange={(e) => setTestInputs({ ...testInputs, employmentStatus: e.target.value })}
+            >
               <option value="employed">employed</option>
               <option value="self-employed">self-employed</option>
               <option value="unemployed">unemployed</option>
             </select>
           </div>
-          <button className="btn" data-variant="primary" disabled={running}
-                  onClick={runTest} style={{width:"100%"}}>
-            <Icon name="play" size={13}/>{running ? "Running…" : "Run decision"}
+          <button
+            className="btn"
+            data-variant="primary"
+            disabled={running}
+            onClick={runTest}
+            style={{ width: "100%" }}
+          >
+            <Icon name="play" size={13} />
+            {running ? "Running…" : "Run decision"}
           </button>
 
           {testResult && (
             <>
               <div className="drawer-sect">Result</div>
-              <div style={{display:"flex", flexDirection:"column", gap:6}}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {Object.entries(testResult.resultVariables || {}).map(([k, v]) => (
-                  <div key={k} style={{display:"flex", alignItems:"center", justifyContent:"space-between",
-                                       padding:"6px 10px", background:"var(--bg-sunken)",
-                                       borderRadius:6, border:"1px solid var(--line)"}}>
-                    <span className="mono" style={{fontSize:12, color:"var(--fg-soft)"}}>{k}</span>
-                    <span className="mono" style={{fontSize:12, fontWeight:600}}>{String(v)}</span>
+                  <div
+                    key={k}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "6px 10px",
+                      background: "var(--bg-sunken)",
+                      borderRadius: 6,
+                      border: "1px solid var(--line)",
+                    }}
+                  >
+                    <span className="mono" style={{ fontSize: 12, color: "var(--fg-soft)" }}>
+                      {k}
+                    </span>
+                    <span className="mono" style={{ fontSize: 12, fontWeight: 600 }}>
+                      {String(v)}
+                    </span>
                   </div>
                 ))}
               </div>
               {testResult.ruleFired && (
-                <div className="mt-3" style={{fontSize:12, color:"var(--fg-soft)"}}>
-                  Matched: <span className="badge" data-tone="info">{testResult.ruleFired}</span>
+                <div className="mt-3" style={{ fontSize: 12, color: "var(--fg-soft)" }}>
+                  Matched:{" "}
+                  <span className="badge" data-tone="info">
+                    {testResult.ruleFired}
+                  </span>
                 </div>
               )}
             </>
           )}
 
           <div className="drawer-sect">Engine</div>
-          <div className="code" style={{whiteSpace:"pre-wrap"}}>
-{`bpmn-js  17.11.1   apache 2.0  bpmn.io
+          <div className="code" style={{ whiteSpace: "pre-wrap" }}>
+            {`bpmn-js  17.11.1   apache 2.0  bpmn.io
 dmn-js   16.6.1    apache 2.0  bpmn.io
 target   Flowable 7 REST API`}
           </div>
@@ -731,7 +995,12 @@ function download(name, content, type) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = name;
-  document.body.appendChild(a); a.click();
-  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+    a.remove();
+  }, 0);
 }
