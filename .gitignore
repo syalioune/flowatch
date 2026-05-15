@@ -9,6 +9,9 @@ __screenshots__/
 e2e/test-results/
 e2e/playwright-report/
 e2e/.playwright-cache/
+# Vitest CI JUnit report (Story 4.1) — only the GitHub Actions runner writes
+# it; uploaded as an artifact on failure.
+test-results/
 .env
 .env.local
 .DS_Store
