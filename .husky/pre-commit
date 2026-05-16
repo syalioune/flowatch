@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# Resolve the repository root (where .husky/ lives)
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO_ROOT" || exit 1
+
+# --- Format with Biome (the project's lint + format tool, per PRD NFR-24/25) ---
+# Biome v2 covers formatting and linting via a single binary.
+# This runs against the whole working tree at commit time so we get an
+# auto-fix pass on any new code before it ships. Use --no-install to fail
+# fast if Biome isn't yet wired up (early bootstrap).
+if [ -f "biome.json" ] || [ -f "biome.jsonc" ]; then
+  echo "▶ Running Biome formatter…"
+  npx --no-install biome format --write . || {
+    echo "✗ Biome formatter failed. Run 'npm install' if biome is missing." >&2
+    exit 1
+  }
+  git add -u
+fi
+
+exit 0
