@@ -95,3 +95,21 @@ updates:
     # NOTE: ecosystem identifier is `docker-compose` (the newer parser for
     # docker-compose.yml files). If GitHub rejects the identifier at validation
     # time, fall back to `docker` and adjust this comment.
+
+  # Dockerfile base-image digests (node:20-alpine builder + nginx:alpine
+  # runtime). Distinct from `docker-compose` above which watches the dev-
+  # stack `docker-compose.yml` — this entry watches `Dockerfile` at the
+  # repo root, which feeds the published image at ghcr.io/syalioune/flowatch
+  # and docker.io/syalioune/flowatch.
+  - package-ecosystem: docker
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - "type:chore"
+      - "area:infra"
+    commit-message:
+      prefix: "chore"
+      include: "scope"

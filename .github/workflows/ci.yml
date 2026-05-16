@@ -26,9 +26,11 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, "release/*"]
+    tags: ["v*"]
   pull_request:
     branches: [main, develop]
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -331,3 +333,218 @@ jobs:
     steps:
       - name: Placeholder — deploy artifact to gh-pages
         run: echo "TBD (epic 4) — actions/download-artifact + actions/deploy-pages — see ADR-010"
+
+  # Build the Flowatch SPA Docker image and publish it to ghcr.io and
+  # Docker Hub on push / tag events. Pull requests build (amd64 only, for
+  # speed) but never push — secrets are never exposed to PR builds.
+  #
+  # Tag strategy (via docker/metadata-action):
+  #   - main:                    :latest, :sha-<short>
+  #   - develop:                 :develop, :sha-<short>
+  #   - release/0.0.2:           :release-0.0.2, :sha-<short>
+  #   - tag v0.0.2:              :0.0.2, :0.0, :0, :latest, :sha-<short>
+  #   - tag v0.0.2-rc1:          :0.0.2-rc1, :sha-<short>   (no :latest, no :major.minor / :major)
+  #   - PR (same repo):          (build only — no push, no login)
+  #   - PR (from fork):          (skipped — secrets aren't available to fork PRs)
+  #
+  # Skip rules:
+  #   - The `[skip ci]` skip applies ONLY to branch pushes (semantic-release's
+  #     release commit). Tag pushes always run — the tag itself is what we
+  #     want to build for, and tag refs sit on top of [skip ci] commits.
+  #
+  # Concurrency:
+  #   - The workflow-level concurrency has `cancel-in-progress: true`, which
+  #     would otherwise cancel an in-flight `image` job mid-push (leaving
+  #     ghcr.io and Docker Hub with partial manifests). The job-level
+  #     concurrency below overrides that — never cancel a running push.
+  #
+  # Secrets required (operator-set — see BOOTSTRAP.md§docker-hub-secrets):
+  #   - DOCKERHUB_USERNAME (literal: syalioune)
+  #   - DOCKERHUB_TOKEN    (PAT scoped to Read/Write/Delete on
+  #                         syalioune/flowatch on Docker Hub)
+  #
+  # When DOCKERHUB_TOKEN is missing the push step fails red, but the
+  # job is intentionally NOT in branch-protection's required_checks.json
+  # so merges aren't blocked — `image` is auxiliary, like `release.yml`.
+  image:
+    name: image
+    needs: [check, unit, build]
+    # Skip:
+    #   - branch pushes whose head commit has [skip ci] (release.yml's commit),
+    #     EXCEPT for tag events (we always want the tag's image even if the
+    #     underlying commit was [skip ci]'d).
+    #   - PRs from forks (secrets unavailable; cleaner than partial-build).
+    if: |
+      (startsWith(github.ref, 'refs/tags/') || !contains(github.event.head_commit.message, '[skip ci]'))
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Override the workflow-level cancel-in-progress so a fast-followed push
+    # doesn't kill the previous push mid-flight (which can leave one registry
+    # with a half-uploaded manifest).
+    concurrency:
+      group: image-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write         # push to ghcr.io
+      id-token: write         # SLSA provenance attestation
+      security-events: write  # upload Trivy SARIF to the Security tab
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0    # full history so __BUILD_SHA__ resolves correctly
+
+      - name: Setup QEMU (arm64 emulation)
+        if: github.event_name != 'pull_request'
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+        with:
+          platforms: arm64
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - name: Login to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Compute image tags + labels
+        id: meta
+        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
+        with:
+          images: |
+            ghcr.io/syalioune/flowatch
+            docker.io/syalioune/flowatch
+          # Tag rules — read top-to-bottom:
+          #   - branch / PR / SHA tags are always safe to emit when their
+          #     event type fires.
+          #   - semver patterns only emit on tag pushes. Pre-release tags
+          #     (containing `-` like `v0.0.2-rc1`) get ONLY :{{version}},
+          #     not :{{major}}.{{minor}} or :{{major}}.
+          #   - :latest is emitted on default-branch pushes AND on stable
+          #     (no hyphen) semver tag pushes. Pre-release tags do NOT move
+          #     :latest. The metadata-action `latest` flag false on semver
+          #     entries prevents the default behaviour of also emitting
+          #     :latest from {{version}}.
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,format=short,prefix=sha-
+            type=semver,pattern={{version}},enable=true,latest=false
+            type=semver,pattern={{major}}.{{minor}},enable=${{ !contains(github.ref, '-') }},latest=false
+            type=semver,pattern={{major}},enable=${{ !contains(github.ref, '-') }},latest=false
+            type=raw,value=latest,enable=${{ github.event_name == 'push' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || (startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-'))) }}
+          labels: |
+            org.opencontainers.image.title=Flowatch
+            org.opencontainers.image.description=Modern Flowable 7 REST GUI — BPMN/DMN modeler + runtime operations
+            org.opencontainers.image.licenses=Apache-2.0
+
+      # Two-phase build/scan/push pattern:
+      #   1. Build amd64 to the local daemon (`load: true`) so Trivy can
+      #      scan it. Multi-arch manifest lists don't load to a daemon, so
+      #      we need a single-arch local image for the scan target. We
+      #      cache the layers to gha so the second buildx call hits cache.
+      #   2. Trivy scans the loaded image. CRITICAL vulnerabilities fail
+      #      the job (prevents the push from happening). HIGH vulns also
+      #      report but don't block — pre-1.0 we tune the bar up over
+      #      time. SARIF gets uploaded regardless of step outcome so the
+      #      Security tab tracks state across runs.
+      #   3. If scan passes, the full multi-arch build runs with `push:
+      #      true`. Layers hit the gha cache from step 1, so the second
+      #      build is mostly an emulated-arm64 rebuild + push.
+      #   4. On PRs, the scan still runs against the locally-loaded amd64
+      #      image; the multi-arch push step is skipped via `push: false`.
+      - name: Build amd64 to local daemon (for Trivy scan)
+        id: build-local
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          push: false
+          # A stable local tag so the scan step can reference it without
+          # depending on metadata-action's tag list (which may be empty
+          # for some event combinations).
+          tags: flowatch:scan
+          build-args: |
+            BUILD_SHA=${{ github.sha }}
+            APP_VERSION=${{ steps.meta.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scan
+        id: trivy
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: flowatch:scan
+          # Default scanners cover both OS packages (apk) and language
+          # libraries (npm). Both severities listed as gates: fixed or not,
+          # CRITICAL+HIGH block the push. `ignore-unfixed: true` lets noise
+          # without a fix slip through — operators can rotate it on later
+          # by tightening the bar in a follow-up.
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-results.sarif
+
+      - name: Upload Trivy SARIF
+        if: always() && hashFiles('trivy-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@f411752efdf656cb71aa17b755b22c890960da1d # v3.35.5
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-image
+
+      - name: Build and push (multi-arch)
+        # Only runs if the Trivy scan passed (job-step ordering). Cache
+        # hit from `build-local` makes this fast on amd64; arm64 still
+        # needs to build under qemu.
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+        with:
+          context: .
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            BUILD_SHA=${{ github.sha }}
+            APP_VERSION=${{ steps.meta.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: ${{ github.event_name != 'pull_request' }}
+          sbom: ${{ github.event_name != 'pull_request' }}
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### image"
+            echo ""
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              echo "- Mode: build-only (PR — no push)"
+              echo "- Platforms: linux/amd64"
+            else
+              echo "- Mode: build + push"
+              echo "- Platforms: linux/amd64, linux/arm64"
+            fi
+            echo "- Trivy scan: ${{ steps.trivy.outcome }} (severity gate: CRITICAL,HIGH; ignore-unfixed: true)"
+            echo "- SARIF: uploaded to Security tab (category: trivy-image)"
+            echo "- Tags:"
+            echo '${{ steps.meta.outputs.tags }}' | sed 's/^/  - `/' | sed 's/$/`/'
+            echo ""
+            if [ "${{ github.event_name }}" != "pull_request" ]; then
+              echo "- Inspect: \`docker buildx imagetools inspect ghcr.io/syalioune/flowatch:sha-$(echo ${{ github.sha }} | cut -c1-7)\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
