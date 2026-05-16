@@ -92,6 +92,10 @@ jobs:
         id: notice
         run: node scripts/release/generate-notice.mjs --check
 
+      - name: Verify commitlint scopes match release.config.mjs THEMES
+        id: scope-sync
+        run: node scripts/release/check-commitlint-scopes.mjs
+
       - name: Verify source file sizes (NFR-21, ≤ 50 KB)
         id: filesize
         run: bash scripts/ci/check-file-size.sh
@@ -110,6 +114,7 @@ jobs:
             echo "- tsc --noEmit: ${{ steps.tsc.outcome }}"
             echo "- License allow-list: ${{ steps.licenses.outcome }}"
             echo "- NOTICE freshness: ${{ steps.notice.outcome }}"
+            echo "- Scope sync: ${{ steps['scope-sync'].outcome }}"
             echo "- File-size limit: ${{ steps.filesize.outcome }}"
             echo "- README badges: ${{ steps.badges.outcome }}"
           } >> "$GITHUB_STEP_SUMMARY"
