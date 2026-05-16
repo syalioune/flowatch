@@ -61,7 +61,10 @@ function renderRow(name, info) {
 
 const lines = [];
 lines.push("Flowatch");
-lines.push("Copyright 2026 Flowatch contributors");
+// Computed at generation time so the NOTICE rolls over each calendar year
+// without a manual bump. The check mode in CI re-runs this on every push, so
+// the file rotates automatically on the first build of the new year.
+lines.push(`Copyright ${new Date().getFullYear()} Flowatch contributors`);
 lines.push("");
 lines.push("This product includes software developed at the listed third-party");
 lines.push("projects. Each entry shows the package name, version, license SPDX");
