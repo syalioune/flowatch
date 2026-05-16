@@ -1,0 +1,26 @@
+version: 2
+
+secret:
+  # Paths whose dev-only credentials are documented and intentional.
+  ignored-paths:
+    # docker-compose.yml ships the default Flowable REST admin password
+    # (`test`) and the Postgres user/password (`flowable`/`flowable`).
+    # These are public defaults documented in README.md and exist only
+    # to make `make stack` work out of the box.
+    - "docker-compose.yml"
+    # Bruno REST collection holds the same `rest-admin:test` Basic-auth
+    # header against the local stack. Contributors are expected to
+    # change credentials in the Settings modal at runtime — they are
+    # never read from this file.
+    - "bruno/**"
+    # Allowlist files for other security scanners — they may quote
+    # sensitive-looking patterns by name.
+    - ".trivyignore"
+    - ".gitleaks.toml"
+
+  # Known dev-only credentials baked into the local stack.
+  ignored-matches:
+    - name: "Dev-only Flowable REST admin password (docker-compose default)"
+      match: "rest-admin:test"
+    - name: "Dev-only Postgres user/password (docker-compose default)"
+      match: "flowable:flowable"
