@@ -1,0 +1,136 @@
+[
+  { "name": "state:backlog", "color": "6A737D", "description": "Not yet prioritized or picked up" },
+  { "name": "state:ready", "color": "0366D6", "description": "Ready to start" },
+  { "name": "state:ongoing", "color": "F9C513", "description": "Being implemented" },
+  { "name": "state:review", "color": "6F42C1", "description": "Awaiting review" },
+  { "name": "state:blocked", "color": "D73A49", "description": "Blocked by dependency" },
+  { "name": "state:done", "color": "28A745", "description": "Merged / resolved" },
+
+  { "name": "type:bug", "color": "D73A49", "description": "Something is broken" },
+  { "name": "type:feature", "color": "A2EEEF", "description": "New capability" },
+  {
+    "name": "type:user-story",
+    "color": "1D76DB",
+    "description": "User-facing story (As X, I want Y, so that Z)"
+  },
+  { "name": "type:task", "color": "C5DEF5", "description": "Implementation task" },
+  { "name": "type:chore", "color": "EDEDED", "description": "Maintenance, refactor, deps" },
+  { "name": "type:rfc", "color": "BFD4F2", "description": "Proposal needing discussion" },
+  { "name": "type:documentation", "color": "0075CA", "description": "Docs / ADRs / specs" },
+  { "name": "type:epic", "color": "5319E7", "description": "Large story spanning multiple issues" },
+  { "name": "type:security", "color": "B60205", "description": "Security-related" },
+
+  { "name": "priority:critical", "color": "B60205", "description": "Drop everything" },
+  { "name": "priority:high", "color": "D93F0B", "description": "Next sprint" },
+  { "name": "priority:medium", "color": "FBCA04", "description": "Normal" },
+  { "name": "priority:low", "color": "0E8A16", "description": "Nice to have" },
+
+  { "name": "area:api", "color": "5319E7", "description": "Flowable REST wrappers (src/api*)" },
+  { "name": "area:modeler", "color": "5319E7", "description": "bpmn-js / dmn-js modelers" },
+  { "name": "area:inspector", "color": "5319E7", "description": "API Inspector drawer" },
+  {
+    "name": "area:screens",
+    "color": "5319E7",
+    "description": "Routed screens (Dashboard / Tasks / Jobs / …)"
+  },
+  {
+    "name": "area:design-system",
+    "color": "5319E7",
+    "description": "CSS variables, looks, themes, density"
+  },
+  { "name": "area:auth", "color": "5319E7", "description": "Basic / Bearer / OIDC strategies" },
+  {
+    "name": "area:devops",
+    "color": "EEEEEE",
+    "description": "Docker stack, nginx proxy, Vite config"
+  },
+  {
+    "name": "area:security",
+    "color": "EEEEEE",
+    "description": "Secrets, supply chain, SECURITY.md"
+  },
+  { "name": "area:docs", "color": "EEEEEE", "description": "Docs and BMad planning artifacts" },
+  { "name": "area:branding", "color": "EEEEEE", "description": "Logo, marks, design tokens" },
+  {
+    "name": "area:ci-cd",
+    "color": "EEEEEE",
+    "description": "GitHub Actions workflows + dependabot"
+  },
+  { "name": "area:tests", "color": "EEEEEE", "description": "Vitest, Playwright, test fixtures" },
+  { "name": "area:tooling", "color": "EEEEEE", "description": "Biome, scripts/, hooks" },
+  { "name": "area:tech-foundation", "color": "EEEEEE", "description": "Bootstrap / repo hygiene" },
+
+  { "name": "size:XS", "color": "C5DEF5", "description": "< 1 hour" },
+  { "name": "size:S", "color": "C5DEF5", "description": "1-3 hours" },
+  { "name": "size:M", "color": "C5DEF5", "description": "1 day" },
+  { "name": "size:L", "color": "C5DEF5", "description": "2-3 days" },
+  { "name": "size:XL", "color": "C5DEF5", "description": "1 week" },
+  { "name": "size:XXL", "color": "C5DEF5", "description": "Needs splitting" },
+
+  { "name": "risk:low", "color": "0E8A16", "description": "Low risk" },
+  { "name": "risk:medium", "color": "FBCA04", "description": "Medium risk" },
+  { "name": "risk:high", "color": "D93F0B", "description": "High risk — needs ADR / review" },
+
+  { "name": "ref:FR", "color": "5319E7", "description": "Maps to a Functional Requirement in PRD" },
+  {
+    "name": "ref:NFR",
+    "color": "5319E7",
+    "description": "Maps to a Non-Functional Requirement in PRD"
+  },
+  {
+    "name": "ref:ADR",
+    "color": "5319E7",
+    "description": "References an Architecture Decision Record"
+  },
+  { "name": "ref:bruno", "color": "5319E7", "description": "Touches the Bruno API collection" },
+  {
+    "name": "ref:compat",
+    "color": "5319E7",
+    "description": "Touches docs/compat.md (Flowable REST support)"
+  },
+
+  {
+    "name": "release:0.0.1",
+    "color": "FEF2C0",
+    "description": "Targets 0.0.1 — Tech Foundation (bootstrap)"
+  },
+  {
+    "name": "release:0.0.2",
+    "color": "FEF2C0",
+    "description": "Targets 0.0.2 — v1 MVP (Flowable 6.x OSS UI parity, rebuilt)"
+  },
+  { "name": "release:0.0.3", "color": "FEF2C0", "description": "Targets 0.0.3 — 6.x parity gaps" },
+  {
+    "name": "release:1.0.0",
+    "color": "FEF2C0",
+    "description": "Targets 1.0.0 — Operator polish + GA"
+  },
+
+  {
+    "name": "scope:flowable-7.2",
+    "color": "0075CA",
+    "description": "Verified against flowable-rest:7.2.0"
+  },
+  {
+    "name": "scope:flowable-7.x",
+    "color": "0075CA",
+    "description": "Targets flowable-rest 7.x line"
+  },
+
+  {
+    "name": "good-first-issue",
+    "color": "7057FF",
+    "description": "Easy entry point for new contributors"
+  },
+  { "name": "help-wanted", "color": "008672", "description": "Maintainer welcomes outside help" },
+  {
+    "name": "known-issue",
+    "color": "D93F0B",
+    "description": "Surfaced in release notes' Known issues section"
+  },
+  {
+    "name": "skip-changelog",
+    "color": "EDEDED",
+    "description": "Excluded from auto-generated release notes"
+  }
+]
