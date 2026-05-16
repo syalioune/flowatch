@@ -23,3 +23,8 @@ test-results/
 # anything that resolves through them must stay out of the public repo.
 _bmad
 _bmad-output
+
+# Claude Code per-developer overrides — settings.local.json (and any sibling
+# *.local.json) are gitignored so contributors can add personal permission
+# allowlists without polluting the shared .claude/settings.json.
+.claude/*.local.json
