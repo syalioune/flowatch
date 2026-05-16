@@ -1,26 +1,31 @@
-# Placeholder CI pipeline matching ADR-010 (architecture.md §3).
+# CI pipeline — matches ADR-010 (architecture.md §3) after the 0.0.1
+# sprint-change proposal that retired the public GitHub Pages demo.
 #
-# Five jobs are wired so branch-protection contexts
-# (.github/protection/required_checks.json) can be enforced on `main` from
-# day one. Each job currently echoes its intent; real implementations land
-# during milestone 0.0.1 (Tech Foundation):
+# Five jobs run on push / PR / tag (the trailing `image` job is auxiliary):
 #
-#   check : ADR-007 Biome v2 + ADR-001 tsc --noEmit          → epic 1
-#   unit  : ADR-008 Vitest unit + component tests            → epic 2
-#   e2e   : ADR-008 Playwright vs. live flowable-rest:7.2.0  → epic 2
-#   build : ADR-002 Vite production build + artifact upload  → epic 4
-#   pages : ADR-010 deploy artifact to GitHub Pages (main)   → epic 4
+#   check : Biome v2 (ADR-007), tsc --noEmit (ADR-001), SPDX headers,
+#           license allow-list, NOTICE freshness, ≤50 KB source-file
+#           limit, README-badge drift, commitlint scope-sync.
+#   unit  : Vitest unit + browser tiers (ADR-008).
+#   e2e   : Playwright golden path vs. live flowable-rest:7.2.0
+#           (ADR-008, ADR-012).
+#   build : Vite production build + dist artifact upload (ADR-002).
+#   image : multi-arch Docker image build + Trivy scan + push to
+#           ghcr.io and docker.io on non-PR events. NOT required for
+#           branch protection — see the `image:` block's header for
+#           secrets / tag strategy / skip rules.
 #
-# When wiring a real implementation, KEEP the job id (and the `name:` if
-# set) — the four required-check contexts `CI / check`, `CI / unit`,
-# `CI / e2e`, `CI / build` are hard-coded in branch protection.
+# The four required-check contexts (`CI / check`, `CI / unit`,
+# `CI / e2e`, `CI / build`) are hard-coded in
+# .github/protection/required_checks.json. KEEP the job id (and the
+# `name:` if set) when refactoring — renaming silently breaks branch
+# protection.
 #
 # All third-party actions are pinned to a full-length commit SHA per
-# NFR-26 (and the repo's "Require actions to be pinned to a full-length
-# commit SHA" setting). Dependabot's `github-actions` ecosystem bumps the
-# SHAs weekly (see .github/dependabot.yml) and keeps the trailing `# vX.Y.Z`
-# comment in sync — never strip that comment, it documents the human-
-# readable version pin matches.
+# NFR-26. Dependabot's `github-actions` ecosystem (.github/dependabot.yml)
+# bumps the SHAs weekly and keeps the trailing `# vX.Y.Z` comment in
+# sync — never strip that comment, it documents the human-readable
+# version pin.
 
 name: CI
 
@@ -319,20 +324,6 @@ jobs:
           retention-days: 14
           if-no-files-found: error
           compression-level: 6
-
-  pages:
-    name: pages
-    needs: [check, unit, e2e, build]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-    steps:
-      - name: Placeholder — deploy artifact to gh-pages
-        run: echo "TBD (epic 4) — actions/download-artifact + actions/deploy-pages — see ADR-010"
 
   # Build the Flowatch SPA Docker image and publish it to ghcr.io and
   # Docker Hub on push / tag events. Pull requests build (amd64 only, for
