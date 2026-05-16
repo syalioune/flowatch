@@ -1,0 +1,34 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 42" fill="none" role="img" aria-label="Flowatch — full lockup">
+  <!-- Mark (Draft 01 — Eye on the line), nudged 1px so its eye center sits at y=21,
+       aligning with the wordmark's x-height centerline. Total padding 5px top / 5px bottom. -->
+  <g transform="translate(4 5)">
+    <line x1="3" y1="16" x2="29" y2="16"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="16" cy="16" r="6"
+            fill="var(--bg, white)"
+            stroke="var(--accent, currentColor)" stroke-width="2"/>
+    <circle cx="16" cy="16" r="2"
+            fill="var(--accent, currentColor)"/>
+  </g>
+
+  <!-- Wordmark: "Fl" + eye-as-o (same proportions as the mark's eye, no line) + "watch" -->
+  <!-- "Fl" -->
+  <text x="50" y="29"
+        font-family="'IBM Plex Sans', system-ui, sans-serif"
+        font-weight="600" font-size="26" letter-spacing="-0.02em"
+        fill="currentColor">Fl</text>
+
+  <!-- "o" replaced by an eye glyph at cy=21 — same y as the mark's eye -->
+  <circle cx="83" cy="21" r="6"
+          fill="none"
+          stroke="currentColor" stroke-width="2"/>
+  <circle cx="83" cy="21" r="2"
+          fill="var(--accent, currentColor)"/>
+
+  <!-- "watch" -->
+  <text x="91" y="29"
+        font-family="'IBM Plex Sans', system-ui, sans-serif"
+        font-weight="600" font-size="26" letter-spacing="-0.02em"
+        fill="currentColor">watch</text>
+</svg>
