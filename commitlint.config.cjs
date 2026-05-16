@@ -104,6 +104,7 @@ module.exports = {
         "routing",
         "routes",
         "navigation",
+        "nav",
         "sidebar",
         "topbar",
         "chrome",
