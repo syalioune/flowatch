@@ -1,0 +1,76 @@
+name: "✨ Feature request"
+description: Propose a new capability for Flowatch
+title: "[FEAT]: "
+labels: ["type:feature", "state:backlog", "priority:medium"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Flowatch is a UI for **Flowable 7 OSS**. New features must be expressible against the existing Flowable REST surface (or call out an Enterprise-only dependency upfront — those are out of scope).
+  - type: dropdown
+    id: persona
+    attributes:
+      label: Primary persona (from PRD §5)
+      options:
+        - Mira — operator (day-to-day BPMN runtime)
+        - Daan — evaluator (kicking the tires before adopting Flowable)
+        - Sasha — admin / script author (deploys, tenants, identity)
+        - Multiple / cross-cutting
+    validations: { required: true }
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What is the user trying to do today, and where does Flowatch fall short?
+    validations: { required: true }
+  - type: textarea
+    id: solution
+    attributes: { label: Proposed solution }
+    validations: { required: true }
+  - type: textarea
+    id: alt
+    attributes: { label: Alternatives considered }
+  - type: textarea
+    id: fr_ref
+    attributes:
+      label: Existing FR / NFR reference (if any)
+      description: Cross-link to the PRD (`_bmad-output/planning-artifacts/prd.md`) — e.g. FR-19, NFR-7. Leave blank if this is a net-new requirement.
+      placeholder: "FR-…; NFR-…"
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - api (src/api*, the request() funnel)
+        - modeler (bpmn-js / dmn-js)
+        - inspector (API Inspector)
+        - screens (Dashboard, Tasks, Jobs, History, …)
+        - design-system (looks, themes, density, CSS variables)
+        - auth (Basic / Bearer / OIDC)
+        - devops (docker stack, nginx proxy, Vite config)
+        - security (SECURITY.md, supply chain)
+        - ci-cd (GitHub Actions, dependabot)
+        - tests (Vitest, Playwright, fixtures)
+        - tooling (Biome, scripts/, hooks)
+        - branding (logo, marks, design tokens)
+        - docs (docs/, README, CLAUDE.md, BMAD)
+        - unsure
+    validations: { required: true }
+  - type: dropdown
+    id: target_milestone
+    attributes:
+      label: Target milestone (best guess)
+      description: "Per `_bmad-output/planning-artifacts/epics.md`. Maintainer may re-bucket on triage."
+      options:
+        - "0.0.1 — Tech foundation (bootstrap)"
+        - "0.0.2 — v1 MVP (parity rebuild)"
+        - "0.0.3 — 6.x parity gaps"
+        - "1.0.0 — GA / operator polish"
+        - "v2+ — placeholder (engine-blocked / demand-gated)"
+        - "Unknown / maintainer to decide"
+    validations: { required: true }
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact / success signal
+      description: How will we know this landed? Adoption numbers, support tickets dropped, evaluator feedback…

@@ -1,0 +1,119 @@
+name: "🧑‍💻 User Story"
+description: "Capture a user story with ACs, scope, traceability, and delivery plan"
+title: "<AREA-CODE>-<PERSONA_TRIGRAMM>-<SEQ> <short summary>"
+labels: ["type:user-story", "state:backlog", "priority:high"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Guidance**
+        - Use the classic format: *As a <persona>, I want <capability>, so that <benefit>.*
+        - Keep ACs simple, numbered, and testable (AC1, AC2, …).
+        - Reference FR/NFR/ADR IDs from the PRD/architecture so traceability survives the merge.
+        - Stories are sized **S–M** (a single dev-agent sitting per `_bmad-output/planning-artifacts/epics.md`). Bigger? Split into multiple stories under one epic.
+  # — Story core
+  - type: input
+    id: personas
+    attributes:
+      label: Persona(s)
+      description: From the PRD §5 — Mira (operator), Daan (evaluator), Sasha (admin / script author).
+      placeholder: "Mira (operator); Sasha (admin)"
+    validations: { required: true }
+  - type: textarea
+    id: story
+    attributes:
+      label: Story
+      placeholder: "As a <persona>, I want <capability>, so that <benefit>."
+    validations: { required: true }
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / Motivation
+      description: Why now? What gap, risk, or evaluator feedback drove this?
+    validations: { required: true }
+  # — Scope & context
+  - type: textarea
+    id: context
+    attributes:
+      label: Context / Notes
+      placeholder: "Links to designs, prior discussions, spikes, prototypes, related Flowable docs…"
+  - type: dropdown
+    id: area
+    attributes:
+      label: Primary area
+      options:
+        - api (src/api*, the request() funnel)
+        - modeler (bpmn-js / dmn-js)
+        - inspector (API Inspector)
+        - screens (Dashboard, Tasks, Jobs, History, …)
+        - design-system (looks, themes, density, CSS variables)
+        - auth (Basic / Bearer / OIDC)
+        - devops (docker stack, nginx proxy, Vite config)
+        - security (SECURITY.md, supply chain)
+        - ci-cd (GitHub Actions, dependabot)
+        - tests (Vitest, Playwright, fixtures)
+        - tooling (Biome, scripts/, hooks)
+        - branding (logo, marks, design tokens)
+        - docs (docs/, README, CLAUDE.md, BMAD)
+        - tech-foundation (bootstrap / repo hygiene)
+    validations: { required: true }
+  - type: dropdown
+    id: target_milestone
+    attributes:
+      label: Target milestone
+      description: "Per `_bmad-output/planning-artifacts/epics.md`."
+      options:
+        - "0.0.1 — Tech foundation (bootstrap)"
+        - "0.0.2 — v1 MVP (parity rebuild)"
+        - "0.0.3 — 6.x parity gaps"
+        - "1.0.0 — GA / operator polish"
+        - "v2+ — placeholder"
+    validations: { required: true }
+  # — Acceptance criteria
+  - type: textarea
+    id: ac_list
+    attributes:
+      label: Acceptance Criteria (Numbered)
+      description: Testable, unambiguous, numbered ACs — Given / When / Then preferred.
+      placeholder: |
+        AC1: Given …, When …, Then …
+        AC2: …
+        AC3: …
+    validations: { required: true }
+  # — Traceability
+  - type: textarea
+    id: references
+    attributes:
+      label: Linked Artifacts (Traceability)
+      description: PRD / architecture references this story touches or must align with.
+      placeholder: "FR-…; NFR-…; ADR-…; Pattern P-…; bruno/<collection>"
+    validations: { required: true }
+  # — Definition of Ready / Done
+  - type: checkboxes
+    id: dor
+    attributes:
+      label: Definition of Ready (before starting)
+      options:
+        - label: Personas known and problem well articulated
+        - label: ACs are complete, specific, and testable
+        - label: Traceability (FR/NFR/ADR/Pattern) linked
+        - label: Scope and non-goals clear
+        - label: Key dependencies identified (Flowable engine version, ADR prerequisites, …)
+        - label: Rough solution sketch agreed (if non-trivial)
+    validations: { required: true }
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: Definition of Done (to close the story)
+      options:
+        - label: All ACs validated by Vitest unit/component tests and/or Playwright E2E against `flowable-rest:7.2.0`
+        - label: PRD / ADR / `docs/compat.md` updated and linked from the PR
+        - label: Loading / error / empty / data states render correctly on every screen touched
+        - label: API Inspector still captures every call (no `request()` bypass)
+        - label: WCAG AA contrast verified across affected look × theme combinations
+        - label: Works in all three densities (compact / regular / comfy) where UI changed
+        - label: TypeScript strict + Biome lint clean (no new warnings)
+        - label: Visual snapshot baseline updated where the screen changed
+        - label: CI pipeline green; coverage thresholds met
+        - label: Conventional Commits used so semantic-release picks the change up (apply `skip-changelog` label only if intentionally excluded from release notes — see `release.config.mjs`)
+    validations: { required: true }

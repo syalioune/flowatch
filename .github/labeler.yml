@@ -1,0 +1,129 @@
+# Path-based auto-labeling for Flowatch.
+# Mirrors the area: labels defined in scripts/bootstrap-gh/labels.json.
+
+# --- Functional areas (Flowatch domain) ---
+
+area:api:
+- changed-files:
+  - any-glob-to-any-file:
+    - "src/api*"
+    - "src/lib/api/**"
+
+area:modeler:
+- changed-files:
+  - any-glob-to-any-file:
+    - "src/modeler*"
+    - "src/components/Bpmn*"
+    - "src/components/Dmn*"
+
+area:inspector:
+- changed-files:
+  - any-glob-to-any-file:
+    - "src/components/ApiInspector*"
+
+area:screens:
+- changed-files:
+  - any-glob-to-any-file:
+    - "src/screens*"
+    - "src/routes/**"
+
+area:design-system:
+- changed-files:
+  - any-glob-to-any-file:
+    - "src/styles.css"
+    - "src/styles/**"
+    - "src/components/primitives/**"
+    - "src/tweaks-panel*"
+    - "branding/**"
+
+# --- Cross-cutting ---
+
+area:tests:
+- changed-files:
+  - any-glob-to-any-file:
+    - "**/__tests__/**"
+    - "**/*.test.ts"
+    - "**/*.test.tsx"
+    - "**/*.spec.ts"
+    - "**/*.spec.tsx"
+    - "e2e/**"
+    - "tests/**"
+
+area:ci-cd:
+- changed-files:
+  - any-glob-to-any-file:
+    - ".github/workflows/**"
+    - ".github/dependabot.yml"
+    - ".github/labeler.yml"
+
+area:devops:
+- changed-files:
+  - any-glob-to-any-file:
+    - "docker-compose.yml"
+    - "docker/**"
+    - "vite.config.*"
+
+area:security:
+- changed-files:
+  - any-glob-to-any-file:
+    - ".github/protection/**"
+    - "SECURITY.md"
+    - ".trivyignore"
+
+area:docs:
+- changed-files:
+  - any-glob-to-any-file:
+    - "docs/**"
+    - "!docs/specifications/user-stories/**"
+    - "README.md"
+    - "CONTRIBUTING.md"
+    - "CODE_OF_CONDUCT.md"
+    - "DEVELOPERS.md"
+    - "SUPPORT.md"
+    - "_bmad-output/**"
+
+type:user-story:
+- changed-files:
+  - any-glob-to-any-file: "docs/specifications/user-stories/**.md"
+
+area:tooling:
+- changed-files:
+  - any-glob-to-any-file:
+    - "scripts/**"
+    - "package.json"
+    - "package-lock.json"
+    - "biome.json*"
+    - ".husky/**"
+    - ".editorconfig"
+    - "tsconfig*.json"
+
+area:tech-foundation:
+- changed-files:
+  - any-glob-to-any-file:
+    - "scripts/bootstrap-gh/**"
+    - ".github/**"
+
+area:branding:
+- changed-files:
+  - any-glob-to-any-file: "branding/**"
+
+# --- Traceability (FR / NFR / ADR references) ---
+
+ref:FR:
+- changed-files:
+  - any-glob-to-any-file:
+    - "_bmad-output/planning-artifacts/prd.md"
+    - "docs/requirements/functional/**"
+
+ref:NFR:
+- changed-files:
+  - any-glob-to-any-file:
+    - "docs/requirements/non-functional/**"
+
+ref:ADR:
+- changed-files:
+  - any-glob-to-any-file: "docs/architecture/decisions/**"
+
+ref:bruno:
+- changed-files:
+  - any-glob-to-any-file: "bruno/**"

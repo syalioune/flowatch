@@ -1,0 +1,62 @@
+name: "🖥️ UI / Screen task"
+description: "Implementation task for a routed screen, modeler integration, or UI component"
+title: "[UI]: "
+labels: ["area:screens", "state:backlog", "priority:medium"]
+body:
+  - type: input
+    id: parent
+    attributes:
+      label: Parent Story
+      placeholder: "#123"
+  - type: textarea
+    id: ux
+    attributes:
+      label: UX changes
+      description: "Reference the UX design spec where applicable (`_bmad-output/planning-artifacts/ux-design-specification.md`)."
+      placeholder: "Screens, CTAs, modals, modeler interactions"
+  - type: textarea
+    id: data
+    attributes:
+      label: Data & state
+      description: "Project policy: `useState` / `useEffect` only, no state library. Cross-component coordination via `window` events or prop drilling."
+      placeholder: "Hooks, useApi() shape, derived state"
+  - type: textarea
+    id: api
+    attributes:
+      label: API integration
+      description: "All Flowable calls go through `src/api*` `request()`. New endpoints get a thin wrapper. DMN endpoints use `dmnBase()`."
+      placeholder: "GET /repository/deployments, POST /runtime/tasks/{id}/claim, …"
+  - type: textarea
+    id: a11y
+    attributes:
+      label: Accessibility
+      description: "Keyboard nav, focus order, ARIA labels, contrast across all 8 look × theme combos."
+  - type: textarea
+    id: tests
+    attributes:
+      label: Tests
+      placeholder: "Vitest unit + browser-mode component tests; Playwright E2E if the flow crosses screens"
+  - type: checkboxes
+    id: ac_map
+    attributes:
+      label: Acceptance Criteria mapping
+      options:
+        - label: AC1 implemented and tested
+        - label: AC2 implemented and tested
+        - label: AC3 implemented and tested
+        - label: AC4 implemented and tested
+        - label: AC5+ (tick all that apply)
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: Definition of Done
+      options:
+        - label: API calls flow through the `request()` funnel and surface in the API Inspector
+        - label: Loading / error / empty / data states explicit on every screen touched
+        - label: Verbatim Flowable error message shown — no friendly rewrites
+        - label: Works across all 8 look × theme combos and three densities (compact / regular / comfy)
+        - label: Uses CSS variables from `styles.css` — no hard-coded colors
+        - label: Keyboard navigation works; visible focus ring
+        - label: TypeScript strict clean; Biome (lint + format) clean
+        - label: Visual snapshot baseline updated where the screen / component changed
+        - label: No console errors / warnings

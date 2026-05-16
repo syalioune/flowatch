@@ -1,0 +1,46 @@
+name: "✅ Integration / component tests"
+description: "Vitest browser-mode component tests with mocked Flowable responses"
+title: "[IT Tests]: "
+labels: ["area:tests", "state:backlog", "priority:medium"]
+body:
+  - type: input
+    id: parent
+    attributes:
+      label: Parent Story
+      placeholder: "#123"
+  - type: textarea
+    id: scenarios
+    attributes:
+      label: Scenario matrix
+      description: "Each row = a Vitest test. Cover happy path + error / empty / loading variants."
+      placeholder: |
+        - Tasks screen renders 0 / 1 / many tasks (mocked GET /runtime/tasks)
+        - Claim button optimistically updates row, rolls back on 409
+        - API Inspector chip count increments per request
+    validations: { required: true }
+  - type: textarea
+    id: mocks
+    attributes:
+      label: Mocking strategy
+      description: "Stub the `request()` funnel (or `fetch`) to return canned Flowable responses. Use real `useApi()` and real component code; never bypass `request()`."
+      placeholder: "vi.spyOn(api, 'request').mockResolvedValueOnce(...) — fixtures under tests/fixtures/"
+  - type: checkboxes
+    id: ac_map
+    attributes:
+      label: Acceptance Criteria mapping
+      options:
+        - label: AC1 implemented and tested
+        - label: AC2 implemented and tested
+        - label: AC3 implemented and tested
+        - label: AC4 implemented and tested
+        - label: AC5+ (tick all that apply)
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: Definition of Done
+      options:
+        - label: Tests run under Vitest browser mode (Playwright provider — see ADR + epic Story 2.2)
+        - label: Fixtures deterministic (no `Date.now` / `Math.random` without seeding)
+        - label: API Inspector entry assertions added where the test exercises a screen call
+        - label: CI `unit` job green
+        - label: Coverage delta within threshold

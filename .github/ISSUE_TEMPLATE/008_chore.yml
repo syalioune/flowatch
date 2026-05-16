@@ -1,0 +1,34 @@
+name: "🧹 Chore"
+description: Maintenance, refactor, dependency bump, or housekeeping
+title: "[CHORE]: "
+labels: ["type:chore", "state:backlog", "priority:medium"]
+body:
+  - type: textarea
+    id: why
+    attributes: { label: Why / goal }
+    validations: { required: true }
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: "Files, packages, or areas touched"
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area hint
+      description: "Closest `area:*` label — drives auto-labelling if path mapping misses."
+      options:
+        - tooling (Biome, scripts/, hooks)
+        - ci-cd (GitHub Actions, dependabot)
+        - devops (docker stack, nginx, Vite config)
+        - tech-foundation (bootstrap / repo hygiene)
+        - docs
+        - branding
+        - tests
+        - api
+        - modeler
+        - inspector
+        - screens
+        - design-system
+        - auth
+        - other

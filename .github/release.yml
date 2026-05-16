@@ -1,0 +1,38 @@
+changelog:
+  categories:
+    - title: "🚀 Features"
+      labels:
+        - "type: feature"
+        - "enhancement"
+    - title: "🐛 Bug Fixes"
+      labels:
+        - "type:bug"
+        - "bug"
+    - title: "📖 Documentation"
+      labels:
+        - "type:docs"
+        - "documentation"
+    - title: "🏗️ Infrastructure & CI"
+      labels:
+        - "type:chore"
+        - "type:ci"
+        - "ci"
+    - title: "🔧 Maintenance"
+      labels:
+        - "type:refactor"
+        - "type:style"
+        - "type:test"
+        - "dependencies"
+    - title: "🔒 Security"
+      labels:
+        - "type:security"
+        - "security"
+    - title: "⚡ Performance"
+      labels:
+        - "type: perf"
+    - title: "Other Changes"
+      labels:
+        - "*"
+  exclude:
+    labels:
+      - "skip-changelog"

@@ -1,0 +1,44 @@
+name: "🧩 E2E tests"
+description: "Playwright end-to-end tests against the live Docker Flowable stack"
+title: "[E2E Tests]: "
+labels: ["area:tests", "state:backlog", "priority:medium"]
+body:
+  - type: input
+    id: parent
+    attributes:
+      label: Parent Story
+      placeholder: "#123"
+  - type: textarea
+    id: flows
+    attributes:
+      label: Flows
+      description: "User journeys end-to-end (UI → request() → flowable-rest → DB → back). Note preconditions and assertions."
+      placeholder: |
+        1. Deploy a BPMN, start an instance, claim a user task, complete it, see it in History
+        2. Suspend a definition, attempt to start, see the verbatim 4xx surface in the error box
+    validations: { required: true }
+  - type: checkboxes
+    id: env
+    attributes:
+      label: Environment
+      options:
+        - label: Stack via `make stack` (Postgres 16 + flowable-rest:7.2.0 + nginx CORS proxy)
+        - label: Deterministic seed BPMN/DMN under `tests/e2e/fixtures/`
+        - label: Test runs idempotent (cleanup or unique deployment keys)
+  - type: checkboxes
+    id: assertions
+    attributes:
+      label: Core assertions
+      options:
+        - label: All ACs validated end-to-end via UI interactions
+        - label: API Inspector log shows the expected method / path / status sequence
+        - label: Visual snapshot updated for any new screen state (one look × theme × density baseline)
+        - label: Axe smoke check passes on the touched screens
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: Definition of Done
+      options:
+        - label: Test stable across 3 consecutive CI runs (no flake)
+        - label: Screenshots / traces / videos saved as CI artifacts on failure
+        - label: "`e2e` job green with the new test included"
