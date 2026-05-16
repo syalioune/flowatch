@@ -24,6 +24,33 @@ Flowatch is filling that gap. The benchmark is the old 6.x OSS UI: if 6.x-OSS us
 - **OSS only.** No dependency on enterprise endpoints, no SaaS fallback, no telemetry.
 - **Live API only.** No embedded mocks, no offline pretence — operators get real engine state or an honest error.
 
+## Pull the image
+
+Pre-built multi-arch images (`linux/amd64` + `linux/arm64`) are published from CI to two registries on every push to `main`, `develop`, and on `v*` tags:
+
+```bash
+# GitHub Container Registry (no auth needed for public pulls)
+docker pull ghcr.io/syalioune/flowatch:latest
+
+# Docker Hub mirror
+docker pull syalioune/flowatch:latest
+```
+
+Each push gets the matching `:latest` (main) / `:develop` (develop) tag plus a `:sha-<short>` tag for traceability. Releases get `:<X.Y.Z>`, `:<X.Y>`, and `:<X>` tags as well. Every image carries SBOM (`spdx-json`) and SLSA provenance attestations — verify with:
+
+```bash
+docker buildx imagetools inspect ghcr.io/syalioune/flowatch:latest --format '{{ json .SBOM }}'
+```
+
+Run it pointed at any reachable Flowable backend (configure the URL in the Settings modal after the SPA loads):
+
+```bash
+docker run --rm -p 8081:8080 ghcr.io/syalioune/flowatch:latest
+# open http://localhost:8081 — set baseUrl in Settings to your Flowable instance
+```
+
+The image carries only the static SPA bundle and a tiny nginx — no Node, no JRE. **Runs as non-root** (`uid 101`, `nginx`) and listens on the **unprivileged port 8080**, so it drops cleanly into Kubernetes restricted-baseline policies and can run with all Linux capabilities dropped. CPU/RAM at idle: <5 MB / <50 m-cpu.
+
 ## Quick start
 
 ```bash
