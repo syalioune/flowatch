@@ -18,6 +18,7 @@ interface AppToastEvent
 declare global {
   interface WindowEventMap {
     "api:log": ApiLogEvent;
+    "api:log-cleared": Event;
     "app:toast": AppToastEvent;
   }
 }
@@ -219,7 +220,7 @@ const Logo = () => (
       <Mark />
     </div>
     <div className="brand-name">Flowatch</div>
-    <div className="brand-tag">v0.7</div>
+    <div className="brand-tag">v0.0.1</div>
   </div>
 );
 
@@ -319,9 +320,11 @@ interface SidebarProps {
   counts?: Partial<Record<"tasks" | "jobs", number | null | undefined>>;
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: TanStack Router's LinkProps doesn't expose data-* pass-through.
+// @migration-any: TanStack Router's LinkProps does not expose data-* attribute pass-through. Tracked in #119.
+// biome-ignore lint/suspicious/noExplicitAny: see @migration-any marker above (issue #119).
 const ACTIVE_PROPS = { "data-active": "1" } as any;
-// biome-ignore lint/suspicious/noExplicitAny: TanStack Router's LinkProps doesn't expose data-* pass-through.
+// @migration-any: TanStack Router's LinkProps does not expose data-* attribute pass-through. Tracked in #119.
+// biome-ignore lint/suspicious/noExplicitAny: see @migration-any marker above (issue #119).
 const INACTIVE_PROPS = { "data-active": "0" } as any;
 
 export const Sidebar = ({ connection, onConnClick, counts }: SidebarProps) => (
@@ -690,7 +693,11 @@ export const ApiInspector = ({
   React.useEffect(() => {
     const onLog = () => setLog([...API_LOG]);
     window.addEventListener("api:log", onLog);
-    return () => window.removeEventListener("api:log", onLog);
+    window.addEventListener("api:log-cleared", onLog);
+    return () => {
+      window.removeEventListener("api:log", onLog);
+      window.removeEventListener("api:log-cleared", onLog);
+    };
   }, []);
 
   const runRequest = async () => {

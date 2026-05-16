@@ -266,11 +266,10 @@ if (import.meta.env.DEV && typeof window !== "undefined") {
   };
   w.__flowatchClearApiLog = () => {
     API_LOG.length = 0;
-    window.dispatchEvent(
-      new CustomEvent<ApiLogEntry>("api:log", {
-        detail: { id: "", method: "GET", path: "", url: "", status: 0, ms: 0, at: "" },
-      }),
-    );
+    // Use a distinct event so listeners can react to the clear without
+    // mistaking a synthetic blank entry for a real API call. ApiInspector
+    // subscribes to both events and re-reads API_LOG on either signal.
+    window.dispatchEvent(new Event("api:log-cleared"));
   };
 }
 

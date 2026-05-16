@@ -13,7 +13,7 @@
  * Linux-only: snapshots include the OS suffix; macOS developers see a known
  * mismatch and should run `--update-snapshots` only from CI / Docker.
  *
- * Allow ±400 pixels — covers font hinting / sub-pixel anti-aliasing across
+ * Allow ±100 pixels — covers font hinting / sub-pixel anti-aliasing across
  * Linux hosts. If diff exceeds the budget, the change is intentional
  * (regenerate with --update-snapshots) or a regression (fix the bug).
  *
@@ -110,6 +110,6 @@ test("API Inspector — editorial / light / regular default", async ({ page }) =
   // 6. Visual snapshot. Scoped to the drawer container.
   const drawer = page.locator(".drawer");
   await expect(drawer).toHaveScreenshot("api-inspector-editorial-light-regular.png", {
-    maxDiffPixels: 400,
+    maxDiffPixels: 100,
   });
 });
