@@ -1,0 +1,88 @@
+name: "📝 RFC / Proposal"
+description: Propose a change requiring discussion or an architecture decision
+title: "[RFC]: "
+labels: ["type:rfc", "state:backlog", "priority:medium"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for changes that need consensus before code lands — typically anything that:
+        - introduces a new dependency or rewrites a foundational layer (router, state, modeler wrapping),
+        - changes the API funnel contract (`src/api*`) or the API Inspector behaviour,
+        - touches the design-system contract (CSS variables, look × theme × density invariants),
+        - revises an existing **ADR** (`docs/architecture/decisions/`) or warrants a new one.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is being proposed, in one paragraph.
+    validations: { required: true }
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why now? What forces this decision today rather than later?
+    validations: { required: true }
+  - type: textarea
+    id: design
+    attributes:
+      label: Proposed design
+      description: How would it work? Pseudo-code, sketches, file-tree deltas welcome.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: At least one — "do nothing" counts.
+  - type: textarea
+    id: risks
+    attributes: { label: Risks, tradeoffs, migration cost }
+  - type: textarea
+    id: adr_ref
+    attributes:
+      label: ADR target
+      description: Which ADR does this create or update? Use the next free `ADR-NNN` number for new decisions.
+      placeholder: "ADR-025 (new) — adopt Zustand for cross-screen state"
+  - type: dropdown
+    id: area
+    attributes:
+      label: Primary area
+      options:
+        - api (src/api*, the request() funnel)
+        - modeler (bpmn-js / dmn-js)
+        - inspector (API Inspector)
+        - screens (Dashboard, Tasks, Jobs, History, …)
+        - design-system (looks, themes, density, CSS variables)
+        - auth (Basic / Bearer / OIDC)
+        - devops (docker stack, nginx proxy, Vite config)
+        - security (SECURITY.md, supply chain)
+        - ci-cd (GitHub Actions, dependabot)
+        - tests (Vitest, Playwright, fixtures)
+        - tooling (Biome, scripts/, hooks)
+        - docs (docs/, README, CLAUDE.md, BMAD)
+        - tech-foundation (bootstrap / repo hygiene)
+    validations: { required: true }
+  - type: dropdown
+    id: target_milestone
+    attributes:
+      label: Target milestone
+      description: "Per `_bmad-output/planning-artifacts/epics.md`."
+      options:
+        - "0.0.1 — Tech foundation (bootstrap)"
+        - "0.0.2 — v1 MVP (parity rebuild)"
+        - "0.0.3 — 6.x parity gaps"
+        - "1.0.0 — GA / operator polish"
+        - "v2+ — placeholder"
+        - "Unknown / maintainer to decide"
+    validations: { required: true }
+  - type: dropdown
+    id: compat_impact
+    attributes:
+      label: Pre-1.0 compatibility impact
+      description: "Pre-1.0 has no compat guarantee, but breakage should still be intentional and announced (see `release.config.mjs` PRE_1_0_BANNER)."
+      options:
+        - No user-facing break
+        - Connection / settings / localStorage shape changes (operators must reconfigure)
+        - Flowable REST surface drift (engine compatibility window changes)
+        - Visual regression (look × theme × density)
+        - Other (describe in risks)
+    validations: { required: true }

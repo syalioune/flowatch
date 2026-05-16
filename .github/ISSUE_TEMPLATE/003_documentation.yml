@@ -1,0 +1,63 @@
+name: "📚 Documentation"
+description: "Write or update Flowatch docs: PRD, ADR, README, CLAUDE.md, compat matrix, Bruno collection"
+title: "[DOCS]: "
+labels: ["type:documentation", "state:backlog", "priority:medium", "area:docs"]
+body:
+  - type: input
+    id: parent
+    attributes:
+      label: Parent story / RFC (optional)
+      description: Link the originating user-story or RFC issue.
+      placeholder: "#123"
+  - type: checkboxes
+    id: surfaces
+    attributes:
+      label: Documentation surface(s) touched
+      options:
+        - label: PRD — `_bmad-output/planning-artifacts/prd.md` (FR / NFR / personas)
+        - label: Architecture — `_bmad-output/planning-artifacts/architecture.md`
+        - label: Epics — `_bmad-output/planning-artifacts/epics.md`
+        - label: ADR (new or updated) — `docs/architecture/decisions/ADR-NNN-*.md`
+        - label: User-facing — `README.md` / `docs/user-guide/`
+        - label: Contributor-facing — `CLAUDE.md`, `DEVELOPERS.md`, `CONTRIBUTING.md`
+        - label: Flowable compatibility matrix — `docs/compat.md`
+        - label: Bruno API collection — `bruno/`
+        - label: Release notes / `CHANGELOG.md`
+        - label: BPMN/DMN modeler guidance (bpmn-js / dmn-js wiring)
+  - type: textarea
+    id: change_summary
+    attributes:
+      label: Change summary
+      description: What is being added, clarified, or removed? Reference FR/NFR/ADR IDs where applicable.
+      placeholder: "Clarify FR-19 to require optimistic concurrency on variable edits; add ADR-025 explaining why."
+    validations: { required: true }
+  - type: textarea
+    id: fr_nfr_updates
+    attributes:
+      label: FR / NFR impact (if PRD touched)
+      placeholder: "FR-44 — extend AC3 to cover attachment deletion; NFR-7 unchanged."
+  - type: textarea
+    id: adr_updates
+    attributes:
+      label: ADRs to create / update
+      description: Use the next free `ADR-NNN` number for new decisions and set status (proposed / accepted / superseded).
+      placeholder: "ADR-025 (proposed) — multi-connection storage strategy"
+  - type: textarea
+    id: compat_updates
+    attributes:
+      label: Flowable REST compat changes
+      description: Any endpoint added / removed / re-verified against `flowable-rest:7.2.0`? Update `docs/compat.md` and the Bruno collection.
+      placeholder: "Verified `/dmn-api/dmn-deployments` for v7.2.0 — green."
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: Definition of Done
+      options:
+        - label: PRD updated with AC-impacting changes (FR/NFR IDs cited)
+        - label: ADR created/updated and status set
+        - label: README / CLAUDE.md updated where contributor or user behaviour changes
+        - label: "`docs/compat.md` reflects the verified Flowable engine version"
+        - label: Bruno collection updated for any new or changed endpoint
+        - label: All internal links resolved (no dead links)
+        - label: BPMN/DMN sample diagrams regenerated and committed if the wrapping or fixtures changed
+        - label: BMAD private repo synced (`bash scripts/bmad-sync.sh -m "..."`) if `_bmad/` artefacts changed

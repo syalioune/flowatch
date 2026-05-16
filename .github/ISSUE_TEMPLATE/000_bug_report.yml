@@ -1,0 +1,104 @@
+name: "🐛 Bug report"
+description: Report a defect in Flowatch (the UI) — not in the Flowable engine itself
+title: "[BUG]: "
+labels: ["type:bug", "state:backlog", "priority:medium"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Before filing**
+        - Engine-side bugs (Flowable REST returning the wrong payload, BPMN execution wrong) belong upstream at https://github.com/flowable/flowable-engine — please verify with `curl -u rest-admin:test http://localhost:8080/flowable-rest/...` first.
+        - For Flowatch UI bugs, the **API Inspector drawer** (right edge of the app) is the fastest way to share what failed — copy the affected entry as cURL.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: "What happened? What should have happened?"
+      placeholder: Short, actionable summary
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1) ...\n2) ...\n3) ..."
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes: { label: Expected behaviour }
+  - type: textarea
+    id: actual
+    attributes: { label: Actual behaviour }
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Pick the closest match — used to auto-route the issue.
+      options:
+        - api (src/api*, the request() funnel)
+        - modeler (bpmn-js / dmn-js wrapping)
+        - inspector (API Inspector drawer)
+        - screens (Dashboard, Tasks, Jobs, History, …)
+        - design-system (looks, themes, density, CSS variables)
+        - auth (Basic / Bearer / OIDC)
+        - devops (docker stack, nginx proxy, Vite config)
+        - security (SECURITY.md, supply chain)
+        - ci-cd (GitHub Actions, dependabot)
+        - tests (Vitest, Playwright, fixtures)
+        - tooling (Biome, scripts/, hooks)
+        - branding (logo, marks, design tokens)
+        - docs (docs/, README, CLAUDE.md, BMAD)
+        - tech-foundation (bootstrap / repo hygiene)
+        - unsure
+    validations: { required: true }
+  - type: input
+    id: flowatch_version
+    attributes:
+      label: Flowatch version / commit
+      placeholder: "v0.0.1, or commit SHA"
+    validations: { required: true }
+  - type: input
+    id: engine_version
+    attributes:
+      label: Flowable engine image
+      description: From `docker compose ps` or `make engine-health`. Flowatch targets `flowable-rest:7.2.0`.
+      placeholder: "flowable/flowable-rest:7.2.0"
+  - type: input
+    id: browser
+    attributes:
+      label: Browser + OS
+      placeholder: "Firefox 134 on Linux / Chrome 132 on macOS / …"
+    validations: { required: true }
+  - type: input
+    id: look_theme_density
+    attributes:
+      label: Look × theme × density (if UI-visible)
+      description: Visible on the Tweaks panel (Ctrl+Shift+T). Skip for non-visual bugs.
+      placeholder: "editorial × dark × regular"
+  - type: textarea
+    id: inspector_log
+    attributes:
+      label: API Inspector entry (cURL preferred)
+      description: Open the Inspector drawer, find the failing call, copy as cURL. Redact the `Authorization` header before pasting.
+      render: shell
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - S0 — Critical (app unusable / data loss / engine writes corrupted)
+        - S1 — High (core flow broken, no workaround)
+        - S2 — Medium (workaround exists)
+        - S3 — Low (cosmetic, edge case)
+    validations: { required: true }
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console errors / screenshots
+      description: Browser devtools console output and/or screenshots. For modeler bugs, a screenshot of the canvas is usually decisive.
+  - type: checkboxes
+    id: regress
+    attributes:
+      label: Regression?
+      options:
+        - label: This worked in a previous Flowatch version
+          required: false

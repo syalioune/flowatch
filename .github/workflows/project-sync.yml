@@ -1,0 +1,187 @@
+name: Github project sync
+on:
+  issues:
+    types: [opened, edited, labeled, unlabeled, reopened, closed]
+  pull_request_target:
+    types: [opened, ready_for_review, synchronize, labeled, unlabeled, reopened, closed]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  repository-projects: write
+
+jobs:
+  add-and-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout for ids.json
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Read project ids
+        id: ids
+        shell: bash
+        run: |
+          URL=$(jq -r '.project.url' .github/project/ids.json)
+          PID=$(jq -r '.project.id'  .github/project/ids.json)
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "pid=$PID" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure item is in project
+        uses: actions/add-to-project@244f685bbc3b7adfa8466e08b698b5577571133e # v1.0.2
+        with:
+          project-url: ${{ steps.ids.outputs.url }}
+          github-token: ${{ secrets.PROJECT_TOKEN }}
+
+      - name: Map labels → fields
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          github-token: ${{ secrets.PROJECT_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const ids = JSON.parse(fs.readFileSync('.github/project/ids.json','utf8'));
+            const PROJECT_ID = ids.project.id;
+            const nodeId = (context.payload.issue?.node_id) ?? (context.payload.pull_request?.node_id);
+            if (!nodeId) { core.info('No node id'); return; }
+            async function findItemId() {
+              const q = `query($pid:ID!){
+                node(id:$pid){ ... on ProjectV2 {
+                  items(first:100){ nodes { id content { __typename ... on Issue { id } ... on PullRequest { id } } } }
+                }}
+              }`;
+              const data = await github.graphql(q, { pid: PROJECT_ID });
+              const found = data.node.items.nodes.find(n => n.content?.id === nodeId);
+              return found?.id ?? null;
+            }
+            let itemId = await findItemId();
+            if (!itemId) {
+              const m = `mutation($pid:ID!,$cid:ID!){
+                addProjectV2ItemById(input:{projectId:$pid,contentId:$cid}){ item { id } }
+              }`;
+              const add = await github.graphql(m, { pid: PROJECT_ID, cid: nodeId });
+              itemId = add.addProjectV2ItemById.item.id;
+            }
+            const milestone = context.payload.issue?.milestone?.title ?? context.payload.pull_request?.milestone?.title ?? null;
+            const labels = (context.payload.issue?.labels ?? context.payload.pull_request?.labels ?? []).map(l => l.name);
+            const stateMap = {
+              "state:backlog": "Backlog",
+              "state:ready": "Ready",
+              "state:ongoing": "Ongoing",
+              "state:review": "Review",
+              "state:blocked": "Blocked",
+              "state:done": "Done"
+            };
+            const prioMap = { "priority:critical":"critical","priority:high":"high","priority:medium":"medium","priority:low":"low" };
+            const effortMap = {
+              "size:XS": "XS",
+              "size:S": "S",
+              "size:M": "M",
+              "size:L": "L",
+              "size:XL": "XL",
+              "size:XXL": "XXL"
+            };
+            const riskMap = {
+              "risk:high": "High",
+              "risk:medium": "Medium",
+              "risk:low": "Low"
+            };
+            const wantedState = Object.entries(stateMap).find(([k]) => labels.includes(k))?.[1] ?? null;
+            const wantedPrio   = Object.entries(prioMap).find(([k]) => labels.includes(k))?.[1] ?? null;
+            const wantedEffort = Object.entries(effortMap).find(([k]) => labels.includes(k))?.[1] ?? null;
+            const wantedRisk   = Object.entries(riskMap).find(([k]) => labels.includes(k))?.[1] ?? null;
+            const qF = `query($pid:ID!){
+              node(id:$pid){ ... on ProjectV2 {
+                fields(first:50){
+                  nodes{
+                    ... on ProjectV2SingleSelectField { id name options{ id name } }
+                    ... on ProjectV2FieldCommon { id name }
+                  }
+                }
+              }}
+            }`;
+            const f = await github.graphql(qF, { pid: PROJECT_ID });
+            const fields = f.node.fields.nodes;
+            const stateField = fields.find(x => x.name === 'State');
+            const prioField = fields.find(x => x.name === 'Priority');
+            const effortField = fields.find(x => x.name === 'Effort');
+            const riskField = fields.find(x => x.name === 'Risk');
+            const milestoneField = fields.find(x => x.name === 'Release');
+            const stateOpt = wantedState ? stateField?.options?.find(o => o.name === wantedState)?.id : null;
+            const prioOpt   = wantedPrio ? prioField?.options?.find(o => o.name === wantedPrio)?.id : null;
+            const effortOpt = wantedEffort ? effortField?.options?.find(o => o.name === wantedEffort)?.id : null;
+            const riskOpt   = wantedRisk ? riskField?.options?.find(o => o.name === wantedRisk)?.id : null;
+            const milestoneOpt = milestone ? milestoneField?.options?.find(o => o.name === milestone)?.id : null;
+            const updates = [];
+            if (stateOpt) updates.push({ fieldId: stateField.id, value: { singleSelectOptionId: stateOpt } });
+            if (prioOpt)   updates.push({ fieldId: prioField.id,   value: { singleSelectOptionId: prioOpt } });
+            if (effortOpt) updates.push({ fieldId: effortField.id, value: { singleSelectOptionId: effortOpt } });
+            if (riskOpt)   updates.push({ fieldId: riskField.id,   value: { singleSelectOptionId: riskOpt } });
+            if (milestoneOpt) updates.push({ fieldId: milestoneField.id, value: { singleSelectOptionId: milestoneOpt } });
+            if (updates.length) {
+              for (const fieldUpdate of updates) {
+                const mUpd = `mutation($pid:ID!,$item:ID!,$field:ID!,$optionValueId:String!){
+                  updateProjectV2ItemFieldValue(input:{projectId:$pid,itemId:$item,fieldId:$field,value:{singleSelectOptionId:$optionValueId}}){ 
+                    projectV2Item{ 
+                      id 
+                    } 
+                  }
+                }`;
+                await github.graphql(mUpd, { pid: PROJECT_ID, item: itemId, field: fieldUpdate.fieldId, optionValueId: fieldUpdate.value.singleSelectOptionId });
+              }
+            }
+
+      - name: Move linked issues based on PR events
+        if: github.event_name == 'pull_request_target'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          github-token: ${{ secrets.PROJECT_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const ids = JSON.parse(fs.readFileSync('.github/project/ids.json','utf8'));
+            const PROJECT_ID = ids.project.id;
+            const prNodeId = context.payload.pull_request.node_id;
+            const qPR = `query($id:ID!){
+              node(id:$id){
+                ... on PullRequest {
+                  merged
+                  closingIssuesReferences(first:50){ nodes { id number title } }
+                }
+              }
+            }`;
+            const pr = await github.graphql(qPR, { id: prNodeId });
+            const issues = pr.node.closingIssuesReferences.nodes;
+            if (!issues.length) return;
+            const qF = `query($pid:ID!){
+              node(id:$pid){ ... on ProjectV2 {
+                fields(first:50){ nodes{ ... on ProjectV2SingleSelectField { id name options{ id name } } } }
+              }}
+            }`;
+            const f = await github.graphql(qF, { pid: PROJECT_ID });
+            const stateField = f.node.fields.nodes.find(x => x.name === 'State');
+            const inReview = stateField.options.find(o => o.name === 'Review')?.id;
+            const done     = stateField.options.find(o => o.name === 'Done')?.id;
+            const targetOpt = (context.payload.action === 'closed' && pr.node.merged) ? done : inReview;
+            async function ensureItem(issueId) {
+              const qItems = `query($pid:ID!){
+                node(id:$pid){ ... on ProjectV2 {
+                  items(first:100){ nodes { id content{ __typename ... on Issue { id } } } }
+                }}
+              }`;
+              const items = await github.graphql(qItems, { pid: PROJECT_ID });
+              const found = items.node.items.nodes.find(n => n.content?.id === issueId);
+              if (found) return found.id;
+              const mAdd = `mutation($pid:ID!,$cid:ID!){
+                addProjectV2ItemById(input:{projectId:$pid,contentId:$cid}){ item{ id } }
+              }`;
+              const add = await github.graphql(mAdd, { pid: PROJECT_ID, cid: issueId });
+              return add.addProjectV2ItemById.item.id;
+            }
+            for (const iss of issues) {
+              const itemId = await ensureItem(iss.id);
+              const mUpd = `mutation($pid:ID!,$item:ID!,$fid:ID!,$opt:String!){
+                updateProjectV2ItemFieldValue(input:{
+                  projectId:$pid,itemId:$item,fieldId:$fid,value:{ singleSelectOptionId:$opt }
+                }){ projectV2Item{ id } }
+              }`;
+              await github.graphql(mUpd, { pid: PROJECT_ID, item: itemId, fid: stateField.id, opt: targetOpt });
+            }
