@@ -1,0 +1,58 @@
+#!/bin/sh
+
+# Run unit tests + typecheck before pushing.
+# Tests are cheap enough at push time but too slow for pre-commit.
+# E2E tests (Playwright against a live Flowable engine) are NOT run here —
+# those are CI's job. Skip with `git push --no-verify` only in genuine emergencies.
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO_ROOT" || exit 1
+
+# Allow opt-out for very rare cases (e.g. pushing a docs-only branch).
+# Set FLOWATCH_SKIP_PREPUSH=1 to bypass tests but keep the hook for hygiene.
+if [ "${FLOWATCH_SKIP_PREPUSH:-0}" = "1" ]; then
+  echo "⚠ FLOWATCH_SKIP_PREPUSH=1 set — skipping pre-push tests."
+  exit 0
+fi
+
+# Determine what changed in this push so we can skip when nothing relevant moved.
+UPSTREAM="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || echo origin/main)"
+CHANGED_FILES="$(git diff --name-only "$UPSTREAM"...HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD 2>/dev/null || echo '')"
+
+# Skip if only branding / docs / planning artifacts changed.
+needs_check=0
+if [ -z "$CHANGED_FILES" ]; then
+  needs_check=1
+else
+  echo "$CHANGED_FILES" | grep -qE '^(src/|public/|index\.html|vite\.config\.|package(-lock)?\.json|biome\.json|tsconfig|\.husky/)' && needs_check=1
+fi
+
+if [ "$needs_check" = "0" ]; then
+  echo "✓ pre-push: no source/config changes detected — skipping tests."
+  exit 0
+fi
+
+# --- Typecheck (TypeScript) ---
+if [ -f "tsconfig.json" ]; then
+  echo "▶ TypeScript typecheck (tsc --noEmit)…"
+  if [ ! -d "node_modules" ]; then
+    echo "✗ node_modules missing. Run 'npm ci' first." >&2
+    exit 1
+  fi
+  npx --no-install tsc --noEmit || {
+    echo "✗ TypeScript typecheck failed." >&2
+    exit 1
+  }
+fi
+
+# --- Unit tests (Vitest) ---
+if [ -f "vitest.config.ts" ] || [ -f "vitest.config.js" ] || [ -f "vitest.config.mts" ]; then
+  echo "▶ Unit tests (vitest run)…"
+  npx --no-install vitest run || {
+    echo "✗ Vitest unit tests failed. Fix or set FLOWATCH_SKIP_PREPUSH=1 if intentional." >&2
+    exit 1
+  }
+fi
+
+echo "✓ pre-push checks passed."
+exit 0
