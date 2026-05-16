@@ -125,6 +125,13 @@ test("operator golden path: definitions → start → instance → claim → com
   await expect(completeBtn).toBeVisible();
   await completeBtn.click();
 
+  // TaskDetail.complete() awaits the REST call THEN navigates to /tasks.
+  // Wait for that navigation to land before clicking History — otherwise
+  // the delayed navigate({to:"/tasks"}) clobbers the History click.
+  // Match /tasks optionally followed by a query string (the "All" filter
+  // earlier set ?assignee=all, which TanStack Router preserves).
+  await expect(page).toHaveURL(/\/tasks(\?|$)/);
+
   // ── 4. History: completed instance appears
   await page.locator(".nav-item").filter({ hasText: "History" }).click();
   const historicRow = page
