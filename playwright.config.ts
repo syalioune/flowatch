@@ -32,8 +32,19 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "docker compose up -d",
-      url: "http://rest-admin:test@localhost:8080/flowable-rest/service/management/engine",
+      // Foreground `docker compose up` (not `-d`) so the process stays
+      // attached for the lifetime of the test run. Detached mode exits
+      // in ~1s, and Playwright treats early process-exit before the URL
+      // probe responds as fatal ("Process from config.webServer exited
+      // early") on cold starts. The gracefulShutdown SIGTERM below tears
+      // the stack down cleanly when tests finish.
+      command: "docker compose up",
+      // Probe the management endpoint without inline credentials — Playwright's
+      // webServer treats 2xx/3xx/400/401/402/403 as "alive", so a 401 from the
+      // unauthenticated probe is sufficient to confirm Flowable is up. Inlining
+      // `user:pass@` would leak the cleartext password into Playwright's
+      // stdout/HTML report artifacts on CI.
+      url: "http://localhost:8080/flowable-rest/service/management/engine",
       timeout: 180_000,
       reuseExistingServer: !isCI,
       stdout: "pipe",
