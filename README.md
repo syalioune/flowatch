@@ -129,6 +129,23 @@ The full doc index lives at [docs/index.md](docs/index.md).
 
 **Pre-alpha.** The current `src/` is the output of a Claude Design → Claude Code handoff that was completed only partially before being carried forward locally. It runs against `flowable-rest:7.2.0` end-to-end, but the project will be bootstrapped from zero to install proper engineering practices — tests, lint, formatter, CI, and possibly a TypeScript move. Treat existing implementation choices as starting points to validate, not as permanent decisions. The [docs/](docs/) folder is the public source of truth; PRD / architecture / epics / story-specs live in a private companion repo (see [DEVELOPERS.md §2](DEVELOPERS.md#2-first-time-setup) for the two-repo split).
 
+## AI-assisted development
+
+Flowatch is built openly with AI as a first-class collaborator. Treat that as a feature, not a disclaimer: it's how a single maintainer can deliver Flowable-grade scope on a community budget. Every commit is human-reviewed and the maintainer (`Signed-off-by: Alioune SY`) carries the DCO; an `Co-Authored-By: Claude Opus 4.x` trailer is appended whenever an agent materially co-wrote the change.
+
+**Tools the project uses:**
+
+| Tool | Role | Where it shows up |
+|---|---|---|
+| [Claude Code](https://claude.com/claude-code) (Anthropic) | Interactive coding agent — implements stories, runs tests, opens PRs against the live engine. | [.claude/settings.json](.claude/settings.json), [.claude/commands/](.claude/commands/), [.claude/hooks/](.claude/hooks/) |
+| [BMAD Method](https://github.com/bmad-code-org/BMAD-METHOD) (community framework) | Agentic agile workflow — defined agents (PM, Architect, Analyst, Dev, UX, Tech-writer) and skills (brainstorm → PRD → architecture → epics → stories → dev → retro). | [.claude/skills/bmad-*](.claude/skills/) |
+
+**Workflow in one breath:** BMAD plans the work (private companion repo: PRD, architecture, epics) → BMAD shards epics into story specs (public: [docs/specifications/user-stories/](docs/specifications/user-stories/)) → Claude Code implements one story at a time → tests + human review → conventional-commit + sign-off → CI. The two custom slash commands in [.claude/commands/](.claude/commands/) (`/flowable-status`, `/deploy-process`) automate the routine engine-interaction checks.
+
+**For contributors:** every BMAD skill is committed and every Claude Code permission allowlist is reproducible from this repo. There is no maintainer-only sauce. See [DEVELOPERS.md](DEVELOPERS.md) for first-time setup and [BOOTSTRAP.md](BOOTSTRAP.md) for the one-time GitHub repo provisioning. Personal Claude Code overrides go in `.claude/settings.local.json` (gitignored) so the shared surface stays clean.
+
+**Attribution & responsibility.** Claude Code and BMAD are tools; the design choices, the QA, and the responsibility for what ships are the maintainer's. Bug reports and feedback go to the same [issue tracker](https://github.com/syalioune/flowatch/issues) regardless of which keystrokes were AI-assisted.
+
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE).
