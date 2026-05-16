@@ -1,0 +1,101 @@
+# SPA nginx vhost for the Flowatch image.
+#
+# This is RUNTIME config for the published image (ghcr.io / docker.io). It
+# serves the Vite-built static bundle and is intentionally separate from
+# `docker/nginx.conf.template`, which is the dev-stack CORS proxy in front
+# of the Flowable container.
+#
+# Routing model — TanStack Router uses History API (no hash routing), so
+# any deep link like `/deployments/xyz` must serve `/index.html` and let
+# the client-side router handle it. `try_files` accomplishes this without
+# a 404.
+#
+# Cache-control:
+#   - /index.html is intentionally NOT cached. New deploys overwrite it
+#     with new asset references and clients must pick those up on the
+#     next navigation.
+#   - /assets/* are content-hashed by Vite (`assets/foo-<hash>.js`), so
+#     they are safe to cache aggressively (1 year, immutable). Vite emits
+#     them under `dist/assets/`; this nginx mounts dist at the doc root,
+#     so the URL prefix in production is `/assets/...`.
+#   - Brand SVGs / fonts under `/branding/` are also content-stable; cache
+#     them long. The font files have hashed filenames courtesy of Vite's
+#     asset pipeline so this is safe.
+#
+# nginx add_header inheritance trap:
+#   When ANY `add_header` is set in a child `location`, ALL inherited
+#   `add_header` directives from parent blocks are dropped. Since each
+#   location needs its own Cache-Control, every location must also repeat
+#   the security headers. We use an included partial to keep them DRY.
+
+# Security headers — included into every location below. Defined as a
+# partial (rather than at server level) because nginx's add_header replaces
+# all inherited headers as soon as a child block adds its own.
+#
+# CSP is intentionally NOT set — the SPA renders verbatim Flowable error
+# bodies (Pattern P-003) and a strict CSP would conflict; CSP-via-meta is
+# tracked as follow-up work.
+
+server {
+    # Unprivileged port — matches nginxinc/nginx-unprivileged:alpine's
+    # default and lets the container run as uid 101 without
+    # CAP_NET_BIND_SERVICE. Operators map this to whatever host port they
+    # want (`-p 8081:8080` etc).
+    listen 8080 default_server;
+    server_name _;
+
+    # The doc root is where the runtime stage places the built SPA.
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Hashed assets — long cache, immutable. Vite places everything under
+    # /assets/ with content hashes, so this is safe.
+    location ^~ /assets/ {
+        access_log off;
+        # Cache-Control is set via add_header (not `expires 1y;` which
+        # would emit a second header and produce two Cache-Control lines).
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        # Security headers — repeated per the inheritance-trap note above.
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        try_files $uri =404;
+    }
+
+    # Branded static files (favicon, lockup, marks) — also content-stable.
+    location ^~ /branding/ {
+        access_log off;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        try_files $uri =404;
+    }
+
+    # The SPA entry — never cached. New deploys must invalidate the
+    # client's reference to old asset hashes.
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        try_files $uri =404;
+    }
+
+    # Everything else falls through to the SPA. Deep links like
+    # /deployments/abc must serve /index.html so the router can mount.
+    #
+    # IMPORTANT: try_files' named fallback (`/index.html`) is an internal
+    # rewrite that does NOT re-enter `location = /index.html` — it stays
+    # in this block. So the no-cache header here is required to prevent
+    # CDNs / browsers from caching the deep-link bootstrap HTML with stale
+    # asset references. Without it, a fresh deploy's hashed asset URLs
+    # would 404 against the cached old index.html.
+    location / {
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        try_files $uri /index.html;
+    }
+}

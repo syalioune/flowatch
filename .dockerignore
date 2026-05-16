@@ -1,0 +1,62 @@
+# Keep the Docker build context tiny. Anything not needed by `npm ci` or
+# `npm run build` is excluded here. The Dockerfile then COPYs `package*.json`
+# first (for the npm-install cache layer) and the remaining sources second.
+
+# VCS — the build doesn't need .git, and excluding it forces vite.config.ts's
+# getBuildSha() helper to fall back to "dev" unless the CI passes
+# --build-arg BUILD_SHA=$GITHUB_SHA (which it does via the metadata-action
+# integration in the workflow).
+.git
+.gitattributes
+.gitignore
+.gitleaks.toml
+.gitguardian.yml
+
+# Build outputs / dependencies
+node_modules
+dist
+coverage
+.husky/_
+
+# Test artifacts (these are big and irrelevant to the build).
+e2e/test-results
+e2e/playwright-report
+
+# Local-only tooling
+.claude
+.editorconfig
+
+# Planning / private artefacts — symlinks into a separate companion repo.
+_bmad
+_bmad-output
+
+# Docs are useful for downstream readers but not for the build itself.
+docs
+bruno
+
+# GitHub / dependabot / branch protection meta
+.github
+
+# Env files — never bake secrets into images
+.env
+.env.*
+
+# Local logs
+*.log
+npm-debug.log*
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
+
+# Markdown that doesn't ship in the image
+BOOTSTRAP.md
+CODE_OF_CONDUCT.md
+SECURITY.md
+SUPPORT.md
+CHANGELOG.md
+CONTRIBUTING.md
