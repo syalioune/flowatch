@@ -1,0 +1,15 @@
+Title,Body,Labels,Milestone
+TEST-IMPORT-001: Smoke-test import_issues.py against the real repo,"
+As a maintainer, I want a single throwaway issue created by `scripts/user-stories/import_issues.py`, so that I can verify the script's GitHub auth, CSV parsing, label creation, and milestone creation paths work end-to-end against the actual `syalioune/flowatch` repository before running the full backlog import.
+
+### Acceptance criteria
+- The script reads this CSV without parse errors.
+- One issue titled ""TEST-IMPORT-001: Smoke-test import_issues.py against the real repo"" is created.
+- Labels `test`, `import-smoketest` are attached (created on the fly if missing).
+- Milestone `Import Smoke Test` is attached (created if missing).
+- The issue can be closed and deleted manually after verification.
+
+### Notes
+- Safe to delete once verified — this is not part of the real backlog.
+- Run with `--dry-run` first to confirm CSV parsing and auth, then re-run without it for the live create.
+","test,import-smoketest",Import Smoke Test
