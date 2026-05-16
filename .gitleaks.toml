@@ -1,0 +1,25 @@
+# Gitleaks configuration — https://github.com/gitleaks/gitleaks
+# Extends the default ruleset; only overrides are listed here.
+
+title = "Flowatch Gitleaks Config"
+
+[allowlist]
+  description = "Global allowlist for known dev-only defaults and false positives"
+
+  paths = [
+    # Public dev defaults: REST admin `test`, Postgres `flowable`.
+    '''docker-compose\.yml$''',
+    '''docker-compose\.override\.yml$''',
+    # Bruno REST collection ships Basic-auth headers against the local stack.
+    '''bruno/''',
+    # Allowlist files for sibling scanners — may quote patterns by name.
+    '''\.trivyignore$''',
+    '''\.gitguardian\.yml$''',
+  ]
+
+  regexes = [
+    # Hard-coded dev defaults documented in README.md (Settings modal
+    # overrides them at runtime).
+    '''rest-admin:test''',
+    '''flowable:flowable''',
+  ]
