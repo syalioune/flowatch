@@ -19,15 +19,22 @@ const REPO_ROOT = resolve(__dirname, "..", "..");
 const COMPAT_PATH = join(REPO_ROOT, "docs", "compat.md");
 const README_PATH = join(REPO_ROOT, "README.md");
 
+// shields.io URL-encodes a single hyphen in the value as `--` to disambiguate
+// from the trailing `-orange` color separator. The capture is non-greedy and
+// anchored on the literal `-orange.svg` suffix so versions like `7.2.0-rc1`
+// (rendered as `Flowable-7.2.0--rc1-orange.svg`) match cleanly.
 const BADGE_RE =
-  /^\[!\[Tested vs Flowable\]\(https:\/\/img\.shields\.io\/badge\/Flowable-([^-]+)-orange\.svg\)\]\(docs\/compat\.md\)$/m;
+  /^\[!\[Tested vs Flowable\]\(https:\/\/img\.shields\.io\/badge\/Flowable-(.+?)-orange\.svg\)\]\(docs\/compat\.md\)$/m;
+
+const encodeShieldsValue = (v) => v.replace(/-/g, "--");
+const decodeShieldsValue = (v) => v.replace(/--/g, "-");
 
 function parseFrontmatter(md) {
   const m = md.match(/^---\n([\s\S]*?)\n---/);
   if (!m) throw new Error("docs/compat.md is missing YAML frontmatter");
   const fm = {};
   for (const line of m[1].split("\n")) {
-    const kv = line.match(/^(\w+):\s*"?([^"]+)"?$/);
+    const kv = line.match(/^(\w+):\s*"?([^"]+?)"?\s*$/);
     if (kv) fm[kv[1]] = kv[2];
   }
   return fm;
@@ -51,7 +58,7 @@ if (!match) {
   );
   process.exit(2);
 }
-const haveVersion = match[1];
+const haveVersion = decodeShieldsValue(match[1]);
 
 if (haveVersion === wantVersion) {
   if (!check) {
@@ -68,9 +75,10 @@ if (check) {
   process.exit(1);
 }
 
+const encoded = encodeShieldsValue(wantVersion);
 const updated = readme.replace(
   BADGE_RE,
-  `[![Tested vs Flowable](https://img.shields.io/badge/Flowable-${wantVersion}-orange.svg)](docs/compat.md)`,
+  `[![Tested vs Flowable](https://img.shields.io/badge/Flowable-${encoded}-orange.svg)](docs/compat.md)`,
 );
 writeFileSync(README_PATH, updated);
 console.log(`✓ Updated README Flowable badge: ${haveVersion} → ${wantVersion}`);
