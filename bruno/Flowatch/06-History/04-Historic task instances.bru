@@ -1,0 +1,16 @@
+meta {
+  name: Historic task instances
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/history/historic-task-instances?size=10
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}

@@ -1,0 +1,24 @@
+meta {
+  name: Deploy DMN (multipart)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{dmnBase}}/dmn-repository/deployments
+  body: multipartForm
+  auth: basic
+}
+
+body:multipart-form {
+  file: @file()
+  deploymentName: Example DMN deployment
+  ~tenantId: {{tenantId}}
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs { Related: PRD FR-33. }

@@ -1,0 +1,16 @@
+meta {
+  name: List DMN deployments
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{dmnBase}}/dmn-repository/deployments?size=10
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}

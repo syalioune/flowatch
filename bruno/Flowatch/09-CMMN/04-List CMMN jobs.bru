@@ -1,0 +1,16 @@
+meta {
+  name: List CMMN jobs
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{cmmnBase}}/cmmn-management/jobs?size=10
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}

@@ -1,0 +1,24 @@
+meta {
+  name: Privileges — BLOCKED in flowable-rest 7.2 OSS (FR-48)
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/identity/privileges
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs {
+  # /identity/privileges — not exposed in flowable-rest 7.2.0
+
+  Verified: returns 500 "No endpoint GET /flowable-rest/service/identity/privileges."
+  Kept here as a parking spot for FR-48 — re-test on each Flowable minor release.
+  Related: docs/compat.md, PRD FR-48 (deferred to v2+ pending engine support).
+}

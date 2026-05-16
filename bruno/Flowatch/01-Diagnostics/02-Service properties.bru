@@ -1,0 +1,25 @@
+meta {
+  name: Service properties
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/management/properties
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs {
+  # Service properties
+
+  Returns engine schema versions across CMMN / DMN / EventRegistry / App.
+  Useful for detecting Flowable version drift.
+
+  Related: PRD NFR-7 (engine version compatibility warning).
+}

@@ -1,0 +1,30 @@
+meta {
+  name: List process definitions
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/repository/process-definitions?size=20&sort=name
+  body: none
+  auth: basic
+}
+
+params:query {
+  size: 20
+  sort: name
+  ~tenantId: {{tenantId}}
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs {
+  # List process definitions
+
+  Used by the ProcessDefinitions screen and the BPMN modeler's loader dropdown.
+
+  Related: PRD FR-14.
+}

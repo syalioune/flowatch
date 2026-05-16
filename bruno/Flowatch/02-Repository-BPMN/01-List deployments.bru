@@ -1,0 +1,33 @@
+meta {
+  name: List deployments
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/repository/deployments?size=10&sort=deployTime&order=desc
+  body: none
+  auth: basic
+}
+
+params:query {
+  size: 10
+  sort: deployTime
+  order: desc
+  ~tenantId: {{tenantId}}
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs {
+  # List deployments
+
+  Standard Flowable pagination (`size`, `start`, `sort`, `order`, `tenantId`).
+  Flowatch uses this for the Deployments screen and to synthesize the tenants
+  list (since /identity/tenants is not exposed in flowable-rest 7.2).
+
+  Related: PRD FR-10, FR-31.
+}

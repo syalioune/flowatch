@@ -1,0 +1,12 @@
+{
+  "version": "1",
+  "name": "Flowatch — Flowable REST",
+  "type": "collection",
+  "ignore": ["node_modules", ".git"],
+  "size": 0.024503707885742188,
+  "filesCount": 67,
+  "presets": {
+    "requestType": "http",
+    "requestUrl": "http://localhost:8080"
+  }
+}

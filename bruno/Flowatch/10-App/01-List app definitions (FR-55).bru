@@ -1,0 +1,25 @@
+meta {
+  name: List app definitions (FR-55)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{appBase}}/app-repository/app-definitions?size=10
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs {
+  # App definitions — verified working
+
+  Read side of FR-55 (`.bar` upload recognition + browse). Flowatch will use
+  this to surface bundled artifacts after a `.bar` upload.
+
+  Related: PRD FR-55, docs/compat.md.
+}

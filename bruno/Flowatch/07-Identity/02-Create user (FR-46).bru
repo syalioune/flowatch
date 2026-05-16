@@ -1,0 +1,33 @@
+meta {
+  name: Create user (FR-46)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/identity/users
+  body: json
+  auth: basic
+}
+
+body:json {
+  {
+    "id": "operator1",
+    "firstName": "Mira",
+    "lastName": "Operator",
+    "email": "mira@example.com",
+    "password": "change-me"
+  }
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs {
+  # Create user
+
+  Verified endpoint exists (returns 400 'Id cannot be null' on empty body).
+  Related: PRD FR-46.
+}

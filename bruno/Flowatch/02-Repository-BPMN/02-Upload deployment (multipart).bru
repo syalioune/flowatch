@@ -1,0 +1,32 @@
+meta {
+  name: Upload deployment (multipart)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/repository/deployments
+  body: multipartForm
+  auth: basic
+}
+
+body:multipart-form {
+  file: @file()
+  deploymentName: Example deployment
+  ~tenantId: {{tenantId}}
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs {
+  # Upload deployment
+
+  Multipart POST. Flowable rejects JSON-with-base64 payloads — multipart is
+  the only supported route. Used by Flowatch's `deployBpmn` and `deployDmn`
+  (the DMN variant points at the dmn-api root).
+
+  Related: PRD FR-11.
+}

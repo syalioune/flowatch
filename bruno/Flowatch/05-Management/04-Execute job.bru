@@ -1,0 +1,28 @@
+meta {
+  name: Execute job
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/management/jobs/{{jobId}}
+  body: json
+  auth: basic
+}
+
+body:json {
+  {
+    "action": "execute"
+  }
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  jobId: PASTE_A_JOB_ID
+}
+
+docs { Related: PRD FR-25. }

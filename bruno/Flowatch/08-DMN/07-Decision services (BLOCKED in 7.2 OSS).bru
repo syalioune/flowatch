@@ -1,0 +1,24 @@
+meta {
+  name: Decision services / DRDs — BLOCKED in 7.2 OSS (FR-58)
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{dmnBase}}/dmn-repository/decision-services?size=10
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs {
+  # Decision services — NOT exposed in flowable-rest 7.2.0
+
+  Returns 500 "No endpoint". dmn-js supports DRD modeling client-side but
+  the deploy path is missing. Re-test on Flowable minor releases.
+  Related: docs/compat.md, PRD FR-58 (deferred v2+).
+}

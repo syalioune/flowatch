@@ -1,0 +1,37 @@
+meta {
+  name: Edit task (FR-44)
+  type: http
+  seq: 9
+}
+
+put {
+  url: {{baseUrl}}/runtime/tasks/{{taskId}}
+  body: json
+  auth: basic
+}
+
+body:json {
+  {
+    "name": "Updated task name",
+    "priority": 75,
+    "dueDate": "2026-06-01T12:00:00Z"
+  }
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  taskId: PASTE_A_TASK_ID
+}
+
+docs {
+  # Edit task
+
+  Properties: name, description, priority, dueDate, owner, assignee, category,
+  parentTaskId, tenantId. Verified live in docs/compat.md.
+
+  Related: PRD FR-44.
+}

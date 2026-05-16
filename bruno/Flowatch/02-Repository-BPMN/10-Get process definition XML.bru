@@ -1,0 +1,32 @@
+meta {
+  name: Get process definition XML
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/repository/process-definitions/{{processDefinitionId}}/resourcedata
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+headers {
+  Accept: application/xml
+}
+
+vars:pre-request {
+  processDefinitionId: PASTE_A_PROCESS_DEFINITION_ID
+}
+
+docs {
+  # Get process definition XML
+
+  Returns raw BPMN 2.0 XML. Used by the BPMN modeler to load deployed definitions.
+
+  Related: PRD FR-14.
+}

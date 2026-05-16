@@ -1,0 +1,29 @@
+meta {
+  name: List event subscriptions (FR-54)
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{baseUrl}}/runtime/event-subscriptions?size=10
+  body: none
+  auth: basic
+}
+
+params:query {
+  size: 10
+  ~processInstanceId:
+  ~eventType:
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs {
+  # Event subscriptions
+
+  What an instance is waiting on (message, signal, timer). Verified working.
+  Related: PRD FR-54.
+}

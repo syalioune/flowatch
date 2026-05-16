@@ -1,0 +1,27 @@
+meta {
+  name: List case definitions
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{cmmnBase}}/cmmn-repository/case-definitions?size=10
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs {
+  # CMMN — case definitions
+
+  CMMN is fully exposed in flowable-rest 7.2.0 (positive surprise from compat
+  audit). Flowatch does not yet build the CMMN surface — FR-50 is deferred to
+  v2+ pending demand signal. These endpoints are documented so the surface
+  is discoverable when/if we adopt it.
+
+  Related: docs/compat.md, PRD FR-50.
+}

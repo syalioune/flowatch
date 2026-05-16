@@ -1,0 +1,36 @@
+meta {
+  name: Task action (claim / complete / delegate / resolve / unclaim)
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/runtime/tasks/{{taskId}}
+  body: json
+  auth: basic
+}
+
+body:json {
+  {
+    "action": "claim",
+    "assignee": "{{username}}"
+  }
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  taskId: PASTE_A_TASK_ID
+}
+
+docs {
+  # Task actions
+
+  Actions: `claim`, `unclaim`, `complete`, `delegate`, `resolve`.
+  Pass action-specific fields in the same body.
+
+  Related: PRD FR-21.
+}
