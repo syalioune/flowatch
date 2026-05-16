@@ -1,0 +1,22 @@
+[
+  {
+    "title": "0.0.1",
+    "state": "open",
+    "description": "Tech Foundation (bootstrap): TS strict + Biome migration, Vitest + Playwright + TanStack Router, GitHub Actions CI (check/unit/e2e/build), Conventional Commits + automated release notes, hardened Docker stack, air-gap NFR-9 fix (no fonts CDN), repo hygiene (CODEOWNERS, branch protection, SHA-pinned dependabot). First main-commit equals the complete 0.0.1 state; develop → release/0.0.1 → main."
+  },
+  {
+    "title": "0.0.2",
+    "state": "open",
+    "description": "v1 MVP — Flowable 6.x OSS UI parity, rebuilt. All 11 screens working against flowable-rest 7.2.0 on the bootstrapped stack; explicit loading/error/empty/data states everywhere; API Inspector preserved; three-look design system × 2 themes × 3 densities; one-command demo stack; WCAG AA across 8 look × theme combos."
+  },
+  {
+    "title": "0.0.3",
+    "state": "open",
+    "description": "6.x parity gaps: process instance token overlay (FR-29), variable edit on running instances (FR-19), task edit + attachments (FR-44/45), user & group lifecycle (FR-46/47), multi-connection (FR-49), batches + event subscriptions surface (FR-53/54), app-definition browse (FR-55), DMN execution history (FR-57), model versioning (FR-59), category edit (FR-43)."
+  },
+  {
+    "title": "1.0.0",
+    "state": "open",
+    "description": "Operator polish + GA: pluggable auth — Basic/Bearer/OIDC PKCE (FR-4/48), form-js designer + standalone form rendering (FR-23/51), Flowable-specific bpmn-js properties panel (FR-38), engine version compatibility warning (NFR-7), full accessibility audit, public release (README screenshots per look, forum announcement, social-preview card). Compatibility-stable from this point forward."
+  }
+]
