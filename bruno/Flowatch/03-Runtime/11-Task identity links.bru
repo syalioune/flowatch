@@ -1,0 +1,27 @@
+meta {
+  name: Task identity links
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/runtime/tasks/{{taskId}}/identitylinks
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  taskId: PASTE_A_TASK_ID
+}
+
+docs {
+  # Identity links
+
+  Lists assignee/candidate users/groups on a task. Same endpoint accepts POST
+  to add a link. Useful for FR-44 (task edit — candidate management).
+}

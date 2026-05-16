@@ -1,0 +1,22 @@
+meta {
+  name: Get instance variables
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/runtime/process-instances/{{instanceId}}/variables
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  instanceId: PASTE_AN_INSTANCE_ID
+}
+
+docs { Related: PRD FR-18. }

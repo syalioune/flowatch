@@ -1,0 +1,27 @@
+meta {
+  name: Update user
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/identity/users/{{userId}}
+  body: json
+  auth: basic
+}
+
+body:json {
+  {
+    "firstName": "Updated",
+    "lastName": "Name"
+  }
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  userId: rest-admin
+}

@@ -1,0 +1,23 @@
+meta {
+  name: List batches (FR-53)
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/management/batches?size=10
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs {
+  # Batches
+
+  Long-running async ops (bulk migration, bulk delete). Verified working.
+  Related: PRD FR-53.
+}

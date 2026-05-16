@@ -1,0 +1,16 @@
+meta {
+  name: List timer jobs
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/management/timer-jobs?size=10
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}

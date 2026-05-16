@@ -1,0 +1,35 @@
+meta {
+  name: Start process instance
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/runtime/process-instances
+  body: json
+  auth: basic
+}
+
+body:json {
+  {
+    "processDefinitionKey": "oneTaskProcess",
+    "businessKey": "BR-123",
+    "variables": [
+      { "name": "amount", "value": 1000, "type": "integer" }
+    ]
+  }
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs {
+  # Start process instance
+
+  Body accepts `processDefinitionKey` OR `processDefinitionId`, optional
+  `businessKey`, `tenantId`, `variables`.
+
+  Related: PRD FR-16.
+}

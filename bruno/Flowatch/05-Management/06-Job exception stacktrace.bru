@@ -1,0 +1,31 @@
+meta {
+  name: Job exception stacktrace
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/management/jobs/{{jobId}}/exception-stacktrace
+  body: none
+  auth: basic
+}
+
+headers {
+  Accept: text/plain
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  jobId: PASTE_A_FAILED_JOB_ID
+}
+
+docs {
+  # Job exception stacktrace
+
+  Returns raw text. Used in the Jobs detail panel.
+  Related: PRD FR-27.
+}

@@ -1,0 +1,36 @@
+meta {
+  name: Suspend or activate process definition
+  type: http
+  seq: 8
+}
+
+put {
+  url: {{baseUrl}}/repository/process-definitions/{{processDefinitionId}}
+  body: json
+  auth: basic
+}
+
+body:json {
+  {
+    "action": "suspend"
+  }
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  processDefinitionId: PASTE_A_PROCESS_DEFINITION_ID
+}
+
+docs {
+  # Suspend or activate
+
+  Body: `{ "action": "suspend" }` or `{ "action": "activate" }`.
+  Same endpoint also accepts `{ "category": "new-cat" }` for FR-43
+  (process-definition category edit, verified working in compat.md).
+
+  Related: PRD FR-14, FR-43.
+}

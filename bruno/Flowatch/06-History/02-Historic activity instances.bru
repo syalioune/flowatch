@@ -1,0 +1,27 @@
+meta {
+  name: Historic activity instances
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/history/historic-activity-instances?processInstanceId={{instanceId}}
+  body: none
+  auth: basic
+}
+
+params:query {
+  processInstanceId: PASTE_AN_INSTANCE_ID
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs {
+  # Activity instances (audit trail)
+
+  Used together with the BPMN XML for FR-29 (token overlay on instance detail).
+  Related: PRD FR-28, FR-29.
+}

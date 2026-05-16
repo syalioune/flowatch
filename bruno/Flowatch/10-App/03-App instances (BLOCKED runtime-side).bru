@@ -1,0 +1,25 @@
+meta {
+  name: App instances — BLOCKED runtime-side
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{appBase}}/app-runtime/app-instances?size=10
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs {
+  # App runtime — NOT exposed in flowable-rest 7.2.0
+
+  `app-runtime/app-instances` returns "No endpoint". Flowatch's FR-55 scope is
+  trimmed to read-only browsing on the repository side; runtime is out.
+
+  Related: docs/compat.md, PRD FR-55 scope reduction.
+}

@@ -1,0 +1,27 @@
+meta {
+  name: Task comments
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/runtime/tasks/{{taskId}}/comments
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  taskId: PASTE_A_TASK_ID
+}
+
+docs {
+  # Task comments
+
+  Verified working. Note: process-instance-level comments are NOT exposed
+  (see docs/compat.md). Task-level only.
+}

@@ -1,0 +1,28 @@
+meta {
+  name: List jobs
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/management/jobs?size=10
+  body: none
+  auth: basic
+}
+
+params:query {
+  size: 10
+  ~withException: true
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs {
+  # List jobs
+
+  Common filter: `withException=true` for the failing-jobs view.
+  Related: PRD FR-24.
+}

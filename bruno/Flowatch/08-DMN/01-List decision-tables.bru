@@ -1,0 +1,25 @@
+meta {
+  name: List decisions
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{dmnBase}}/dmn-repository/decisions?size=20
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs {
+  # List decisions
+
+  DMN lives under /flowable-rest/dmn-api, not /service. Flowatch's `dmnBase()`
+  helper rewrites the base URL.
+
+  Related: PRD FR-33.
+}

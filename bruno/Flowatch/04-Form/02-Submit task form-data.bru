@@ -1,0 +1,27 @@
+meta {
+  name: Submit task form-data
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/form/form-data
+  body: json
+  auth: basic
+}
+
+body:json {
+  {
+    "taskId": "PASTE_A_TASK_ID",
+    "properties": [
+      { "id": "approved", "value": "true" }
+    ]
+  }
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs { Related: PRD FR-22. }

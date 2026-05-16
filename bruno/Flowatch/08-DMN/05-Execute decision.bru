@@ -1,0 +1,27 @@
+meta {
+  name: Execute decision
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{dmnBase}}/dmn-rule/execute
+  body: json
+  auth: basic
+}
+
+body:json {
+  {
+    "decisionKey": "loanApproval",
+    "inputVariables": [
+      { "name": "amount", "value": 1000, "type": "integer" }
+    ]
+  }
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs { Related: PRD FR-33. }

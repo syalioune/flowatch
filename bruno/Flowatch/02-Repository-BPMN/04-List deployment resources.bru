@@ -1,0 +1,28 @@
+meta {
+  name: List deployment resources
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/repository/deployments/{{deploymentId}}/resources
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  deploymentId: PASTE_A_REAL_DEPLOYMENT_ID_HERE
+}
+
+docs {
+  # List deployment resources
+
+  Returns BPMN/DMN/Form artifacts bundled in a deployment.
+
+  Related: PRD FR-13.
+}
