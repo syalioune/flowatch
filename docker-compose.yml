@@ -27,7 +27,13 @@ services:
       FLOWABLE_REST_APP_ADMIN_FIRST_NAME: REST
       FLOWABLE_REST_APP_ADMIN_LAST_NAME: Admin
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://rest-admin:test@localhost:8080/flowable-rest/service/management/engine || exit 1"]
+      # Probe the Swagger UI landing at /flowable-rest/docs/ — it is served
+      # unauthenticated by Flowable 7.2.0 and returns 200 once Spring + Tomcat
+      # finish bootstrapping, which is the readiness signal we need. The
+      # /management/engine endpoint requires Basic auth, so embedding
+      # credentials in the URL would leak the password to `docker inspect`
+      # for anyone with daemon access.
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/flowable-rest/docs/ || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -43,6 +49,11 @@ services:
       NGINX_ENVSUBST_FILTER: ALLOWED_ORIGIN
     volumes:
       - ./docker/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+      # 40-validate-origin runs after the official image's envsubst step (30-)
+      # and fails the container start if ALLOWED_ORIGIN is empty, has a
+      # trailing slash, is a wildcard, or contains a comma. See the script for
+      # the full contract.
+      - ./docker/40-validate-origin.sh:/docker-entrypoint.d/40-validate-origin.sh:ro
     depends_on:
       flowable:
         condition: service_healthy
