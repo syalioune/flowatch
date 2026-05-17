@@ -28,33 +28,61 @@ jobs:
     runs-on: ubuntu-latest
     # Skip if the head commit is the [skip ci] release commit from a previous run.
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    # `release-bot` is a GitHub Environment (Settings → Environments)
+    # holding the App credentials as Environment-scoped secrets. The
+    # environment is configured with:
+    #   - Deployment branch restrictions: only main / develop / release/*
+    #   - Required reviewer: the maintainer (one approval per release run)
+    # This gates secret access so a contributor cannot mint a Release Bot
+    # token from a feature-branch workflow. See plan v3.
+    environment: release-bot
     env:
-      # Disable husky so the project's local-only pre-commit + pre-push
-      # hooks (.husky/) don't gate semantic-release's internal git
-      # commit (CHANGELOG.md, package.json bump via @semantic-release/git)
-      # and git push (tag + release commit). Those hooks exist to catch
-      # local developer mistakes — biome formatting, NOTICE regen,
-      # tsc + vitest unit + browser tiers — and are already gated
-      # separately by the `check` / `unit` / `e2e` / `build` jobs in
-      # ci.yml. Re-running them inside the Release workflow:
-      #   - duplicates work already validated upstream;
-      #   - fails on missing per-job provisioning (Playwright Chromium
-      #     isn't installed in the release job — that's the `unit` job's
-      #     responsibility);
-      #   - couples release plumbing to local-dev-only invariants.
-      # HUSKY=0 makes every husky hook a no-op for this job's lifetime.
+      # HUSKY=0 disables every husky hook for the job's lifetime so
+      # local-only pre-commit (biome format, NOTICE regen) and pre-push
+      # (tsc, vitest unit + browser tiers) don't gate semantic-release's
+      # internal git commit/push. CI already gates the same invariants
+      # via the required `check` / `unit` / `e2e` / `build` jobs in ci.yml.
       HUSKY: "0"
     permissions:
-      contents: write          # tag + commit CHANGELOG back
-      issues: write            # comment on closed issues
-      pull-requests: write     # comment on released PRs
+      # Minimal default — the App token (minted below) carries the
+      # write capabilities; the default GITHUB_TOKEN's permissions
+      # don't matter here because every git/api call uses the App token.
+      contents: read
       id-token: write          # OIDC for future plugins (npm provenance, etc.)
     steps:
+      # Mint a Flowatch Release Bot token for this run. The bot is a
+      # dedicated GitHub App with Contents R/W + Issues R/W + Pull
+      # requests R/W + Metadata R, installed only on this repo and
+      # added to the repository ruleset's bypass_actors list. Using a
+      # per-run App token instead of the default GITHUB_TOKEN matters
+      # for two reasons:
+      #   1. The default GITHUB_TOKEN CANNOT be added to ruleset
+      #      bypass_actors — GitHub blocks it (any workflow could push
+      #      arbitrary content to protected branches otherwise). A
+      #      dedicated App, gated by Environment secrets, is the only
+      #      safe path. See plan-v3 §"Why my v1 plan was wrong".
+      #   2. Pushes made with the default GITHUB_TOKEN do not trigger
+      #      downstream workflows (recursion prevention). The App
+      #      token is a distinct identity, so its tag push DOES trigger
+      #      ci.yml `image` job → versioned image published.
+      - name: Mint Flowatch Release Bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.FLOWATCH_RELEASE_APP_ID }}
+          private-key: ${{ secrets.FLOWATCH_RELEASE_APP_PRIVATE_KEY }}
+
       - name: Checkout (full history)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 0          # semantic-release needs the full git log
-          persist-credentials: false
+          fetch-depth: 0           # semantic-release needs the full git log
+          # persist-credentials=true (default) stores the token below in
+          # .git/config so subsequent git push (from @semantic-release/git)
+          # authenticates as the Release Bot — that's the actor on the
+          # ruleset bypass list, so the push succeeds without going
+          # through a PR.
+          persist-credentials: true
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Setup Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -70,5 +98,11 @@ jobs:
 
       - name: Run semantic-release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Override both env vars so every plugin that reads either
+          # name (@semantic-release/github uses GITHUB_TOKEN;
+          # @semantic-release/git uses git config which we wrote above;
+          # GH_TOKEN is a fallback some plugins honour) authenticates
+          # as the Release Bot, not the default github-actions[bot].
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: npx semantic-release
