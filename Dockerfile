@@ -94,6 +94,17 @@ LABEL org.opencontainers.image.source="https://github.com/syalioune/flowatch" \
 # `rm -f` so a future digest that ships without default.conf doesn't break
 # the build.
 USER root
+
+# Pull every security fix Alpine has published for the packages in this
+# base image since the digest pin was set. The digest is locked per
+# NFR-26 for supply-chain provenance, but that means curl / libcurl /
+# openssl etc. fall behind upstream's CVE backports until Dependabot
+# bumps the pin (weekly). Without this `apk -U upgrade`, Trivy fails the
+# CI scan on every newly-disclosed Alpine SecDB CVE in those packages —
+# even when an `:r` patch is already available in the Alpine repo.
+# `--no-cache` keeps the layer slim (no apk index left behind).
+RUN apk -U upgrade --no-cache
+
 RUN rm -f /etc/nginx/conf.d/default.conf
 COPY docker/nginx-spa.conf.template /etc/nginx/templates/default.conf.template
 
