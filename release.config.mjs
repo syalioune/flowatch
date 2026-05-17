@@ -653,15 +653,25 @@ const releaseNotesConfig = {
 
 export default {
   branches: [
-    // `main` is the stable-release branch. It was bootstrapped as an
-    // **orphan** branch with a single empty commit and tagged `v0.0.0`,
-    // so it has no shared history with develop. The tag anchors
-    // semantic-release's baseline — without one, semantic-release's
-    // first release would default to v1.0.0 regardless of package.json.
+    // `main` is the stable-release branch. It currently points at
+    // develop's root commit (the very first commit on develop), and the
+    // `v0.0.0` tag is anchored there too — so v0.0.0 is reachable from
+    // both main and develop via their shared root.
     //
-    // The first `release/0.0.1 → main` promotion will need
-    // `--allow-unrelated-histories` (one-off, seed-merge only); from
-    // 0.0.2 onwards the histories converge and merges are linear.
+    // Reachability matters: semantic-release on a prerelease branch
+    // (develop) determines its baseline by finding the highest stable
+    // tag reachable from BOTH the prerelease branch AND the matching
+    // release branch (main). With a shared-history root, that
+    // intersection is `v0.0.0` and the next beta computes correctly
+    // (e.g. `v0.0.1-beta.1`). If main and develop had unrelated
+    // histories the intersection would be empty and semantic-release
+    // would fall back to its built-in first-release default `v1.0.0`,
+    // emitting `v1.0.0-beta.1` instead — a version that overshoots the
+    // agreed milestone plan.
+    //
+    // The first `release/0.0.1 → main` promotion is a normal fast-
+    // forward (main is reachable from develop), no
+    // `--allow-unrelated-histories` needed.
 
     "main",
 
