@@ -263,9 +263,10 @@ The TanStack Router devtools panel renders bottom-right in dev only (`import.met
 |------|------|---------|------|
 | Biome v2 | Lint + format (replaces ESLint + Prettier) | `npx biome check` / `npx biome format --write` | pre-commit (auto-fix), CI on every PR |
 | TypeScript | Type check (strict) | `npx tsc --noEmit` | pre-push, CI |
-| Vitest | Unit tests | `npm test` | pre-push, CI |
+| Vitest | Unit tests + coverage (60% lines/branches per-file on curated includes; 70% on `src/api.ts`) | `npm test` / `npm run test:coverage` | pre-push, CI |
 | Playwright | E2E + visual snapshots | `npm run e2e` | CI |
-| CodeQL | SAST (JS/JSX, `security-extended` suite) | `make codeql` | CI on push/PR + weekly cron |
+| CodeQL | SAST (JS/JSX, `security-extended` suite, gate ≥ medium severity, **required check**) | `make codeql` | CI on push/PR + weekly cron |
+| Stryker | Mutation testing (scoped to `src/api.ts`, advisory — no threshold) | `make mutate` | CI on PR (artifact only) |
 | Trivy | Container CVE scan (Docker images, if any) | CI job | CI |
 | `check-scope.mjs` | Validate Conventional Commits scopes | `node scripts/release/check-scope.mjs <scope>` | Manual, pre-commit hint |
 

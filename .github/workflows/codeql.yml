@@ -3,10 +3,13 @@
 # CodeQL SAST for Flowatch (JS / JSX). Standalone workflow — independent
 # of ci.yml so Dependabot can bump github/codeql-action without churning
 # the four required-check contexts that branch protection pins by name
-# (.github/protection/required_checks.json). This workflow is NOT in
-# required_checks.json — bake-in period before promoting it to a
-# required check. Findings land in the Security tab regardless of
-# whether the run is required.
+# (.github/protection/required_checks.json). The job name
+# `Analyze (javascript-typescript)` IS in required_checks.json as of the
+# 2026-05-17 quality-gates tightening — the bake-in period has concluded.
+# A post-analysis `Gate on alerts ≥ medium severity` step polls the Code
+# Scanning API for this ref and fails the job if any open alert has
+# security_severity_level >= medium. Renaming the job (or this step)
+# silently breaks branch protection.
 #
 # Triggers:
 #   - push to main / develop  → catch regressions on the trunk branches
@@ -79,6 +82,66 @@ jobs:
         uses: github/codeql-action/analyze@f411752efdf656cb71aa17b755b22c890960da1d # v3.35.5
         with:
           category: "/language:${{ matrix.language }}"
+
+      # Severity gate. The CodeQL action uploads SARIF to the Security
+      # tab but does NOT fail the job on findings — that's our policy
+      # decision. We poll the Code Scanning API for analyses tied to
+      # this commit, then count open alerts at security_severity_level
+      # in {medium, high, critical} and fail the job if any exist.
+      #
+      # Threshold MEDIUM matches the cleanup bar the 2026-05-17 quality-
+      # gates tightening set. Raising it to HIGH would let medium-grade
+      # smells (e.g. js/missing-origin-check, js/indirect-command-line-
+      # injection) accumulate again; lowering to LOW pulls in too much
+      # noise. Adjust here if the policy moves — also update
+      # docs/repo-settings.md §"CodeQL & Trivy".
+      #
+      # On PRs from forks GITHUB_TOKEN is read-only and the Code
+      # Scanning API may not be queryable for the head ref. The step
+      # tolerates this via `|| echo 0` fallbacks; in that case the
+      # workflow effectively becomes advisory for the fork PR. Trusted
+      # PRs (same-repo branches) get the full gate.
+      - name: Gate on alerts ≥ medium severity
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REF: ${{ github.event.pull_request.head.sha || github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Wait up to 5 min for SARIF processing to surface an analysis
+          # for this exact commit. Without this, the alerts API may
+          # return stale state from a parent commit.
+          for i in $(seq 1 30); do
+            analyses=$(gh api "/repos/${REPO}/code-scanning/analyses?tool_name=CodeQL&per_page=20" \
+              --jq "[.[] | select(.commit_sha==\"${REF}\")] | length" 2>/dev/null || echo 0)
+            if [ "$analyses" -gt 0 ]; then
+              echo "✓ CodeQL analysis indexed for ${REF} after ${i} poll(s)"
+              break
+            fi
+            sleep 10
+          done
+          blocking=0
+          for sev in medium high critical; do
+            n=$(gh api "/repos/${REPO}/code-scanning/alerts?state=open&ref=${REF}&severity=${sev}" \
+              --jq "length" 2>/dev/null || echo 0)
+            blocking=$((blocking + n))
+          done
+          {
+            echo "### CodeQL severity gate"
+            echo ""
+            echo "- Ref: \`${REF}\`"
+            echo "- Threshold: severity ≥ medium"
+            echo "- Open blocking alerts: **${blocking}**"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$blocking" -gt 0 ]; then
+            echo "::error::CodeQL gate failed — ${blocking} open alert(s) at severity ≥ medium."
+            gh api "/repos/${REPO}/code-scanning/alerts?state=open&ref=${REF}" \
+              --jq '.[] | "  - #\(.number) [\(.rule.security_severity_level // .rule.severity)] \(.rule.id) at \(.most_recent_instance.location.path):\(.most_recent_instance.location.start_line)"' \
+              | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "✓ No open alerts at severity ≥ medium on ${REF}."
 
       - name: Summary
         if: always()
