@@ -1,1 +1,1 @@
-["CI / check", "CI / unit", "CI / e2e", "CI / build"]
+["check", "unit", "e2e", "build"]
