@@ -28,6 +28,22 @@ jobs:
     runs-on: ubuntu-latest
     # Skip if the head commit is the [skip ci] release commit from a previous run.
     if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    env:
+      # Disable husky so the project's local-only pre-commit + pre-push
+      # hooks (.husky/) don't gate semantic-release's internal git
+      # commit (CHANGELOG.md, package.json bump via @semantic-release/git)
+      # and git push (tag + release commit). Those hooks exist to catch
+      # local developer mistakes — biome formatting, NOTICE regen,
+      # tsc + vitest unit + browser tiers — and are already gated
+      # separately by the `check` / `unit` / `e2e` / `build` jobs in
+      # ci.yml. Re-running them inside the Release workflow:
+      #   - duplicates work already validated upstream;
+      #   - fails on missing per-job provisioning (Playwright Chromium
+      #     isn't installed in the release job — that's the `unit` job's
+      #     responsibility);
+      #   - couples release plumbing to local-dev-only invariants.
+      # HUSKY=0 makes every husky hook a no-op for this job's lifetime.
+      HUSKY: "0"
     permissions:
       contents: write          # tag + commit CHANGELOG back
       issues: write            # comment on closed issues
