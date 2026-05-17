@@ -51,6 +51,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Vitest auto-discovers `vitest.workspace.ts` which defines a
+      # `browser` project running on Playwright Chromium. Stryker
+      # invokes vitest's full project graph during its initial dry
+      # run, so it tries to spin up Chromium even though `src/api.ts`
+      # is exercised only by the node/jsdom project. Install Chromium
+      # to satisfy vitest's startup; no browser tests actually run in
+      # the mutation pass. Matches the install pattern in the `unit`
+      # job in ci.yml — Stryker vitest-runner's schema has no
+      # project-filter option so we can't sidestep this from config.
+      - name: Install Playwright Chromium (vitest browser-tier prerequisite)
+        run: npx playwright install --with-deps chromium
+
       - name: Run Stryker
         id: stryker
         # `|| true` would mask failures — we want a non-zero exit if
