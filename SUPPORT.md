@@ -16,6 +16,6 @@ For security issues, follow **SECURITY.md**.
 
 ## Service levels
 
-**TBD**
+**Best-effort triage within 14 days; no formal SLA until v1.0.0.**
 
-Community support starts when the repo becomes public at **v1.0.0**.
+Community support starts when the repo reaches **v1.0.0**.
