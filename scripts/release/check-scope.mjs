@@ -139,7 +139,8 @@ for (const t of themes) {
 // Mirror the QUALITY_GATES_CI_RE + SUBJECT_HEURISTICS regexes from
 // release.config.mjs so the script's verdict matches what the
 // release will emit.
-const QUALITY_GATES_CI_RE = /\b(mutation|stryker|pit|pitest|playwright|e2e|axe|coverage|jacoco)\b/i;
+const QUALITY_GATES_CI_RE =
+  /\b(mutation|stryker|pit|pitest|playwright|e2e|axe|coverage|jacoco|codeql|sast|trivy)\b/i;
 const SUBJECT_HEURISTICS = [
   {
     theme: "🌍 Help, i18n & Docs",
@@ -151,7 +152,7 @@ const SUBJECT_HEURISTICS = [
   },
   {
     theme: "🛡️ Quality Gates",
-    re: /\b(playwright|axe|stryker|pit|pitest|mutation|coverage|jacoco|e2e|spectral)\b/i,
+    re: /\b(playwright|axe|stryker|pit|pitest|mutation|coverage|jacoco|e2e|spectral|codeql|sast|trivy)\b/i,
   },
 ];
 

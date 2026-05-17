@@ -1,0 +1,93 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# CodeQL SAST for Flowatch (JS / JSX). Standalone workflow — independent
+# of ci.yml so Dependabot can bump github/codeql-action without churning
+# the four required-check contexts that branch protection pins by name
+# (.github/protection/required_checks.json). This workflow is NOT in
+# required_checks.json — bake-in period before promoting it to a
+# required check. Findings land in the Security tab regardless of
+# whether the run is required.
+#
+# Triggers:
+#   - push to main / develop  → catch regressions on the trunk branches
+#   - PR to main / develop    → surface findings before merge
+#   - weekly cron             → catch new CVEs in CodeQL packs themselves
+#   - workflow_dispatch       → on-demand re-run
+#
+# Reproduce locally: `make codeql` (uses the `gh codeql` CLI extension
+# and writes codeql.sarif to the repo root; both are gitignored).
+#
+# All third-party actions are pinned to a full-length commit SHA per
+# NFR-26. Dependabot's `github-actions` ecosystem (.github/dependabot.yml)
+# bumps the SHAs weekly and keeps the trailing `# vX.Y.Z` comment in
+# sync — never strip that comment, it documents the human-readable
+# version pin.
+
+name: CodeQL
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Monday 06:17 UTC — offset from the top of the hour to dodge the
+    # GitHub Actions cron-rush at :00.
+    - cron: "17 6 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write   # upload SARIF to the Security tab
+      contents: read
+      actions: read            # required for CodeQL to read workflow metadata
+    strategy:
+      fail-fast: false
+      matrix:
+        # `javascript-typescript` is the combined pack (CodeQL >= 2.16) — one
+        # entry covers .js, .jsx, and any future .ts/.tsx without re-wiring
+        # the matrix. Per CLAUDE.md the project is JS/JSX only, but the
+        # extractor doesn't care about absence of .ts files.
+        language: [javascript-typescript]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@f411752efdf656cb71aa17b755b22c890960da1d # v3.35.5
+        with:
+          languages: ${{ matrix.language }}
+          # `security-extended` is richer than the GitHub default suite —
+          # Flowatch's source surface is small enough to triage the extra
+          # findings. Downgrade to `default` only if signal-to-noise
+          # proves untenable; do NOT silently drop queries with a custom
+          # config until that decision is on the record.
+          queries: security-extended
+
+      - name: Perform CodeQL Analysis
+        id: analyze
+        uses: github/codeql-action/analyze@f411752efdf656cb71aa17b755b22c890960da1d # v3.35.5
+        with:
+          category: "/language:${{ matrix.language }}"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### CodeQL"
+            echo ""
+            echo "- Language: ${{ matrix.language }}"
+            echo "- Suite: security-extended"
+            echo "- Outcome: ${{ steps.analyze.outcome }}"
+            echo "- Findings: see the Security tab → Code scanning alerts (category /language:${{ matrix.language }})"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -134,6 +134,24 @@ landing-check: ## NFR-9 enforcement — fail on any external https:// asset refe
 	@if grep -nE 'src:[[:space:]]*url\([[:space:]]*"?https?://' landing/style.css 2>/dev/null; then echo "FAIL: external @font-face url() in landing/style.css"; exit 1; fi
 	@echo "landing/: no external asset references ✓"
 
+# --- CodeQL (SAST, local reproduction of .github/workflows/codeql.yml) ----
+# Uses the `gh codeql` CLI extension so contributors don't need a separate
+# CodeQL CLI install. Same language + suite as CI. Outputs codeql.sarif
+# to the repo root — open it with the "SARIF Viewer" or "CodeQL" VS Code
+# extension. Both the DB dir and the sarif file are gitignored.
+.PHONY: codeql codeql-clean
+codeql:       ## Local CodeQL SAST run (gh codeql; writes codeql.sarif at repo root)
+	@command -v gh >/dev/null 2>&1 || { echo "gh CLI not found — install from https://cli.github.com"; exit 2; }
+	@gh extension list 2>/dev/null | grep -q github/gh-codeql || gh extension install github/gh-codeql
+	@rm -rf .codeql-db codeql.sarif
+	gh codeql database create .codeql-db --language=javascript-typescript --source-root=. --overwrite
+	gh codeql database analyze .codeql-db \
+		codeql/javascript-queries:codeql-suites/javascript-security-extended.qls \
+		--format=sarif-latest --output=codeql.sarif --download
+	@echo "→ codeql.sarif written. Open with the 'SARIF Viewer' or 'CodeQL' VS Code extension."
+codeql-clean: ## Remove local CodeQL DB + sarif output
+	rm -rf .codeql-db codeql.sarif
+
 # --- Misc ------------------------------------------------------------------
 .PHONY: clean
 clean: ## Remove node_modules and build output

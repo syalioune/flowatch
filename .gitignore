@@ -15,6 +15,11 @@ e2e/.playwright-cache/
 # Vitest CI JUnit report (Story 4.1) — only the GitHub Actions runner writes
 # it; uploaded as an artifact on failure.
 test-results/
+# CodeQL local analysis output (Makefile: codeql / codeql-clean). CI runs in
+# .github/workflows/codeql.yml use the runner's ephemeral DB — these paths
+# only exist when contributors reproduce the scan locally.
+.codeql-db/
+codeql.sarif
 .env
 .env.local
 .DS_Store
