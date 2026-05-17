@@ -145,9 +145,3 @@ The job will fail when an issue is filed without a corresponding local file, or 
 | Empty output / silent exit | Likely a regression in error handling under `set -euo pipefail`. | Run `bash -x scripts/user-stories/sync-user-stories.sh check` to trace. |
 | Lots of "stale title" entries after a release | Common after a milestone closure where many issue titles were renamed (e.g. adding `(legacy)`). | Review each, run the suggested `git mv`, commit as `chore(docs): rename user-story files for canonical filenames`. |
 | Bootstrap fetches an empty body | Issue body really is empty in GitHub. | Either fill in the issue's body upstream and re-run bootstrap (the file already exists, won't be overwritten — delete it first to re-bootstrap), or edit the local stub directly. |
-
-## Related conventions
-
-- [`docs/development/guidelines/documentation-standards.md`](../../docs/development/guidelines/documentation-standards.md) — the canonical doc on user-story file format, naming, and lifecycle.
-- [`docs/plans/README.md`](../../docs/plans/README.md) — companion convention for brainstorms and implementation plans.
-- [`.claude/commands/new-feature.md`](../../.claude/commands/new-feature.md) — slash command that files an issue + creates the matching user-story file in one flow.
