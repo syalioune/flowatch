@@ -11,7 +11,13 @@
 # Defaults: main requires 1 approving review; develop requires 1.
 
 set -euo pipefail
-repo="${1:-}"; main_appr="${2:-1}"; dev_appr="${3:-1}"
+repo="${1:-}"; main_appr="${2:-0}"; dev_appr="${3:-0}"
+# Opt-in: enable required signed commits via SIGNED_COMMITS=true env var.
+# Off by default because the project's commit-author convention is the DCO
+# Signed-off-by: trailer (enforced by commitlint), and the maintainer's
+# commits are not currently GPG/SSH-signed — turning this on would block
+# every PR until signing keys are wired up.
+sign_commits="${SIGNED_COMMITS:-false}"
 [ -n "$repo" ] || { echo "Usage: $0 <owner/repo> [main_approvals] [develop_approvals]"; exit 1; }
 command -v gh >/dev/null || { echo "gh CLI required"; exit 1; }
 command -v jq >/dev/null || { echo "jq required"; exit 1; }
@@ -43,6 +49,11 @@ protect_branch() {
   local contexts_json
   contexts_json=$(printf '%s\n' "${ctxs[@]}" | jq -R . | jq -cs .)
 
+  # required_pull_request_reviews is set to null when appr=0 so the whole
+  # reviews block is dropped — emitting it with required_approving_review_count=0
+  # still triggers require_code_owner_reviews enforcement against CODEOWNERS,
+  # which blocks single-maintainer repos where the author cannot self-approve.
+  # Pass appr>=1 (e.g. `2 1`) when a co-maintainer joins.
   local body
   body=$(jq -n \
     --argjson contexts "$contexts_json" \
@@ -54,11 +65,11 @@ protect_branch() {
       allow_force_pushes: false,
       allow_deletions: false,
       restrictions: null,
-      required_pull_request_reviews: {
+      required_pull_request_reviews: ($appr | if . > 0 then {
         dismiss_stale_reviews: true,
         require_code_owner_reviews: true,
-        required_approving_review_count: $appr
-      }
+        required_approving_review_count: .
+      } else null end)
     }')
 
   gh api -X PUT "repos/$repo/branches/$branch/protection" \
@@ -66,10 +77,15 @@ protect_branch() {
         --input - <<<"$body" >/dev/null \
     || { echo "Failed to protect $branch"; exit 1; }
 
-  # Require signed commits (best-effort; existing protection is preserved if this fails).
-  gh api -X POST \
-        -H "Accept: application/vnd.github+json" \
-        "repos/$repo/branches/$branch/protection/required_signatures" >/dev/null || true
+  # Required signed commits — opt-in via SIGNED_COMMITS=true. Default off
+  # because the project uses DCO sign-off (Signed-off-by: trailer enforced
+  # by commitlint) not GPG/SSH signing; turning this on would block every PR
+  # from the maintainer until signing keys are wired up to their account.
+  if [ "$sign_commits" = "true" ]; then
+    gh api -X POST \
+          -H "Accept: application/vnd.github+json" \
+          "repos/$repo/branches/$branch/protection/required_signatures" >/dev/null || true
+  fi
 }
 
 # `develop` may not exist yet on a freshly-created repo. Create it from
