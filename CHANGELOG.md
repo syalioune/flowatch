@@ -1,0 +1,127 @@
+## [0.0.1-beta.1](https://github.com/syalioune/flowatch/compare/v0.0.0...v0.0.1-beta.1) (2026-05-17)
+
+> ⚠️ **Pre-1.0 posture.** Flowatch does **not** guarantee compatibility
+> between pre-1.0 releases. Breaking changes may land at any time.
+> Operators following the main branch should expect to rebuild state
+> between releases. **1.0.0** will be the first public,
+> compatibility-stable milestone.
+
+
+### 🔍 API Inspector
+
+* **inspector:** add api:log-cleared event and tighten visual snapshot tolerance ([eff8033](https://github.com/syalioune/flowatch/commit/eff803356e8b68d5cc8a4dcdcd42fe14df1f6aef)), closes [#119](https://github.com/syalioune/flowatch/issues/119)
+
+
+### 🎭 Design System & Theming
+
+* **branding:** add Flowatch mark, lockup, and favicon SVG assets ([035246a](https://github.com/syalioune/flowatch/commit/035246a7c83731dda78442651881d947bc98ce6f))
+* **branding:** self-host IBM Plex woff2 and remove Google Fonts CDN (Story 6.2, NFR-9) ([a0d6e19](https://github.com/syalioune/flowatch/commit/a0d6e191f5ff8e244ddabab914bf5e9668298abd))
+
+
+### 🧭 Routing & Navigation
+
+* **chrome:** surface build SHA and tested Flowable version in sidebar footer (Story 6.5, NFR-20) ([7cb16ca](https://github.com/syalioune/flowatch/commit/7cb16ca1c20478674e17156b85090a0bc4751293))
+* **nav:** /deployments and /definitions list + detail routes (Story 3.3, ADR-004) ([f153f2c](https://github.com/syalioune/flowatch/commit/f153f2ce0679e8714b404f3e16d96fbe08aec419))
+* **nav:** /history, /identity, /tenants close out the route migration (Story 3.5, ADR-004) ([0c4d2d4](https://github.com/syalioune/flowatch/commit/0c4d2d428cb60696ba497d36ccb87db906196625))
+* **nav:** install TanStack Router and add the root route (Story 3.1, ADR-004) ([26ddce3](https://github.com/syalioune/flowatch/commit/26ddce35053dfed1510d4c963c4470455b1fea29))
+* **nav:** retire VIEW_TITLE/ENDPOINT_BY_VIEW for route staticData (Story 3.6, ADR-004) ([3aec835](https://github.com/syalioune/flowatch/commit/3aec835786c4dc74a92035554ad30d1aeaca46e0))
+* **nav:** route /instances, /tasks, /jobs with typed search params (Story 3.4, ADR-004) ([c05aa75](https://github.com/syalioune/flowatch/commit/c05aa75fdeb34689b69ca1f754d2ccdfcb0b0b33))
+* **nav:** route dashboard, bpmn, dmn via tanstack router (Story 3.2, ADR-004) ([18bcd53](https://github.com/syalioune/flowatch/commit/18bcd532c89bb19f18aa2cc0822fb2bf9d05c340))
+
+
+### 🌐 Flowable REST contract
+
+* **bruno:** add Bruno REST collection mirroring the Flowable 7 API surface ([61726ea](https://github.com/syalioune/flowatch/commit/61726ea2eecfd091c2b078c8ebf1705b0c32bff1))
+
+
+### 🛡️ Quality Gates
+
+* **ci:** replace e2e placeholder with playwright and docker compose flowable (Story 4.2) ([11e824a](https://github.com/syalioune/flowatch/commit/11e824af0f211b5f208cba90a63d8b6cc64ea711))
+* **e2e:** always reuse existing server so CI's pre-warmed stack does not collide ([eac1148](https://github.com/syalioune/flowatch/commit/eac1148776bba108033df47c6058851ad2cd9f39))
+* **e2e:** harden playwright webServer for cold starts (Story 2.3) ([3115495](https://github.com/syalioune/flowatch/commit/311549502fcb62b0d29d2fb447df1e6f070c99f2))
+* **e2e:** wait for /tasks navigation before clicking History in golden path ([4409752](https://github.com/syalioune/flowatch/commit/44097523ee002ecd95025edd0070bff8ce70394c))
+* **tests:** wire playwright E2E + golden-path against live Flowable (Story 2.3, ADR-008) ([c81dea2](https://github.com/syalioune/flowatch/commit/c81dea2ee3ef47e6a886b753f732553a17c48fd5))
+* **tests:** wire vitest + request() funnel suite (Story 2.1, ADR-008) ([fdd61df](https://github.com/syalioune/flowatch/commit/fdd61df3405995dd0f1935e10e9de9448f7fba3c))
+* **tests:** wire vitest browser tier + ErrorBox spec in Chromium (Story 2.2, ADR-008) ([ef22b43](https://github.com/syalioune/flowatch/commit/ef22b437b0e29a64606977285c0f79bf73bbcbd1))
+
+
+### 🧱 Foundation & Build
+
+* **devops:** add .editorconfig + gitleaks + gitguardian secret-scan configs ([8053e26](https://github.com/syalioune/flowatch/commit/8053e264ec74d0d5139b8313fbd54e784e8556ff))
+* **devops:** bump .nvmrc 20 → 22 for semantic-release 25 compat ([661bc87](https://github.com/syalioune/flowatch/commit/661bc8720aa542716d6320ac081ab57f0fa2f7e9))
+* **docker:** apk -U upgrade in runtime stage to pull Alpine SecDB patches ([6e447ad](https://github.com/syalioune/flowatch/commit/6e447adfca87e9832ad62218df54aae927c26f3f))
+* **docker:** build and publish multi-arch image to ghcr.io / docker hub ([977d4ec](https://github.com/syalioune/flowatch/commit/977d4ec4dc6a11345fc18845af9ba9324535d7ab))
+* **docker:** bump builder stage to node:22-alpine to match .nvmrc ([046a18a](https://github.com/syalioune/flowatch/commit/046a18a4d53097413d03fc49b3b6833a284a3d18))
+* **nginx:** mount ALLOWED_ORIGIN validator + drop creds from compose healthcheck (Story 6.3) ([6e63978](https://github.com/syalioune/flowatch/commit/6e63978fec6c17b9a84eea74504e736994258588))
+* **nginx:** parameterize CORS allowed origin via ALLOWED_ORIGIN env var (Story 6.3) ([17d97ea](https://github.com/syalioune/flowatch/commit/17d97ea6abd259f9edca8727bd75c69208ab53e5))
+* **vite:** read BUILD_SHA and APP_VERSION from env for CI image builds ([4bf26cc](https://github.com/syalioune/flowatch/commit/4bf26cc20f734280ded35755537800dc2e2490f3))
+
+
+### 🛠️ DevEx & Tooling
+
+* **bmad:** add 0.0.2+ sharded user-story specs and backlog CSVs ([60cc731](https://github.com/syalioune/flowatch/commit/60cc731459cebfdba05fade801b0f9ff82784cdf))
+* **bmad:** mark milestone 0.0.1 user stories done ([8a7f87a](https://github.com/syalioune/flowatch/commit/8a7f87a6d52fdb3601dbd96fee6939a65a399ebe))
+* **ci:** add docker-compose dependabot ecosystem and document review cadence (Story 4.4) ([ed85aa1](https://github.com/syalioune/flowatch/commit/ed85aa1e7708237724f3b1056e1711a1c6b1e220))
+* **ci:** drop pages placeholder job and rewrite header ([14192a1](https://github.com/syalioune/flowatch/commit/14192a1ed618742836c6af6c738a02f84ece1a1a))
+* **ci:** gate commitlint scope vocabulary against release.config.mjs THEMES ([e6804ba](https://github.com/syalioune/flowatch/commit/e6804ba8f4049a5503a1fc0a0836ff86cf55c070))
+* **ci:** match required-check contexts to actual GitHub Actions check-run names ([f90a012](https://github.com/syalioune/flowatch/commit/f90a0122548438faef7490debf5c3dfa2b92289f)), closes [#131](https://github.com/syalioune/flowatch/issues/131)
+* **ci:** replace build placeholder with vite build and dist artifact upload (Story 4.3) ([97e5ac0](https://github.com/syalioune/flowatch/commit/97e5ac0edef5d7d652e4cb6620a753a267e38114))
+* **ci:** replace check + unit placeholders with biome ci, tsc, and vitest (Story 4.1, ADR-010) ([e6d5fac](https://github.com/syalioune/flowatch/commit/e6d5facc5627110623894c1963bb0d900550a4eb))
+* **ci:** wire GitHub repo automation — CODEOWNERS, templates, project sync, branch protection ([350b376](https://github.com/syalioune/flowatch/commit/350b376b8af1b0c0541e1905d5def0ab13b6779b))
+* **claude:** commit shared Claude Code agent surface (settings, hooks, commands, BMAD skills) ([568b392](https://github.com/syalioune/flowatch/commit/568b392ac5b58749bdc30fe96f8335452c1d9fc0))
+* **commitlint:** add nav scope to scope-enum ([6566daf](https://github.com/syalioune/flowatch/commit/6566daf38e08a197771dfd5478a79f7fe64906b6))
+* **commitlint:** pin v21 and author scope-enum from release.config.mjs THEMES (Story 5.1) ([105f834](https://github.com/syalioune/flowatch/commit/105f8348e28321cd56c60d68756a6976a8ab8469))
+* **husky:** regenerate NOTICE on package*.json changes in pre-commit ([4423677](https://github.com/syalioune/flowatch/commit/442367799889ed4527d1930ccc7c75c645dd1c63))
+* **husky:** wire commit-msg, pre-commit, pre-push hooks (Story FND-SYS-005 follow-on) ([5eef8c7](https://github.com/syalioune/flowatch/commit/5eef8c7913c3de57b32c15c6d78d720b41799711))
+* **release:** activate 0.0.1 milestone description, sync nav scope, wire npm plugin ([026f5b7](https://github.com/syalioune/flowatch/commit/026f5b7fbcc64b0879d8e556af381da461e1a4ef))
+* **release:** defer main from semantic-release branches until first stable cut ([dc4f5b1](https://github.com/syalioune/flowatch/commit/dc4f5b1b9b9184065f06579e0b5c5faa3848ef1d))
+* **release:** handle shields.io double-hyphen encoding in badge sync ([8140655](https://github.com/syalioune/flowatch/commit/814065543dccfc0bd0c13fc177c333b86a24b740))
+* **release:** re-add main to branches + fix BREAKING bump to MAJOR ([fc8cf8e](https://github.com/syalioune/flowatch/commit/fc8cf8e01d104556c87cf3e116bde8b633a2af87))
+* **release:** rewrite branches comment to reflect shared-root main + reachable v0.0.1 baseline ([cc2a212](https://github.com/syalioune/flowatch/commit/cc2a21260c9b232f2323b6ff3409a635d1b1f8d3))
+* **release:** set HUSKY=0 in Release job so local-only hooks don't gate semantic-release ([460087a](https://github.com/syalioune/flowatch/commit/460087ae1241fbd6da15187dad69e0606a54f07d))
+* **release:** wire semantic-release workflow + changelog + git plugins (Story 5.2) ([9654ed5](https://github.com/syalioune/flowatch/commit/9654ed58bc1aa58c504cdf4e5e1b8c04485d3217))
+* **scripts:** add Makefile-referenced operational scripts (release / bootstrap / stories / dev) ([b83ec59](https://github.com/syalioune/flowatch/commit/b83ec5986aa10bc55902bb8b6fd9351779e8135d))
+* **scripts:** enforce 50 KB source-file navigability limit (Story 5.5, NFR-21) ([f445525](https://github.com/syalioune/flowatch/commit/f44552517c5a1f7819a919440ad2d60832181b95))
+* **scripts:** make protect-branches.sh single-maintainer-friendly ([e491e61](https://github.com/syalioune/flowatch/commit/e491e610aaa3f0be476aa75f5538ee946d417b72))
+* **scripts:** per-branch existence guard in protect-branches.sh + drop default-branch toggle ([acb4c62](https://github.com/syalioune/flowatch/commit/acb4c62edaa467f11e156fb1df9678f1ec354e04))
+
+
+### 📝 Documentation
+
+* **docs:** add BOOTSTRAP.md operator onboarding doc ([ca2f999](https://github.com/syalioune/flowatch/commit/ca2f99977a9f0741e11d060389232651983385c4))
+* **docs:** add Code of Conduct, security policy, support routing ([7a0da0d](https://github.com/syalioune/flowatch/commit/7a0da0d1478b1d56a2aa651e00ec056a092f91d8))
+* **docs:** add public docs/ — architecture, project overview, repo metadata ([448c9b7](https://github.com/syalioune/flowatch/commit/448c9b758ef0fec69de689cf1079113824b7628c))
+* **license:** add Apache-2.0 LICENSE file ([7584580](https://github.com/syalioune/flowatch/commit/758458084360c5820b8a6123525a0d5597c9cc81))
+* **license:** add Apache-2.0 SPDX headers and CI gate (Story 5.3) ([8475ef3](https://github.com/syalioune/flowatch/commit/8475ef35b641aad6e8db8a7601450b14e9e11c3e))
+* **license:** NOTICE generator, CI license-allowlist, About modal credits (Story 5.4) ([42c10e5](https://github.com/syalioune/flowatch/commit/42c10e517e96b57b0c7da72018efaca7313ea882))
+* **license:** regenerate NOTICE for zod + @semantic-release/npm deps bump ([48ed5a5](https://github.com/syalioune/flowatch/commit/48ed5a5e46856fe26a0b6772e7ee2977fa4956bd))
+* **license:** roll NOTICE copyright year forward automatically ([d5fdc7d](https://github.com/syalioune/flowatch/commit/d5fdc7d79804068885cd7a2023774459a9f795fc))
+* **readme:** add build/license/release/Flowable-compat badges + drift gate (Story 6.4, FR-F11) ([cfccc8a](https://github.com/syalioune/flowatch/commit/cfccc8a3e6948a3767f60994759cff1b22bce655))
+* **readme:** document AI-assisted development workflow and tool attribution ([f1fe884](https://github.com/syalioune/flowatch/commit/f1fe8841ca7b50fdf4ab0e516b2d3f74e354ec99))
+* **readme:** document multi-arch image pull from ghcr.io and Docker Hub ([3e6037d](https://github.com/syalioune/flowatch/commit/3e6037d6b5dc17cb157c37ea42c0489e0800b0a2))
+* **readme:** document one-command boot, restart paths, indicator states (Story 6.1) ([983a959](https://github.com/syalioune/flowatch/commit/983a959f7b2466a1ae4cff560925889baf698b34))
+
+
+### 📦 Dependencies
+
+* **deps:** add zod and @semantic-release/npm, normalise @playwright/test pin ([7a3cdc5](https://github.com/syalioune/flowatch/commit/7a3cdc5316e35af79d95eaba73f36b48dcf8c34f))
+
+
+### 🧰 Other
+
+* **tooling:** document pre-commit Biome format behavior (Story 1.3) ([1691fb7](https://github.com/syalioune/flowatch/commit/1691fb70960a99b40447f09a8687d36792cfafa8))
+* **tooling:** install Biome v2 as the lint+format authority (Story 1.2, ADR-007) ([73d5bcf](https://github.com/syalioune/flowatch/commit/73d5bcf5de6d92479ace730eceb6687d9f2fe279))
+* **types:** migrate remaining src/ files to TypeScript (Story 1.4, ADR-001) ([547f3e9](https://github.com/syalioune/flowatch/commit/547f3e97d4ac41d7d7b3db1215918754835a4e56))
+* **visual:** api inspector baseline at editorial/light/regular (Story 2.4, NFR-23) ([e50a7a2](https://github.com/syalioune/flowatch/commit/e50a7a28f64bb6c4437c3d6bff982ee69fa788ab))
+
+
+### 🌍 Help, i18n & Docs
+
+* **tooling:** expose test scripts in package.json + DEVELOPERS.md (Story 2.5) ([93aee03](https://github.com/syalioune/flowatch/commit/93aee03b9f855300e0f4b5ffa8b078e273b6a0ef)), closes [#1](https://github.com/syalioune/flowatch/issues/1)
+
+
+
+
+---
+
+_Auto-generated by [semantic-release](https://github.com/semantic-release/semantic-release). See [`docs/plans/`](https://github.com/syalioune/flowatch/blob/main/docs/plans/) for the closure ritual + risk register._
