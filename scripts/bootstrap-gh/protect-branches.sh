@@ -76,8 +76,17 @@ apply_ruleset() {
 
   # Build the rules array. Order doesn't matter to GitHub but we keep
   # logical groupings for readability.
+  #
+  # integration_id 15368 = GitHub Actions' app ID. Without it, the ruleset
+  # UI displays each required check's source as "Any Source", which means
+  # GitHub matches by context name alone — any integration that happens to
+  # emit a check named `check`/`unit`/`e2e`/`build` would satisfy the gate.
+  # Pinning to 15368 scopes the requirement to GitHub-Actions-emitted check-
+  # runs only, which is what the ci.yml jobs actually produce.
   local required_checks_json
-  required_checks_json=$(printf '%s\n' "${ctxs[@]}" | jq -R -c '{context: .}' | jq -cs .)
+  required_checks_json=$(printf '%s\n' "${ctxs[@]}" \
+    | jq -R -c '{context: ., integration_id: 15368}' \
+    | jq -cs .)
 
   local rules
   rules=$(jq -n \
@@ -101,7 +110,7 @@ apply_ruleset() {
           required_approving_review_count: $appr,
           require_last_push_approval: false,
           required_review_thread_resolution: false,
-          allowed_merge_methods: ["squash", "merge", "rebase"]
+          allowed_merge_methods: ["rebase"]
         }
       },
       {
