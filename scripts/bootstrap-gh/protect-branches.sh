@@ -24,6 +24,16 @@ mapfile -t ctxs < <(jq -r '.[]' "$checks_file")
 # Args: branch_name, required_approving_review_count
 protect_branch() {
   local branch="$1" appr="$2"
+
+  # Skip if the branch doesn't exist on the remote. In practice this guard
+  # only catches the `main` call — `develop` is auto-created from main above
+  # — but a fresh repo whose seed commit went to a non-`main` ref would
+  # otherwise hit a confusing 404 from the protection PUT.
+  if ! gh api "repos/$repo/branches/$branch" >/dev/null 2>&1; then
+    echo "Branch $branch does not exist on $repo — skipping protection."
+    return 0
+  fi
+
   echo "Protecting $branch…"
 
   # GitHub's branch-protection endpoint expects nested JSON objects for
@@ -52,18 +62,15 @@ protect_branch() {
     }')
 
   gh api -X PUT "repos/$repo/branches/$branch/protection" \
-         -H "Accept: application/vnd.github+json" \
-         --input - <<<"$body" >/dev/null \
+        -H "Accept: application/vnd.github+json" \
+        --input - <<<"$body" >/dev/null \
     || { echo "Failed to protect $branch"; exit 1; }
 
   # Require signed commits (best-effort; existing protection is preserved if this fails).
   gh api -X POST \
-         -H "Accept: application/vnd.github+json" \
-         "repos/$repo/branches/$branch/protection/required_signatures" >/dev/null || true
+        -H "Accept: application/vnd.github+json" \
+        "repos/$repo/branches/$branch/protection/required_signatures" >/dev/null || true
 }
-
-echo "Setting default branch to main on $repo…"
-gh repo edit "$repo" --default-branch main
 
 # `develop` may not exist yet on a freshly-created repo. Create it from
 # `main` if missing so protection rules have something to bind to.
