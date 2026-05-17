@@ -19,8 +19,12 @@
 # ---------------------------------------------------------------------------
 # Stage 1: builder
 # ---------------------------------------------------------------------------
-FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS builder
-# node:20-alpine — Vite build + npm ci
+FROM node:22-alpine@sha256:968df39aedcea65eeb078fb336ed7191baf48f972b4479711397108be0966920 AS builder
+# node:22-alpine — Vite build + npm ci. Matches .nvmrc (Node 22 LTS)
+# which the rest of the toolchain (semantic-release 25, biome, vitest,
+# playwright) requires; node:20-alpine would skew the image's Node
+# version against everything else and risks subtle build-vs-runtime
+# behaviour drift.
 
 WORKDIR /build
 
