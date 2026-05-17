@@ -133,4 +133,25 @@ Dependabot security alerts are enabled at the repository level for automatic vul
 
 ### CodeQL & Trivy — not wired
 - **CodeQL** (SAST for JS/TS) — not currently configured. May land during a later milestone if value justifies the CI minutes.
-- **Trivy** — not configured. Flowatch ships no backend container (frontend deploys to GitHub Pages), so the standard "scan our published image" pattern doesn't apply. [`.trivyignore`](../.trivyignore) exists for forward compatibility but no scanner consumes it yet.
+- **Trivy** — not configured. Flowatch's **app** is published as a multi-arch Docker image to `ghcr.io/syalioune/flowatch` and `docker.io/syalioune/flowatch` (with SBOM + SLSA provenance attestations from CI), so the standard "scan our published image" pattern *would* apply but isn't wired yet. The **project-presentation page** is what ships to GitHub Pages (see [GitHub Pages](#github-pages) below). Trivy on the Docker image lands in a later milestone if the cost justifies the CI minutes. [`.trivyignore`](../.trivyignore) exists for forward compatibility but no scanner consumes it yet.
+
+## GitHub Pages
+Flowatch publishes a **project-presentation page** at `https://syalioune.github.io/flowatch/` from the [`landing/`](../landing/) source. This is **not** a live app demo — it's a one-page pitch for prospective users (PRD FR-F12), deployed on every push to **`develop`** that touches `landing/**` or `branding/**` (PRD FR-F13). The deploy branch is `develop` (not `main`) because `develop` is the long-lived default branch where work lands first; `main` only receives release-only merges, which would mean the Pages site updates only at GA tags.
+
+- **Source:** [`landing/index.html`](../landing/index.html) + [`landing/style.css`](../landing/style.css)
+- **Workflow:** [`.github/workflows/pages.yml`](../.github/workflows/pages.yml)
+- **PR-time gate:** `landing-check` job (asserts zero external `https://` asset references per NFR-9). Path-filtered to `landing/**` — intentionally **NOT** in [`required_checks.json`](../.github/protection/required_checks.json) (making a path-filtered job required would block PRs that don't touch `landing/`).
+
+### First-time setup (one-time UI step)
+Repo → Settings → Pages → **Source: GitHub Actions** → Save.
+
+### Local preview
+```bash
+make landing-preview    # stages _site/ from landing/ + branding/ then serves http://localhost:4173
+make landing-check      # NFR-9 enforcement — same regex the CI gate runs
+```
+
+### Constraints (binding per FR-F12 + NFR-9 + NFR-26 + NFR-28)
+- No CDN-loaded fonts, scripts, or stylesheets. IBM Plex woff2 served from [`branding/fonts/`](../branding/fonts/), copied into `_site/fonts/` at stage time.
+- All actions in [`pages.yml`](../.github/workflows/pages.yml) are SHA-pinned with `# vX.Y.Z` version comments. Dependabot's `github-actions` ecosystem (see [`dependabot.yml`](../.github/dependabot.yml)) bumps them on the weekly schedule.
+- Apache 2.0 SPDX header on every source file (`landing/index.html`, `landing/style.css`).

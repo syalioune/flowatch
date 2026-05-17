@@ -1,0 +1,707 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* ============================================================================
+ * Flowatch project-presentation page (landing/style.css)
+ *
+ * Lifted from src/styles.css editorial-light-regular per PRD FR-F12.
+ * Self-contained: no @import, no CDN, no analytics. NFR-9 compliant.
+ *
+ * Source of truth for visual tokens: src/styles.css :root +
+ * html[data-look="editorial"][data-theme="light"] + html[data-density="regular"]
+ *
+ * Keep in sync by hand when the editorial-light-regular tokens move; this is
+ * intentional (no build coupling between the app and this single page).
+ * ============================================================================ */
+
+/* ── Self-hosted IBM Plex (Latin subset, weights 400/500/600, no italic) ─── */
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/ibm-plex-sans-400.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./fonts/ibm-plex-sans-500.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./fonts/ibm-plex-sans-600.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/ibm-plex-mono-400.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./fonts/ibm-plex-mono-500.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Serif";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/ibm-plex-serif-400.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Serif";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./fonts/ibm-plex-serif-500.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ── Editorial-light tokens (mirror of src/styles.css) ─────────────────── */
+
+:root {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-serif: "IBM Plex Serif", "Iowan Old Style", Georgia, serif;
+
+  --r-xs: 3px;
+  --r-sm: 5px;
+  --r-md: 8px;
+  --r-lg: 12px;
+
+  /* editorial-light */
+  --bg: oklch(98.2% 0.005 80);
+  --bg-elev: oklch(99.5% 0.003 80);
+  --bg-sunken: oklch(96% 0.008 80);
+  --bg-hover: oklch(94% 0.01 80);
+  --line: oklch(89% 0.008 80);
+  --line-strong: oklch(80% 0.012 80);
+  --fg: oklch(22% 0.01 60);
+  --fg-soft: oklch(45% 0.015 60);
+  --fg-mute: oklch(62% 0.012 60);
+  --accent: oklch(52% 0.16 32);
+  --accent-soft: oklch(94% 0.04 32);
+  --accent-fg: #fff;
+  --ok: oklch(54% 0.13 145);
+  --warn: oklch(62% 0.15 70);
+  --bad: oklch(55% 0.18 27);
+
+  --font-display: var(--font-serif);
+  --font-body: var(--font-sans);
+  --tracking-display: -0.01em;
+  --display-weight: 500;
+
+  /* density: regular */
+  --gap: 12px;
+  --pad: 14px;
+  --fs: 13.5px;
+
+  /* shadow tokens (subtle — no decorative drama) */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* Respect a system dark-mode preference without offering a runtime toggle —
+   this single page mirrors src/styles.css editorial-dark tokens.
+   The app itself has a richer 3-look × 2-theme system; here we keep it simple. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: oklch(18% 0.005 80);
+    --bg-elev: oklch(21% 0.006 80);
+    --bg-sunken: oklch(15% 0.005 80);
+    --bg-hover: oklch(25% 0.008 80);
+    --line: oklch(28% 0.008 80);
+    --line-strong: oklch(38% 0.012 80);
+    --fg: oklch(95% 0.005 80);
+    --fg-soft: oklch(75% 0.012 60);
+    --fg-mute: oklch(58% 0.012 60);
+    --accent: oklch(72% 0.16 32);
+    --accent-soft: oklch(28% 0.06 32);
+    --accent-fg: oklch(18% 0.02 30);
+  }
+}
+
+/* ── Base ──────────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--fs);
+  line-height: 1.55;
+  color: var(--fg);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "ss01", "ss02", "cv02";
+}
+
+a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+a:hover {
+  text-decoration-thickness: 2px;
+}
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  letter-spacing: var(--tracking-display);
+  color: var(--fg);
+  margin: 0 0 var(--gap);
+  font-weight: var(--display-weight);
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.94em;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+/* ── Skip link (a11y) ──────────────────────────────────────────────────── */
+
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 8px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  text-decoration: none;
+  z-index: 1000;
+}
+.skip-link:focus {
+  top: 8px;
+}
+
+/* ── Pre-alpha banner (above the fold) ─────────────────────────────────── */
+
+.pre-alpha-banner {
+  background: var(--accent-soft);
+  color: var(--fg);
+  border-bottom: 1px solid var(--line);
+  padding: 8px 24px;
+  text-align: center;
+  font-size: 0.92em;
+}
+.pre-alpha-banner strong {
+  color: var(--accent);
+  margin-right: 4px;
+}
+.pre-alpha-banner a {
+  color: var(--accent);
+  margin-left: 4px;
+  font-weight: 500;
+}
+
+/* ── Topbar ────────────────────────────────────────────────────────────── */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 32px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-elev);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+.brand:hover {
+  text-decoration: none;
+}
+.brand:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+.lockup {
+  color: var(--fg);
+  display: block;
+}
+
+.topnav {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+.topnav a {
+  color: var(--fg-soft);
+  text-decoration: none;
+  font-size: 0.95em;
+  font-weight: 500;
+  padding: 4px 2px;
+  border-bottom: 1px solid transparent;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease;
+}
+.topnav a:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ── Main layout ───────────────────────────────────────────────────────── */
+
+main {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+section {
+  padding: 56px 0;
+  border-bottom: 1px solid var(--line);
+}
+section:last-of-type {
+  border-bottom: none;
+}
+
+section h2 {
+  font-size: 1.65em;
+  margin-bottom: 20px;
+  letter-spacing: var(--tracking-display);
+}
+
+section h3 {
+  font-size: 1.1em;
+  font-weight: 600;
+  font-family: var(--font-body);
+  letter-spacing: 0;
+  margin: 0 0 6px;
+}
+
+section p {
+  color: var(--fg-soft);
+  max-width: 68ch;
+  margin: 0 0 var(--gap);
+}
+
+/* ── Hero ──────────────────────────────────────────────────────────────── */
+
+.hero {
+  padding-top: 72px;
+  padding-bottom: 72px;
+  border-bottom: 1px solid var(--line);
+}
+.hero .kicker {
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  margin: 0 0 16px;
+}
+.hero h1 {
+  font-size: 2.4em;
+  line-height: 1.2;
+  margin: 0 0 20px;
+  max-width: 22ch;
+}
+.hero .lede {
+  font-size: 1.06em;
+  color: var(--fg-soft);
+  max-width: 62ch;
+  margin: 0 0 28px;
+}
+
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 24px;
+}
+.cta-pull {
+  background: var(--fg);
+  color: var(--bg);
+  padding: 12px 16px;
+  border-radius: var(--r-md);
+  margin: 0;
+  overflow-x: auto;
+  font-size: 0.95em;
+}
+.cta-pull code {
+  color: inherit;
+  background: none;
+  padding: 0;
+}
+.cta-secondary {
+  display: inline-block;
+  padding: 12px 20px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  color: var(--fg);
+  text-decoration: none;
+  font-weight: 500;
+  background: var(--bg-elev);
+}
+.cta-secondary:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.hero-badges {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: 24px 0 0;
+  padding: 0;
+  color: var(--fg-soft);
+  font-size: 0.92em;
+}
+.hero-badges li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fg-mute);
+}
+.dot-ok {
+  background: var(--ok);
+}
+
+/* ── Why ───────────────────────────────────────────────────────────────── */
+
+.why .why-claim {
+  border-left: 3px solid var(--accent);
+  padding-left: 16px;
+  color: var(--fg);
+  font-size: 1.04em;
+  max-width: 64ch;
+}
+
+/* ── Tiles ─────────────────────────────────────────────────────────────── */
+
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 16px 0 12px;
+}
+.tile {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 20px;
+}
+.tile h3 {
+  font-family: var(--font-display);
+  letter-spacing: var(--tracking-display);
+  font-weight: var(--display-weight);
+  font-size: 1.05em;
+  margin: 0 0 8px;
+  color: var(--accent);
+}
+.tile p {
+  margin: 0;
+  color: var(--fg-soft);
+  font-size: 0.94em;
+  line-height: 1.5;
+}
+.tiles-footnote {
+  font-size: 0.9em;
+  color: var(--fg-mute);
+  margin-top: 12px;
+}
+
+/* ── Differentiators ───────────────────────────────────────────────────── */
+
+.diff-list {
+  list-style: none;
+  counter-reset: diff;
+  padding: 0;
+  margin: 0;
+}
+.diff-list li {
+  counter-increment: diff;
+  position: relative;
+  padding: 16px 0 16px 56px;
+  border-top: 1px solid var(--line);
+}
+.diff-list li:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+.diff-list li::before {
+  content: counter(diff, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: 16px;
+  font-family: var(--font-mono);
+  font-size: 1.5em;
+  color: var(--accent);
+  font-weight: 500;
+}
+.diff-list li:first-child::before {
+  top: 0;
+}
+
+.look-pill {
+  display: inline-block;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 500;
+  padding: 1px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-xs);
+  background: var(--bg-elev);
+  color: var(--fg);
+}
+.look-pill.look-terminal {
+  font-family: var(--font-mono);
+  font-style: normal;
+}
+.look-pill.look-industrial {
+  font-family: var(--font-sans);
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.85em;
+  padding-top: 3px;
+}
+
+/* ── Get started (code blocks) ─────────────────────────────────────────── */
+
+.code-block {
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-md);
+  padding: 16px 20px;
+  margin: 12px 0 16px;
+  overflow-x: auto;
+  font-size: 0.92em;
+  line-height: 1.6;
+  color: var(--fg);
+}
+.code-block code {
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+.footnote {
+  font-size: 0.9em;
+  color: var(--fg-mute);
+}
+
+/* ── Promises ──────────────────────────────────────────────────────────── */
+
+.promise-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 24px;
+}
+.promise-list li {
+  padding-left: 20px;
+  position: relative;
+  color: var(--fg-soft);
+}
+.promise-list li::before {
+  content: "✓";
+  color: var(--ok);
+  font-weight: 600;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.promise-list strong {
+  color: var(--fg);
+}
+
+/* ── Status ────────────────────────────────────────────────────────────── */
+
+.status-links {
+  font-size: 0.95em;
+  color: var(--fg-soft);
+  margin-top: 16px;
+}
+.status-links span {
+  color: var(--fg-mute);
+  margin: 0 6px;
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────── */
+
+.site-footer {
+  margin-top: 0;
+  padding: 48px 32px 32px;
+  background: var(--bg-sunken);
+  border-top: 1px solid var(--line);
+  color: var(--fg-soft);
+  font-size: 0.92em;
+}
+.footer-cols {
+  max-width: 880px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 32px;
+}
+.footer-brand {
+  margin: 0 0 12px;
+}
+.lockup-sm {
+  color: var(--fg);
+  display: block;
+}
+.footer-disclaimer {
+  margin: 0;
+  font-size: 0.92em;
+  color: var(--fg-mute);
+  line-height: 1.5;
+}
+.footer-col h4 {
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-mute);
+  margin: 0 0 12px;
+  font-family: var(--font-body);
+  font-weight: 600;
+}
+.footer-col ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.footer-col li {
+  margin-bottom: 6px;
+}
+.footer-col a {
+  color: var(--fg-soft);
+  text-decoration: none;
+}
+.footer-col a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.footer-meta {
+  max-width: 880px;
+  margin: 28px auto 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 0.85em;
+  color: var(--fg-mute);
+  text-align: center;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  .topbar {
+    padding: 14px 20px;
+  }
+  .topnav {
+    display: none;
+  } /* keep it simple — anchors still work via in-page nav */
+  main {
+    padding: 0 20px;
+  }
+  .hero {
+    padding-top: 40px;
+    padding-bottom: 40px;
+  }
+  .hero h1 {
+    font-size: 1.85em;
+  }
+  .hero .lede {
+    font-size: 1em;
+  }
+  .tile-grid {
+    grid-template-columns: 1fr;
+  }
+  .promise-list {
+    grid-template-columns: 1fr;
+  }
+  .footer-cols {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .site-footer {
+    padding: 32px 20px 24px;
+  }
+  section {
+    padding: 40px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: prefers-reduced-motion must override per-element transitions; standard a11y pattern */
+    transition: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: prefers-reduced-motion must override per-element animations; standard a11y pattern */
+    animation: none !important;
+  }
+}

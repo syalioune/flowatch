@@ -105,7 +105,36 @@ release-preview-full: ## Preview the next release (full, parses every commit)
 release-dryrun:       ## Dry-run semantic-release end-to-end against the current branch
 	@npx semantic-release --dry-run --no-ci 2>&1 | tee /tmp/semantic-release-dryrun.log
 
+# --- Landing page (GitHub Pages project presentation, PRD FR-F12 / F13) ---
+# Source: landing/ (hand-authored HTML + CSS, no SSG).
+# Branding assets stay canonical in branding/ — copied into _site/ at stage time.
+LANDING_STAGE := _site
+
+.PHONY: landing-stage landing-preview landing-check
+landing-stage: ## Assemble _site/ from landing/ + branding/ (idempotent)
+	@rm -rf $(LANDING_STAGE)
+	@mkdir -p $(LANDING_STAGE)/fonts
+	@cp landing/index.html landing/style.css landing/.nojekyll $(LANDING_STAGE)/
+	@cp branding/flowatch-lockup.svg $(LANDING_STAGE)/
+	@cp branding/flowatch-favicon.svg $(LANDING_STAGE)/favicon.svg
+	@cp branding/fonts/ibm-plex-sans-400.woff2 branding/fonts/ibm-plex-sans-500.woff2 branding/fonts/ibm-plex-sans-600.woff2 $(LANDING_STAGE)/fonts/
+	@cp branding/fonts/ibm-plex-mono-400.woff2 branding/fonts/ibm-plex-mono-500.woff2 $(LANDING_STAGE)/fonts/
+	@cp branding/fonts/ibm-plex-serif-400.woff2 branding/fonts/ibm-plex-serif-500.woff2 $(LANDING_STAGE)/fonts/
+	@echo "Staged → $(LANDING_STAGE)/"
+landing-preview: landing-stage ## Serve the staged landing site on http://localhost:4173
+	@echo "Serving $(LANDING_STAGE)/ at http://localhost:4173  (Ctrl+C to stop)"
+	@cd $(LANDING_STAGE) && python3 -m http.server 4173 --bind 127.0.0.1
+landing-check: ## NFR-9 enforcement — fail on any external https:// asset reference
+	@# Asset-loading tags: scripts, images, iframes, media — never allowed remote
+	@if grep -nE '<(script|img|iframe|video|audio|source)[^>]*src="https?://' landing/index.html landing/style.css 2>/dev/null; then echo "FAIL: external asset src found in landing/"; exit 1; fi
+	@# Asset-loading <link rel="..."> — flag stylesheet, preload, prefetch, modulepreload, icon, manifest, dns-prefetch, preconnect.
+	@# Navigation/metadata rels (canonical, alternate, author) are allowed to be absolute URLs.
+	@if grep -nE '<link[^>]*rel="(stylesheet|preload|prefetch|modulepreload|dns-prefetch|preconnect|subresource|icon|shortcut[[:space:]]+icon|apple-touch-icon|manifest)"[^>]*href="https?://' landing/index.html 2>/dev/null; then echo "FAIL: external asset-loading <link> found in landing/index.html"; exit 1; fi
+	@if grep -nE '@import[[:space:]]+"?https?://' landing/style.css 2>/dev/null; then echo "FAIL: external @import found in landing/style.css"; exit 1; fi
+	@if grep -nE 'src:[[:space:]]*url\([[:space:]]*"?https?://' landing/style.css 2>/dev/null; then echo "FAIL: external @font-face url() in landing/style.css"; exit 1; fi
+	@echo "landing/: no external asset references ✓"
+
 # --- Misc ------------------------------------------------------------------
 .PHONY: clean
 clean: ## Remove node_modules and build output
-	rm -rf node_modules dist
+	rm -rf node_modules dist $(LANDING_STAGE)

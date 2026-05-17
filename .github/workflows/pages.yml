@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Flowatch GitHub Pages project-presentation site (PRD FR-F12 / FR-F13).
+#
+# Source: landing/ (hand-authored HTML + CSS, no SSG).
+# Branding assets canonical in branding/ — assembled into _site/ at stage time.
+#
+# Two jobs:
+#   - landing-check (PRs to develop, path-filtered): NFR-9 enforcement; fails on
+#     any external https:// asset reference. NOT in protection/required_checks.json
+#     because it is path-filtered — making it required would block PRs that
+#     don't touch landing/.
+#   - pages-deploy (push to develop, path-filtered): builds _site/ via `make
+#     landing-stage` and ships to GitHub Pages using SHA-pinned official Pages
+#     actions (NFR-26). Post-merge deploy, not a merge gate.
+#
+# Develop (not main) is the deploy source because develop is the long-lived
+# default branch where work lands first (release/* → main produces stable
+# tags only). Deploying from main would mean the Pages site updates only at
+# GA tags — far too rarely for a presentation page that should track current
+# project state.
+#
+# One-time UI step: Repo → Settings → Pages → Source: "GitHub Actions"
+# (documented in docs/repo-settings.md "GitHub Pages" subsection).
+
+name: Pages
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - 'landing/**'
+      - 'branding/**'
+      - '.github/workflows/pages.yml'
+      - 'Makefile'
+  pull_request:
+    branches: [develop]
+    paths:
+      - 'landing/**'
+      - '.github/workflows/pages.yml'
+      - 'Makefile'
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+
+  landing-check:
+    name: landing-check (NFR-9 — no external asset refs)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: NFR-9 — assert no external https:// asset references in landing/
+        run: make landing-check
+
+  pages-deploy:
+    name: pages-deploy
+    runs-on: ubuntu-latest
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/develop') || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: NFR-9 — re-check no external asset refs before publishing
+        run: make landing-check
+
+      - name: Stage _site/ from landing/ + branding/
+        run: make landing-stage
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Upload _site/ as Pages artefact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
