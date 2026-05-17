@@ -653,7 +653,18 @@ const releaseNotesConfig = {
 
 export default {
   branches: [
-    "main",
+    // `main` is intentionally absent from this list until the first
+    // stable release is cut. semantic-release validates literal branch
+    // names against the remote at startup and errors with
+    // ERELEASEBRANCHES if any literal is missing; the `main` branch
+    // doesn't exist yet because the 0.0.1 milestone is still polishing
+    // on develop (Dependabot rounds, Node/npm upgrades, etc.). Re-add
+    // `"main",` as the first entry the moment `main` is created on the
+    // remote — single-line edit, no other config change required.
+    //
+    // Effect today: semantic-release runs only on develop (beta lane) and
+    // on any release/* branch (rc lane). No stable tag can be cut from
+    // this config — that's deliberate until the 0.0.1 cut is decided.
 
     // `develop` is the long-lived integration branch (DEVELOPERS.md §3).
     // Every merge here produces a `vX.Y.Z-beta.N` pre-release on npm /
