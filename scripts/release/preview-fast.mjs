@@ -17,7 +17,7 @@
 // pipes the result to stdout. Identical output to
 // `npm run release:preview` for the same range.
 
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { generateNotes } from "@semantic-release/release-notes-generator";
@@ -72,9 +72,15 @@ if (!rng) {
 }
 
 const fmt = "%H%x1e%h%x1e%s%x1e%b%x1f";
-const raw = execSync(`git -C "${repoRoot}" log --no-merges --pretty=format:${fmt} ${range}`, {
-  encoding: "utf8",
-});
+// execFileSync (no shell) — CodeQL js/indirect-command-line-injection
+// sink no longer applies; `repoRoot` (from cwd resolution) and `range`
+// (from --range CLI flag) are passed as literal argv elements rather
+// than shell-interpolated. git itself parses the revision-range syntax.
+const raw = execFileSync(
+  "git",
+  ["-C", repoRoot, "log", "--no-merges", `--pretty=format:${fmt}`, range],
+  { encoding: "utf8" },
+);
 const commits = raw
   .split("\x1f")
   .map((r) => r.trim())

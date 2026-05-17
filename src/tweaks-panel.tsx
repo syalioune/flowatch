@@ -172,6 +172,10 @@ export function TweaksPanel({
   React.useEffect(() => {
     if (!hasDeckStage || railEnabled) return undefined;
     const onMsg = (e: MessageEvent) => {
+      // Same-origin only: this channel carries dev-tool signals from the
+      // host page (deck-stage), never from a foreign frame. CodeQL
+      // js/missing-origin-check enforced.
+      if (e.origin !== window.location.origin) return;
       if (e.data && (e.data as { type?: string }).type === "__omelette_rail_enabled")
         setRailEnabled(true);
     };
@@ -221,6 +225,10 @@ export function TweaksPanel({
 
   React.useEffect(() => {
     const onMsg = (e: MessageEvent) => {
+      // Same-origin only: the activate/deactivate signals come from
+      // app.tsx (this window) or from a same-origin parent frame.
+      // CodeQL js/missing-origin-check enforced.
+      if (e.origin !== window.location.origin) return;
       const t = (e?.data as { type?: string } | undefined)?.type;
       if (t === "__activate_edit_mode") setOpen(true);
       else if (t === "__deactivate_edit_mode") setOpen(false);

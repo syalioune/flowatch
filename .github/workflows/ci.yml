@@ -138,8 +138,23 @@ jobs:
       - name: Install Playwright Chromium (for vitest browser tier)
         run: npx playwright install --with-deps chromium
 
-      - name: Vitest (unit + browser tiers)
-        run: npm run test:all -- --reporter=default --reporter=junit --outputFile.junit=./test-results/junit.xml
+      - name: Vitest (unit + browser tiers, with coverage)
+        # `test:all` runs the unit + browser projects via the vitest
+        # workspace; `--coverage` enables the v8 collector with the
+        # curated include set + 60% lines/branches per-file threshold
+        # configured in vitest.config.ts. A threshold violation makes
+        # vitest exit non-zero, which fails this step (and the job),
+        # which fails the required `unit` check on branch protection.
+        run: npm run test:all -- --coverage --reporter=default --reporter=junit --outputFile.junit=./test-results/junit.xml
+
+      - name: Upload coverage report
+        if: always() && hashFiles('coverage/lcov.info') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-${{ github.run_id }}
+          path: coverage/
+          retention-days: 14
+          if-no-files-found: warn
 
       - name: Upload JUnit report on failure
         if: failure()

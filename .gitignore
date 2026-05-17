@@ -20,6 +20,14 @@ test-results/
 # only exist when contributors reproduce the scan locally.
 .codeql-db/
 codeql.sarif
+# Transient stash dir used by `make codeql` to keep coverage/lcov-report
+# noise out of the local SARIF — should never be committed.
+.coverage-stash-for-codeql/
+# Stryker mutation testing (Makefile: mutate / mutate-clean). CI runs in
+# .github/workflows/mutate.yml upload reports/mutation/ as an artifact;
+# local runs write the same paths and should never be committed.
+.stryker-tmp/
+reports/mutation/
 .env
 .env.local
 .DS_Store
