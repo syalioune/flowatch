@@ -1,0 +1,242 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!DOCTYPE html>
+<html lang="en" data-look="editorial" data-theme="light" data-density="regular">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Flowatch — the OSS GUI for Flowable 7+</title>
+  <meta name="description" content="A complete browser GUI for Flowable 7+ OSS: model BPMN and DMN, deploy them, watch instances, work tasks, inspect jobs and history. Apache 2.0, self-hosted, no telemetry, no SaaS lock-in." />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#9c4221" />
+
+  <meta property="og:title" content="Flowatch — the OSS GUI for Flowable 7+" />
+  <meta property="og:description" content="The community-built browser GUI for Flowable 7+ OSS. Apache 2.0. Self-hosted. No telemetry." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://syalioune.github.io/flowatch/" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+  <link rel="canonical" href="https://syalioune.github.io/flowatch/" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="pre-alpha-banner" role="status" aria-live="polite">
+    <strong>Pre-alpha</strong> — Flowatch development is ongoing.
+    No compatibility guarantees between pre-1.0 releases.
+    <a href="https://github.com/syalioune/flowatch/releases">Latest release ›</a>
+  </div>
+
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="Flowatch home">
+      <img class="lockup" src="./flowatch-lockup.svg" alt="" width="210" height="42" />
+    </a>
+    <nav class="topnav" aria-label="Primary">
+      <a href="#what-you-get">What you get</a>
+      <a href="#different">What makes it different</a>
+      <a href="#get-started">Get started</a>
+      <a href="https://github.com/syalioune/flowatch">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="main">
+
+    <!-- 1. HERO -->
+    <section class="hero" aria-labelledby="hero-title">
+      <p class="kicker">Open-source GUI for Flowable 7+</p>
+      <h1 id="hero-title">Model. Deploy. Operate.<br/>The browser GUI for Flowable 7+ OSS.</h1>
+      <p class="lede">
+        Flowatch is a single-page React GUI for <a href="https://www.flowable.com/open-source/">Flowable</a>,
+        the open-source BPMN/DMN process engine. It embeds the official bpmn-js and dmn-js modelers,
+        ships every Flowable REST call through a built-in API Inspector, and talks only to the live engine.
+        Apache 2.0. Self-hosted. No telemetry.
+      </p>
+
+      <div class="cta-row">
+        <pre class="cta-pull" aria-label="Docker pull command"><code>docker pull ghcr.io/syalioune/flowatch:latest</code></pre>
+        <a class="cta-secondary" href="https://github.com/syalioune/flowatch">View on GitHub</a>
+      </div>
+
+      <ul class="hero-badges" aria-label="Project facts">
+        <li><span class="dot dot-ok"></span> Apache 2.0</li>
+        <li><span class="dot dot-ok"></span> Tested vs Flowable 7.2.0</li>
+        <li><span class="dot dot-ok"></span> No telemetry, ever</li>
+        <li><span class="dot dot-ok"></span> Self-hosted Docker image</li>
+      </ul>
+    </section>
+
+    <!-- 2. WHY FLOWATCH EXISTS -->
+    <section class="why" aria-labelledby="why-title">
+      <h2 id="why-title">Why Flowatch exists</h2>
+      <p>
+        Flowatch gives Flowable 7+ OSS users a complete browser GUI: model BPMN and DMN,
+        deploy them, watch instances, work tasks, inspect jobs and history, and manage
+        identity &mdash; all without writing a single curl command.
+      </p>
+      <p>
+        The need is real. Flowable's 7.x OSS distribution ships the engine and REST API;
+        the web UI sits in the enterprise tier. Public-sector teams, SMEs, and air-gapped
+        self-hosters need an OSS browser front-end &mdash; and the 2026 OSS landscape has
+        none actively maintained. Most community alternatives are modeler-only POCs.
+      </p>
+      <p class="why-claim">
+        <strong>Flowatch fills that gap.</strong> The benchmark is the legacy 6.x OSS UI:
+        if a 6.x-OSS operator used to do it, Flowatch should do it.
+      </p>
+    </section>
+
+    <!-- 3. WHAT YOU GET -->
+    <section class="tiles" id="what-you-get" aria-labelledby="tiles-title">
+      <h2 id="tiles-title">What you get</h2>
+      <div class="tile-grid">
+        <article class="tile">
+          <h3>Modeler</h3>
+          <p>Embedded <a href="https://bpmn.io/toolkit/bpmn-js/">bpmn-js</a> and <a href="https://bpmn.io/toolkit/dmn-js/">dmn-js</a>.
+             Load deployed XML, edit, deploy back to the engine via multipart upload.</p>
+        </article>
+        <article class="tile">
+          <h3>Admin</h3>
+          <p>Deployments. Process definitions (suspend/activate/view XML). Process instances
+             (start/cancel/variables). Jobs &mdash; executable, timer, dead-letter. History.</p>
+        </article>
+        <article class="tile">
+          <h3>Identity &amp; Tenants</h3>
+          <p>Users, groups, add-to-group. Multi-tenant cycle in the chrome.
+             Tenants list synthesised from deployments (since <code>/identity/tenants</code>
+             isn't exposed in flowable-rest 7.2).</p>
+        </article>
+      </div>
+      <p class="tiles-footnote">
+        Not an exhaustive feature list &mdash; the goal is parity with the legacy 6.x OSS UI, ten screens at v1.
+      </p>
+    </section>
+
+    <!-- 4. WHAT MAKES IT DIFFERENT -->
+    <section class="different" id="different" aria-labelledby="different-title">
+      <h2 id="different-title">What makes it different</h2>
+      <ol class="diff-list">
+        <li>
+          <h3>API Inspector</h3>
+          <p>
+            Every Flowable REST call your session makes is visible in a side drawer: method,
+            path, status, response time, body. Copy any call as a curl command. Operator-grade
+            transparency, built in by default.
+          </p>
+        </li>
+        <li>
+          <h3>Three-look design system</h3>
+          <p>
+            <span class="look-pill">editorial</span> &middot;
+            <span class="look-pill look-terminal">terminal</span> &middot;
+            <span class="look-pill look-industrial">industrial</span>
+            &times; light/dark &times; compact/regular/comfy.
+            Unique across every direct and adjacent competitor. The operator picks once, the whole app respects it.
+          </p>
+        </li>
+        <li>
+          <h3>Flowable-aware</h3>
+          <p>
+            DMN sub-app URL prefix, missing <code>/identity/tenants</code>, multipart-only deployments,
+            multi-tenant derivation from deployments &mdash; all the 7.x REST quirks are baked in
+            so you don't trip over them.
+          </p>
+        </li>
+      </ol>
+    </section>
+
+    <!-- 5. GET STARTED -->
+    <section class="get-started" id="get-started" aria-labelledby="get-started-title">
+      <h2 id="get-started-title">Get started</h2>
+
+      <p>Run the published image against any reachable Flowable backend &mdash; configure the URL in Settings after the SPA loads:</p>
+      <pre class="code-block"><code># GitHub Container Registry (no auth needed for public pulls)
+docker run --rm -p 8081:8080 ghcr.io/syalioune/flowatch:latest
+
+# Open http://localhost:8081
+# In Settings, set baseUrl to your Flowable instance</code></pre>
+
+      <p>Don't have a Flowable engine handy? Boot the whole local stack &mdash; Postgres + flowable-rest 7.2.0 + nginx + Vite &mdash; in one command:</p>
+      <pre class="code-block"><code>git clone https://github.com/syalioune/flowatch.git
+cd flowatch
+make stack       # boot-to-Dashboard in under 2 minutes</code></pre>
+
+      <p class="footnote">
+        Default credentials in the local stack: <code>rest-admin</code> / <code>test</code> &mdash;
+        change them in Settings (the gear icon). The image runs as non-root (uid 101) on
+        unprivileged port 8080 and drops cleanly into Kubernetes restricted-baseline policies.
+      </p>
+    </section>
+
+    <!-- 6. OSS PROMISES -->
+    <section class="promises" aria-labelledby="promises-title">
+      <h2 id="promises-title">What we promise</h2>
+      <ul class="promise-list">
+        <li><strong>Apache 2.0.</strong> Matching upstream Flowable, bpmn-js, dmn-js. No source-available trickery.</li>
+        <li><strong>No telemetry.</strong> No analytics, no phone-home, no CDN-loaded fonts or scripts. Air-gapped deployments work.</li>
+        <li><strong>No SaaS lock-in.</strong> Distribution is a Docker image. There is no hosted Flowatch. There never will be.</li>
+        <li><strong>No enterprise-only gating.</strong> Every feature works against Flowable OSS. We don't call enterprise endpoints.</li>
+      </ul>
+    </section>
+
+    <!-- 7. PROJECT STATUS -->
+    <section class="status" aria-labelledby="status-title">
+      <h2 id="status-title">Project status</h2>
+      <p>
+        <strong>Pre-alpha.</strong> Flowatch runs against <code>flowable-rest:7.2.0</code> end-to-end
+        today, and is being put on a defensible engineering footing &mdash; TypeScript strict,
+        Vitest + Playwright against a live Dockerized engine, Biome lint+format, TanStack Router,
+        GitHub Actions CI &mdash; before adding net-new capabilities. Treat current implementation
+        choices as starting points, not as permanent decisions.
+      </p>
+      <p>
+        Built openly with AI as a first-class collaborator: every commit is human-reviewed and the
+        maintainer carries the DCO sign-off. The roadmap, architecture, and per-story specs live in
+        a private companion repo; the implementation, docs, and this site are all here on GitHub.
+      </p>
+      <p class="status-links">
+        <a href="https://github.com/syalioune/flowatch/blob/develop/docs/compat.md">Compatibility matrix</a>
+        <span aria-hidden="true">·</span>
+        <a href="https://github.com/syalioune/flowatch/releases">Latest release</a>
+        <span aria-hidden="true">·</span>
+        <a href="https://github.com/syalioune/flowatch/issues">Issue tracker</a>
+      </p>
+    </section>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="footer-cols">
+      <div class="footer-col">
+        <p class="footer-brand">
+          <img class="lockup-sm" src="./flowatch-lockup.svg" alt="" width="120" height="24" />
+        </p>
+        <p class="footer-disclaimer">
+          A community open-source GUI for Flowable.
+          <br/>Not affiliated with Flowable.com Ltd.
+        </p>
+      </div>
+      <div class="footer-col">
+        <h4>Project</h4>
+        <ul>
+          <li><a href="https://github.com/syalioune/flowatch">GitHub repository</a></li>
+          <li><a href="https://github.com/syalioune/flowatch/blob/develop/docs/index.md">Documentation</a></li>
+          <li><a href="https://github.com/syalioune/flowatch/blob/develop/LICENSE">Apache 2.0 License</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Engine</h4>
+        <ul>
+          <li><a href="https://www.flowable.com/open-source">Flowable OSS</a></li>
+          <li><a href="https://bpmn.io/toolkit/bpmn-js/">bpmn-js modeler</a></li>
+          <li><a href="https://bpmn.io/toolkit/dmn-js/">dmn-js modeler</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="footer-meta">
+      Built with respect for your bandwidth: no analytics, no fonts from a CDN, no chat widget.
+    </p>
+  </footer>
+
+</body>
+</html>
