@@ -46,7 +46,12 @@ export default defineConfig({
       // stdout/HTML report artifacts on CI.
       url: "http://localhost:8080/flowable-rest/service/management/engine",
       timeout: 180_000,
-      reuseExistingServer: !isCI,
+      // Always reuse when the URL already responds. The CI workflow pre-
+      // starts the stack (ci.yml `Start Docker stack` step) so by the time
+      // Playwright runs, the URL is up — `false` here would make Playwright
+      // refuse with "URL is already used". Local dev with the stack already
+      // running benefits too; cold local runs still trigger the spawn.
+      reuseExistingServer: true,
       stdout: "pipe",
       stderr: "pipe",
       ...(isCI ? { gracefulShutdown: { signal: "SIGTERM" as const, timeout: 30_000 } } : {}),
@@ -55,7 +60,10 @@ export default defineConfig({
       command: "npm run dev",
       url: "http://localhost:5173",
       timeout: 60_000,
-      reuseExistingServer: !isCI,
+      // Same rationale as the docker entry above — if Vite is already
+      // running (CI prior step or local dev session), attach instead of
+      // erroring on a busy port.
+      reuseExistingServer: true,
       stdout: "pipe",
       stderr: "pipe",
     },
