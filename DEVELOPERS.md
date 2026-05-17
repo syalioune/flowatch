@@ -265,6 +265,7 @@ The TanStack Router devtools panel renders bottom-right in dev only (`import.met
 | TypeScript | Type check (strict) | `npx tsc --noEmit` | pre-push, CI |
 | Vitest | Unit tests | `npm test` | pre-push, CI |
 | Playwright | E2E + visual snapshots | `npm run e2e` | CI |
+| CodeQL | SAST (JS/JSX, `security-extended` suite) | `make codeql` | CI on push/PR + weekly cron |
 | Trivy | Container CVE scan (Docker images, if any) | CI job | CI |
 | `check-scope.mjs` | Validate Conventional Commits scopes | `node scripts/release/check-scope.mjs <scope>` | Manual, pre-commit hint |
 

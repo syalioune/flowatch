@@ -432,7 +432,8 @@ const SCOPE_TO_THEME = (() => {
   return map;
 })();
 const FALLBACK_THEME = THEMES.find((t) => t.fallback)?.name ?? "🧰 Other";
-const QUALITY_GATES_CI_RE = /\b(mutation|stryker|pit|pitest|playwright|e2e|axe|coverage|jacoco)\b/i;
+const QUALITY_GATES_CI_RE =
+  /\b(mutation|stryker|pit|pitest|playwright|e2e|axe|coverage|jacoco|codeql|sast|trivy)\b/i;
 
 // Heuristic subject-keyword fallback for scope-less or unmapped
 // commits. Picks the most specific theme that the subject text
@@ -453,7 +454,7 @@ const SUBJECT_HEURISTICS = [
   // Quality Gates.
   {
     theme: "🛡️ Quality Gates",
-    re: /\b(playwright|axe|stryker|pit|pitest|mutation|coverage|jacoco|e2e|spectral)\b/i,
+    re: /\b(playwright|axe|stryker|pit|pitest|mutation|coverage|jacoco|e2e|spectral|codeql|sast|trivy)\b/i,
   },
 ];
 
