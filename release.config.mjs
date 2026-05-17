@@ -653,21 +653,20 @@ const releaseNotesConfig = {
 
 export default {
   branches: [
-    // `main` is intentionally absent from this list until the first
-    // stable release is cut. semantic-release validates literal branch
-    // names against the remote at startup and errors with
-    // ERELEASEBRANCHES if any literal is missing; the `main` branch
-    // doesn't exist yet because the 0.0.1 milestone is still polishing
-    // on develop (Dependabot rounds, Node/npm upgrades, etc.). Re-add
-    // `"main",` as the first entry the moment `main` is created on the
-    // remote — single-line edit, no other config change required.
+    // `main` is the stable-release branch. It was bootstrapped as an
+    // **orphan** branch with a single empty commit and tagged `v0.0.0`,
+    // so it has no shared history with develop. The tag anchors
+    // semantic-release's baseline — without one, semantic-release's
+    // first release would default to v1.0.0 regardless of package.json.
     //
-    // Effect today: semantic-release runs only on develop (beta lane) and
-    // on any release/* branch (rc lane). No stable tag can be cut from
-    // this config — that's deliberate until the 0.0.1 cut is decided.
+    // The first `release/0.0.1 → main` promotion will need
+    // `--allow-unrelated-histories` (one-off, seed-merge only); from
+    // 0.0.2 onwards the histories converge and merges are linear.
+
+    "main",
 
     // `develop` is the long-lived integration branch (DEVELOPERS.md §3).
-    // Every merge here produces a `vX.Y.Z-beta.N` pre-release on npm /
+    // Every merge here produces a `vX.Y.Z-beta.N` pre-release on
     // GitHub Releases. Promote to `main` via a release/* branch when the
     // beta line is ready to cut.
     { name: "develop", prerelease: "beta" },
@@ -687,11 +686,20 @@ export default {
       {
         preset: "conventionalcommits",
         releaseRules: [
+          // Pre-1.0 line: every routine commit type maps to PATCH so
+          // the milestone path stays 0.0.1 → 0.0.2 → 0.0.3 (no
+          // accidental 0.1.0 from a feat-only burst). Each milestone
+          // is a deliberate patch bump via the release/* flow, not a
+          // by-product of commit-type heuristics.
           { type: "feat", release: "patch" },
           { type: "fix", release: "patch" },
           { type: "perf", release: "patch" },
           { type: "refactor", release: "patch" },
-          { breaking: true, release: "minor" },
+          // BREAKING CHANGE maps to MAJOR (not minor) so the planned
+          // 0.0.3 → 1.0.0 GA jump triggers correctly. Mapping breaking
+          // to minor would emit 0.1.0 — a version the milestone plan
+          // explicitly skips.
+          { breaking: true, release: "major" },
         ],
       },
     ],
