@@ -46,7 +46,7 @@
 // `lastRelease..nextRelease` that semantic-release computes from the
 // branch's git log. No commit-message rewriting required.
 
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import conventionalCommitsPreset from "conventional-changelog-conventionalcommits";
 
 // ---------------------------------------------------------------------
@@ -97,8 +97,25 @@ function detectMilestone() {
 function fetchKnownIssues(milestone) {
   if (!milestone) return "";
   try {
-    const out = execSync(
-      `gh issue list --milestone "${milestone}" --label "known-issue" --state open --json number,title,url --limit 50`,
+    // execFileSync (no shell) — CodeQL js/indirect-command-line-injection
+    // sink no longer applies; `milestone` is passed as a literal argv
+    // element, so any shell metacharacters in it become inert.
+    const out = execFileSync(
+      "gh",
+      [
+        "issue",
+        "list",
+        "--milestone",
+        milestone,
+        "--label",
+        "known-issue",
+        "--state",
+        "open",
+        "--json",
+        "number,title,url",
+        "--limit",
+        "50",
+      ],
       { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
     );
     const issues = JSON.parse(out);
@@ -150,8 +167,22 @@ function fetchTally(milestone, previousTag) {
   const out = { closed: null, commits: null, breaking: null };
   if (milestone) {
     try {
-      const json = execSync(
-        `gh issue list --milestone "${milestone}" --state closed --json number --limit 200`,
+      // execFileSync (no shell) — CodeQL js/indirect-command-line-injection
+      // sink no longer applies; `milestone` is a literal argv element.
+      const json = execFileSync(
+        "gh",
+        [
+          "issue",
+          "list",
+          "--milestone",
+          milestone,
+          "--state",
+          "closed",
+          "--json",
+          "number",
+          "--limit",
+          "200",
+        ],
         { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
       );
       out.closed = JSON.parse(json).length;
@@ -161,18 +192,24 @@ function fetchTally(milestone, previousTag) {
   }
   if (previousTag) {
     try {
+      // execFileSync (no shell). `previousTag` is now an argv element
+      // — any shell metacharacters are inert. `${previousTag}..HEAD`
+      // is git's revision-range syntax, parsed by git itself.
       out.commits = parseInt(
-        execSync(`git rev-list --no-merges --count ${previousTag}..HEAD`, {
+        execFileSync("git", ["rev-list", "--no-merges", "--count", `${previousTag}..HEAD`], {
           encoding: "utf8",
         }).trim(),
         10,
       );
-      out.breaking = parseInt(
-        execSync(`git log --no-merges --pretty=%s ${previousTag}..HEAD | grep -cE '!:' || true`, {
-          encoding: "utf8",
-        }).trim(),
-        10,
+      // The previous `git log … | grep -cE '!:' || true` shell pipeline
+      // is reproduced in JS: count subject lines containing the `!:`
+      // breaking-change marker from conventional commits.
+      const log = execFileSync(
+        "git",
+        ["log", "--no-merges", "--pretty=%s", `${previousTag}..HEAD`],
+        { encoding: "utf8" },
       );
+      out.breaking = log ? log.split("\n").filter((l) => l.includes("!:")).length : 0;
     } catch {
       /* ignore */
     }

@@ -1,1 +1,1 @@
-["check", "unit", "e2e", "build"]
+["check", "unit", "e2e", "build", "Analyze (javascript-typescript)"]

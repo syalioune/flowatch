@@ -138,19 +138,34 @@ landing-check: ## NFR-9 enforcement — fail on any external https:// asset refe
 # Uses the `gh codeql` CLI extension so contributors don't need a separate
 # CodeQL CLI install. Same language + suite as CI. Outputs codeql.sarif
 # to the repo root — open it with the "SARIF Viewer" or "CodeQL" VS Code
-# extension. Both the DB dir and the sarif file are gitignored.
+# extension. Both the DB dir and the sarif file are gitignored. We
+# stash `coverage/` (if present from a prior `make test:coverage` run)
+# during the scan so v8's auto-generated lcov-report JS doesn't pollute
+# the local SARIF with false positives in vendored UI code.
 .PHONY: codeql codeql-clean
 codeql:       ## Local CodeQL SAST run (gh codeql; writes codeql.sarif at repo root)
 	@command -v gh >/dev/null 2>&1 || { echo "gh CLI not found — install from https://cli.github.com"; exit 2; }
 	@gh extension list 2>/dev/null | grep -q github/gh-codeql || gh extension install github/gh-codeql
 	@rm -rf .codeql-db codeql.sarif
-	gh codeql database create .codeql-db --language=javascript-typescript --source-root=. --overwrite
-	gh codeql database analyze .codeql-db \
-		codeql/javascript-queries:codeql-suites/javascript-security-extended.qls \
-		--format=sarif-latest --output=codeql.sarif --download
+	@if [ -d coverage ]; then mv coverage .coverage-stash-for-codeql; fi
+	@trap 'if [ -d .coverage-stash-for-codeql ]; then mv .coverage-stash-for-codeql coverage; fi' EXIT; \
+		gh codeql database create .codeql-db --language=javascript-typescript --source-root=. --overwrite && \
+		gh codeql database analyze .codeql-db \
+			codeql/javascript-queries:codeql-suites/javascript-security-extended.qls \
+			--format=sarif-latest --output=codeql.sarif --download
 	@echo "→ codeql.sarif written. Open with the 'SARIF Viewer' or 'CodeQL' VS Code extension."
 codeql-clean: ## Remove local CodeQL DB + sarif output
 	rm -rf .codeql-db codeql.sarif
+
+# --- Stryker (mutation testing, local reproduction of .github/workflows/mutate.yml)
+# Same scope as CI (src/api.ts only — see stryker.config.mjs). Outputs an
+# HTML report to reports/mutation/. Both .stryker-tmp/ and reports/ are
+# gitignored. Advisory only — no threshold gating, no required check.
+.PHONY: mutate mutate-clean
+mutate:       ## Stryker mutation testing on src/api.ts (HTML report → reports/mutation/)
+	npx stryker run
+mutate-clean: ## Remove Stryker temp + report
+	rm -rf .stryker-tmp reports/mutation
 
 # --- Misc ------------------------------------------------------------------
 .PHONY: clean
