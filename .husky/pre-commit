@@ -18,4 +18,33 @@ if [ -f "biome.json" ] || [ -f "biome.jsonc" ]; then
   git add -u
 fi
 
+# --- Regenerate NOTICE if dependencies changed ---
+# When package.json or package-lock.json is staged for commit, the dep set
+# may have shifted (added/removed/upgraded packages). Re-run the NOTICE
+# generator so attribution stays in sync — otherwise CI's
+# `Verify NOTICE freshness` step (.github/workflows/ci.yml `check` job)
+# fails on the next push.
+#
+# `--cached --name-only` returns only the files actually staged for the
+# pending commit (not the whole tree). Grep is exact-match on basenames
+# anchored to either repo-root or any nested package (defensive — the
+# repo only has one but the script handles both).
+if git diff --cached --name-only | grep -qE '(^|/)package(-lock)?\.json$'; then
+  echo "▶ Regenerating NOTICE (dependency change detected)…"
+  if [ -f scripts/release/generate-notice.mjs ]; then
+    node scripts/release/generate-notice.mjs >/dev/null || {
+      echo "✗ NOTICE regeneration failed." >&2
+      exit 1
+    }
+    # Only re-stage NOTICE if the regen produced a diff. Empty `git add`
+    # would no-op anyway; this branch keeps the hook output quiet on the
+    # common case (lockfile churn that doesn't change the dep tree, e.g.
+    # transitive integrity-hash bumps).
+    if ! git diff --quiet -- NOTICE; then
+      git add NOTICE
+      echo "  → NOTICE updated and re-staged."
+    fi
+  fi
+fi
+
 exit 0
