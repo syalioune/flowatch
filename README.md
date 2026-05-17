@@ -15,9 +15,11 @@ A single-page React + Vite GUI for **[Flowable](https://www.flowable.com/open-so
 
 ## Why Flowatch exists
 
-Flowable 6.x shipped a web UI (modeler + admin + task + IDM) bundled with the OSS engine. Flowable [removed that UI in 7.0](https://www.flowable.com/blog/releases/flowable-open-source-7-0-0-release) and has not restored it since — the redesigned UX is **enterprise-only**. Public-sector teams, SMEs, air-gapped deployments, and self-hosters who can't (or won't) pay for Flowable Enterprise are left with just the REST API. A 2026-05 scan of the OSS landscape ([full report](https://github.com/syalioune/flowatch-bmad/blob/main/_bmad-output/planning-artifacts/research/market-flowable-oss-gui-alternatives-research-2026-05-11.md) — maintainer-only private repo) found **no actively-maintained community alternative** — forks of the legacy 6.x WARs are abandoned, and modern community projects are modeler-only POCs.
+Flowatch gives Flowable 7+ OSS users a complete browser GUI: model BPMN and DMN, deploy them, watch instances, work tasks, inspect jobs and history, and manage identity — all without writing curl commands.
 
-Flowatch is filling that gap. The benchmark is the old 6.x OSS UI: if 6.x-OSS users used to do it, Flowatch should eventually do it.
+The need is real. Flowable's 7.x OSS distribution ships the engine and REST API; the web UI sits in the enterprise tier. Public-sector teams, SMEs, and air-gapped self-hosters need an OSS browser front-end, and the 2026 OSS landscape has none actively maintained — most community alternatives are modeler-only POCs ([full landscape report](https://github.com/syalioune/flowatch-bmad/blob/main/_bmad-output/planning-artifacts/research/market-flowable-oss-gui-alternatives-research-2026-05-11.md) — maintainer-only private repo).
+
+Flowatch fills that gap. The benchmark is the legacy 6.x OSS UI: if a 6.x-OSS operator used to do it, Flowatch should do it.
 
 **Scope choices, on purpose:**
 - **Flowable-specific.** Multi-engine support is out — [Operaton](https://operaton.org/), [Flowset](https://flowset.io/), and [Miragon/bpmn-modeler](https://github.com/Miragon/bpmn-modeler) already serve cross-engine users. Flowatch's value is being Flowable-aware down to the REST quirks (DMN sub-app prefix, missing `/identity/tenants`, multipart deployments).
@@ -127,7 +129,7 @@ The full doc index lives at [docs/index.md](docs/index.md).
 
 ## Status
 
-**Pre-alpha.** The current `src/` is the output of a Claude Design → Claude Code handoff that was completed only partially before being carried forward locally. It runs against `flowable-rest:7.2.0` end-to-end, but the project will be bootstrapped from zero to install proper engineering practices — tests, lint, formatter, CI, and possibly a TypeScript move. Treat existing implementation choices as starting points to validate, not as permanent decisions. The [docs/](docs/) folder is the public source of truth; PRD / architecture / epics / story-specs live in a private companion repo (see [DEVELOPERS.md §2](DEVELOPERS.md#2-first-time-setup) for the two-repo split).
+**Pre-alpha.** Flowatch runs against `flowable-rest:7.2.0` end-to-end today, and is being put on a defensible engineering footing — tests, lint, formatter, CI, and a TypeScript move — before adding net-new capabilities. Treat existing implementation choices as starting points to validate, not as permanent decisions. The [docs/](docs/) folder is the public source of truth; PRD / architecture / epics / story-specs live in a private companion repo (see [DEVELOPERS.md §2](DEVELOPERS.md#2-first-time-setup) for the two-repo split).
 
 ## AI-assisted development
 

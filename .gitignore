@@ -1,6 +1,9 @@
 node_modules/
 dist/
 coverage/
+# Transient GitHub Pages staging output (Makefile: landing-stage / landing-preview).
+# The CI workflow rebuilds it from landing/ + branding/ on every deploy.
+_site/
 # Vitest browser mode emits diagnostic screenshots on failure — Story 2.4
 # introduces the deliberate snapshot baseline; everything else is transient.
 src/**/__screenshots__/
