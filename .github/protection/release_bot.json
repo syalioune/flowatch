@@ -1,0 +1,5 @@
+{
+  "_comment": "Flowatch Release Bot — GitHub App used to bypass repository rulesets so semantic-release can push the release commit (CHANGELOG.md, package.json bump, tag) directly to develop / main. The App is installed only on this repo. Replace the placeholder app_id below with the integer ID shown at the top of the App's settings page (Settings → Developer settings → GitHub Apps → Flowatch Release Bot). The App's private key is stored as the FLOWATCH_RELEASE_APP_PRIVATE_KEY secret in the release-bot GitHub Environment — it does NOT belong in this file. Only the App ID is committed here; the ID is not a secret, it identifies the App publicly.",
+  "app_slug": "flowatch-release-bot",
+  "app_id": 0
+}
