@@ -2,7 +2,7 @@
   "name": "flowatch",
   "version": "0.0.1-rc.2",
   "private": true,
-  "description": "Modern Flowable 7 REST GUI — BPMN/DMN modeler + runtime operations",
+  "description": "Modern Flowable 7 OSS REST GUI — BPMN/DMN modeler + runtime operations",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
