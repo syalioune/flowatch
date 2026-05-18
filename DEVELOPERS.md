@@ -161,9 +161,14 @@ Open <http://localhost:5173>. The Dashboard should connect automatically.
 Flowatch uses **two long-lived branches**:
 
 - **`develop`** — integration branch. All feature, fix, and chore branches PR into `develop`. Dependabot also targets `develop` ([.github/dependabot.yml](.github/dependabot.yml)). Every merge to `develop` produces a beta pre-release (`vX.Y.Z-beta.N`) via semantic-release.
+
 - **`main`** — release-only. `main` only receives merges from `release/*` branches when a beta line is ready to cut. Each merge to `main` produces a stable release (`vX.Y.Z`).
 
-Feature branches: `feat/<short-name>`, `fix/<short-name>`, `chore/<short-name>` — branched off `develop`, PR back into `develop`.
+Short-lived branches:
+
+- **`release/X.Y.Z`** — stabilization branch cut from `develop` when a version is ready to harden. Branched as `release/0.0.2` (no `v` prefix), it lives only for the duration of the release-candidate cycle. Last-mile bug fixes and release prep (changelog touch-ups, docs) are PR'd into the release branch from `fix/*` or `chore/release-*` topic branches; new features stay on `develop`. Each merge into the release branch produces an `rc.N` pre-release via semantic-release. When the line is green, the release branch is merged into `main` (producing the stable `vX.Y.Z` tag) and back into `develop` to carry fixes forward, then deleted.
+
+- **Feature branches** — `feat/<short-name>`, `fix/<short-name>`, `chore/<short-name>` — branched off `develop`, PR back into `develop`. Stabilization-only fixes during an active release cycle may instead branch off `release/X.Y.Z` and PR back to it (then forward-merged to `develop` via the release branch's eventual back-merge).
 
 Release flow:
 
