@@ -359,9 +359,11 @@ jobs:
   #   - PR (from fork):          (skipped — secrets aren't available to fork PRs)
   #
   # Skip rules:
-  #   - The `[skip ci]` skip applies ONLY to branch pushes (semantic-release's
+  #   - The `[skip release]` skip applies ONLY to branch pushes (semantic-release's
   #     release commit). Tag pushes always run — the tag itself is what we
-  #     want to build for, and tag refs sit on top of [skip ci] commits.
+  #     want to build for, and tag refs sit on top of [skip release] commits.
+  #     Marker is project-local, NOT GitHub Actions' native [skip ci] (which
+  #     would also suppress required check / unit / e2e / build jobs).
   #
   # Concurrency:
   #   - The workflow-level concurrency has `cancel-in-progress: true`, which
@@ -381,12 +383,12 @@ jobs:
     name: image
     needs: [check, unit, build]
     # Skip:
-    #   - branch pushes whose head commit has [skip ci] (release.yml's commit),
+    #   - branch pushes whose head commit has [skip release] (release.yml's commit),
     #     EXCEPT for tag events (we always want the tag's image even if the
-    #     underlying commit was [skip ci]'d).
+    #     underlying commit was [skip release]'d).
     #   - PRs from forks (secrets unavailable; cleaner than partial-build).
     if: |
-      (startsWith(github.ref, 'refs/tags/') || !contains(github.event.head_commit.message, '[skip ci]'))
+      (startsWith(github.ref, 'refs/tags/') || !contains(github.event.head_commit.message, '[skip release]'))
       && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 20

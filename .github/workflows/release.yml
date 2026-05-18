@@ -26,8 +26,11 @@ jobs:
   release:
     name: release
     runs-on: ubuntu-latest
-    # Skip if the head commit is the [skip ci] release commit from a previous run.
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    # Skip if the head commit is the release-bot's own commit from a previous run.
+    # Marker is [skip release] — a project-local token, NOT GitHub Actions' native
+    # [skip ci] (which would also suppress required CI / CodeQL jobs and block the
+    # release → main PR). See plan: drop-skip-ci-from-release-bot-commit.
+    if: "!contains(github.event.head_commit.message, '[skip release]')"
     # `release-bot` is a GitHub Environment (Settings → Environments)
     # holding the App credentials as Environment-scoped secrets. The
     # environment is configured with:
