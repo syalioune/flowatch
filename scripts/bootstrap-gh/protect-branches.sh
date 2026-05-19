@@ -5,10 +5,10 @@
 # Rulesets vs. classic protection — why we switched (per maintainer decision
 # 2026-05-17):
 #   - bypass_actors is a top-level ruleset property, not per-rule. A single
-#     entry exempts the actor from PR + status-check + linear-history rules
-#     in one go, where classic protection's bypass_pull_request_allowances
-#     only bypassed the PR rule and not status checks (the same actor would
-#     still be blocked by strict mode).
+#     entry exempts the actor from PR + status-check rules in one go, where
+#     classic protection's bypass_pull_request_allowances only bypassed the
+#     PR rule and not status checks (the same actor would still be blocked
+#     by strict mode).
 #   - Multiple rulesets can coexist on a branch (organisation-wide + repo-
 #     specific). Classic protection was a single monolithic rule per branch.
 #   - bypass_mode lets us choose between "always" and "pull_request"
@@ -19,8 +19,8 @@
 #   - `develop` is the integration branch; feature/fix branches PR into it,
 #     and Dependabot targets it.
 #   - `main` only receives releases (promoted from `develop` via `release/*`
-#     branches per release.config.mjs). Currently main is an empty orphan
-#     baseline carrying the v0.0.0 tag (no protection applied).
+#     branches per release.config.mjs). Both branches get the same ruleset
+#     applied by this script.
 #
 # Usage:
 #   bash scripts/bootstrap-gh/protect-branches.sh <owner/repo> [main_approvals] [develop_approvals]
@@ -32,9 +32,10 @@
 # Optional config file:
 #   .github/protection/release_bot.json    {"app_id": <int>} — the GitHub
 #     App that bypasses the rulesets so semantic-release can push the
-#     release commit. If missing or app_id=0, no bypass is configured
-#     (every actor goes through PRs; semantic-release will fail until the
-#     file is created and the script is re-run).
+#     release commit. The maintainer Admin role always bypasses (single-
+#     maintainer constraint); the App bypass is what's conditional on this
+#     file. If missing or app_id=0, semantic-release will be blocked until
+#     the file is created and the script is re-run.
 
 set -euo pipefail
 repo="${1:-}"; main_appr="${2:-0}"; dev_appr="${3:-0}"
@@ -94,11 +95,15 @@ apply_ruleset() {
     --argjson appr "$appr" \
     --argjson sign_commits "$([ "$sign_commits" = "true" ] && echo true || echo false)" \
     '
-    # Always-present rules: prevent deletion + force-push + non-linear history.
+    # Always-present rules: prevent deletion + force-push.
+    # (Linear history is intentionally NOT enforced. Both rebase and merge
+    # commits are permitted strategies — see allowed_merge_methods below
+    # and the repo-level Pull Requests settings (allow_merge_commit=true,
+    # allow_rebase_merge=true, allow_squash_merge=false). Enforcing
+    # required_linear_history would reject any merge-commit PR.)
     [
       { type: "deletion" },
       { type: "non_fast_forward" },
-      { type: "required_linear_history" },
       {
         type: "pull_request",
         parameters: {
@@ -110,7 +115,9 @@ apply_ruleset() {
           required_approving_review_count: $appr,
           require_last_push_approval: false,
           required_review_thread_resolution: false,
-          allowed_merge_methods: ["rebase"]
+          # rebase + merge are both permitted, matching the repo-level
+          # Pull Requests settings (squash is disabled at both layers).
+          allowed_merge_methods: ["rebase", "merge"]
         }
       },
       {
@@ -127,20 +134,27 @@ apply_ruleset() {
     + (if $sign_commits then [{type: "required_signatures"}] else [] end)
     ')
 
-  # Build bypass_actors. The Release Bot App is the only entry we add —
-  # bypass_mode: "always" lets it push directly (the semantic-release
-  # release commit). Without an App ID configured, the bypass list is
-  # empty and every actor must go through PRs (which means semantic-
-  # release breaks; that's a deliberate fail-loud signal that the App
-  # hasn't been wired yet).
+  # Build bypass_actors. Two entries:
+  #   1. RepositoryRole 5 (Admin) with bypass_mode: "always" — lets the
+  #      maintainer push hotfixes/CHANGELOG cleanups directly without
+  #      raising a self-PR. Required on a single-maintainer repo where
+  #      self-approval is forbidden by GitHub and PR-only flow would
+  #      deadlock urgent fixes.
+  #   2. The Release Bot App (also bypass_mode: "always") so semantic-
+  #      release can push the release commit. Without an App ID
+  #      configured, only the Admin role bypass is emitted; semantic-
+  #      release will then be blocked until the App is wired.
   local bypass
+  bypass='[{ "actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always" }]'
   if [ -n "$release_bot_app_id" ] && [ "$release_bot_app_id" != "0" ]; then
     bypass=$(jq -n --argjson id "$release_bot_app_id" \
-      '[{ actor_id: $id, actor_type: "Integration", bypass_mode: "always" }]')
+      '[
+        { actor_id: 5,   actor_type: "RepositoryRole", bypass_mode: "always" },
+        { actor_id: $id, actor_type: "Integration",    bypass_mode: "always" }
+      ]')
   else
-    bypass='[]'
     echo "  ⚠ No Release Bot App ID configured ($bot_config missing or app_id=0)."
-    echo "     The bypass list is empty — semantic-release will be blocked until configured."
+    echo "     Only the Admin role bypass is set — semantic-release will be blocked until configured."
   fi
 
   # Assemble the ruleset body.
