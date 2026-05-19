@@ -1,3 +1,8 @@
+## [0.0.2-beta.1](https://github.com/syalioune/flowatch/releases/tag/v0.0.2-beta.1) (2026-05-18)
+
+> This pre-release is the post-stabilisation back-merge of [`v0.0.1`](https://github.com/syalioune/flowatch/releases/tag/v0.0.1) into `develop` and **introduces no new user-facing changes**. The auto-generated body was a duplicate-SHA artefact of the 0.0.1 release-PR rebase-merge; see the **[v0.0.1 stable release](https://github.com/syalioune/flowatch/releases/tag/v0.0.1)** for the complete changelog.
+
+
 ## [0.0.1](https://github.com/syalioune/flowatch/compare/v0.0.0...v0.0.1) (2026-05-18)
 
 > ⚠️ **Pre-1.0 posture.** Flowatch does **not** guarantee compatibility
