@@ -149,6 +149,10 @@ Flowatch is built openly with AI as a first-class collaborator. Treat that as a 
 
 **Attribution & responsibility.** Claude Code and BMAD are tools; the design choices, the QA, and the responsibility for what ships are the maintainer's. Bug reports and feedback go to the same [issue tracker](https://github.com/syalioune/flowatch/issues) regardless of which keystrokes were AI-assisted.
 
+## Release process
+
+Releases follow `develop → release/X.Y.Z → main` per [ADR-011](_bmad-output/planning-artifacts/architecture.md#adr-011--release-pipeline-conventional-commits--semantic-release). The operational runbook with exact commands is at [docs/release-runbook.md](docs/release-runbook.md).
+
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE).

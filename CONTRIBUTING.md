@@ -19,7 +19,7 @@ Thanks for considering a contribution. Flowatch is the OSS GUI for Flowable 7+ â
 
 ## Development setup
 
-See [DEVELOPERS.md](DEVELOPERS.md).
+See [DEVELOPERS.md](DEVELOPERS.md). Maintainers cutting a release should follow [docs/release-runbook.md](docs/release-runbook.md) for the step-by-step procedure.
 
 Quick start:
 
