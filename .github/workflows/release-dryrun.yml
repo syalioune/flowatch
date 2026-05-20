@@ -1,0 +1,94 @@
+# Release dry-run — runs semantic-release --dry-run --no-ci on PRs targeting
+# release/* branches to validate the release configuration would emit a
+# clean tag + changelog. Mirrors the env of release.yml (HUSKY=0, Node
+# from .nvmrc) so dry-run accurately predicts what the real release job
+# would do.
+#
+# Does NOT publish, tag, or push. The @semantic-release/git and
+# @semantic-release/github plugins are no-ops under --dry-run.
+#
+# This workflow's job name "release-dryrun" is added to .github/protection/
+# required_checks.json for release/* branch protection only (via
+# scripts/bootstrap-gh/protect-branches.sh). develop and main do NOT
+# require this check.
+
+name: Release Dry-Run
+
+on:
+  pull_request:
+    branches: ["release/**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-dryrun-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-dryrun:
+    name: release-dryrun
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      # Mirrors release.yml — disables husky hooks so semantic-release's
+      # internal git operations aren't gated by local-only pre-commit /
+      # pre-push hooks.
+      HUSKY: "0"
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # semantic-release walks back to the last released tag to compute
+          # the next version range — requires full history.
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run semantic-release --dry-run
+        id: dry-run
+        env:
+          # Default PR GITHUB_TOKEN (read-only on fork PRs; contents:read
+          # on same-repo PRs). semantic-release skips GitHub API writes
+          # under --dry-run; the token is only used to query existing
+          # releases for tag-collision detection.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # --no-ci is required because semantic-release detects the
+        # GitHub Actions environment via CI=true and refuses to run with
+        # --dry-run outside --no-ci.
+        run: |
+          set -o pipefail
+          npx semantic-release --dry-run --no-ci 2>&1 | tee dry-run.log
+
+      - name: Parse dry-run output
+        if: always()
+        run: bash scripts/release/check-dry-run.sh dry-run.log
+
+      - name: Upload dry-run log (always)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-dryrun-${{ github.run_id }}
+          path: dry-run.log
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### release-dryrun"
+            echo ""
+            echo "- Dry-run: ${{ steps.dry-run.outcome }}"
+            if [ -f dry-run.log ]; then
+              version=$(grep -oE 'next release version is [0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9.-]*' dry-run.log | tail -1 || echo "(none computed)")
+              echo "- Computed version: ${version}"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

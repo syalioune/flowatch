@@ -84,8 +84,19 @@ apply_ruleset() {
   # emit a check named `check`/`unit`/`e2e`/`build` would satisfy the gate.
   # Pinning to 15368 scopes the requirement to GitHub-Actions-emitted check-
   # runs only, which is what the ci.yml jobs actually produce.
+  # Per-branch required-checks: release/* branches gain `release-dryrun`
+  # (the semantic-release dry-run gate, per story 6.5-3). main / develop
+  # use the base list unchanged. Other branches (if this function were
+  # ever called with one) get the base list as well.
+  local -a ctxs_for_branch
+  if [[ "$branch" =~ ^release/ ]]; then
+    ctxs_for_branch=("${ctxs[@]}" "release-dryrun")
+  else
+    ctxs_for_branch=("${ctxs[@]}")
+  fi
+
   local required_checks_json
-  required_checks_json=$(printf '%s\n' "${ctxs[@]}" \
+  required_checks_json=$(printf '%s\n' "${ctxs_for_branch[@]}" \
     | jq -R -c '{context: ., integration_id: 15368}' \
     | jq -cs .)
 
@@ -212,5 +223,20 @@ gh repo edit "$repo" --default-branch develop
 
 apply_ruleset main    "$main_appr"
 apply_ruleset develop "$dev_appr"
+
+# Apply rulesets to any existing release/* branches so they inherit the
+# same protection model as main/develop plus the `release-dryrun`
+# required-check (per story 6.5-3 AC-4). Release branches are ephemeral
+# — this discovery loop catches whatever is live on the remote at the
+# time the maintainer re-runs this script. No-op when no release/*
+# branches exist.
+release_branches=$(gh api "repos/$repo/branches" --paginate --jq '.[].name' \
+  | grep -E '^release/' || true)
+if [ -n "$release_branches" ]; then
+  while IFS= read -r rb; do
+    [ -z "$rb" ] && continue
+    apply_ruleset "$rb" "$main_appr"
+  done <<<"$release_branches"
+fi
 
 echo "Done."
