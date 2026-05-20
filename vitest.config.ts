@@ -56,7 +56,7 @@ export default defineConfig({
       //
       // Floors:
       //   src/lib/**:         60/60/60/60 — core tier baseline (was global)
-      //   src/api.ts:         70/70/70    (lines/statements/functions) — earned
+      //   src/api.ts:         70/60/70/70 (lines/branches/statements/functions) — earned; branches preserves the prior global floor
       //   src/screens.tsx:    1/0/0/1     (calibrated floor as of 2026-05-19)
       //   src/modeler.tsx:    0/0/0/0     (calibrated floor as of 2026-05-19)
       //   src/components.tsx: 7/0/0/7     (calibrated floor as of 2026-05-19)
@@ -78,7 +78,7 @@ export default defineConfig({
       thresholds: {
         perFile: true,
         "src/lib/**": { lines: 60, branches: 60, functions: 60, statements: 60 },
-        "src/api.ts": { lines: 70, statements: 70, functions: 70 },
+        "src/api.ts": { lines: 70, branches: 60, statements: 70, functions: 70 },
         "src/components.tsx": { lines: 7, branches: 0, functions: 0, statements: 7 },
         "src/modeler.tsx": { lines: 0, branches: 0, functions: 0, statements: 0 },
         "src/screens.tsx": { lines: 1, branches: 0, functions: 0, statements: 1 },
