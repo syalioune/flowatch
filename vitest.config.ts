@@ -13,19 +13,25 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "html", "lcov"],
       reportsDirectory: "./coverage",
-      // Curated include set (the 2026-05-17 quality-gates tightening
-      // raised the bar from "src/api.ts only" to "core logic tier").
-      // Scope: files with real runtime logic worth covering — explicitly
-      // excludes routing (`src/routes/**`, `src/app.tsx`, the generated
-      // route tree), UI primitives in `src/components/`, big screens
-      // pending a separate test push (`src/screens.tsx`, `modeler.tsx`,
-      // `components.tsx`, `tweaks-panel.tsx`), bootstrap (`main.tsx`),
+      // Curated include set (the 2026-05-19 widening to add the three
+      // large unmigrated screens). Scope: files with real runtime logic
+      // worth covering — explicitly excludes routing (`src/routes/**`,
+      // `src/app.tsx`, the generated route tree), UI primitives in
+      // `src/components/`, the remaining large file pending a separate
+      // test push (`tweaks-panel.tsx`), bootstrap (`main.tsx`),
       // ambient/static data (`vite-env.d.ts`, `data.ts`,
       // `lib/window-events.ts`), and tests themselves.
       // Per-file thresholds with `perFile: true` so a single weakly-
       // covered file fails the gate; aggregate-only would let strong
       // files mask weak ones.
-      include: ["src/api.ts", "src/lib/**/*.ts", "src/lib/**/*.tsx"],
+      include: [
+        "src/api.ts",
+        "src/lib/**/*.ts",
+        "src/lib/**/*.tsx",
+        "src/screens.tsx",
+        "src/modeler.tsx",
+        "src/components.tsx",
+      ],
       exclude: [
         "src/**/*.test.ts",
         "src/**/*.test.tsx",
@@ -35,17 +41,47 @@ export default defineConfig({
         "src/lib/**/__tests__/**",
         "src/lib/window-events.ts",
       ],
+      // ## Coverage thresholds
+      //
+      // `perFile: true` means a single file dropping below its floor fails CI.
+      // Aggregate-only thresholds would let strong files (api.ts at 96%) mask
+      // weak files (screens.tsx at 1.68%); we want per-file signal.
+      //
+      // Vitest 3.x semantics: glob-keyed thresholds are additive to global
+      // ones (a file must satisfy BOTH). To set a true per-file floor we
+      // skip the global lines/branches keys and express every floor as a
+      // glob entry. See `node_modules/vitest/dist/chunks/coverage.*.js`
+      // `resolveThresholds` — "Global threshold is for all files, even if
+      // they are included by glob patterns".
+      //
+      // Floors:
+      //   src/lib/**:         60/60/60/60 — core tier baseline (was global)
+      //   src/api.ts:         70/60/70/70 (lines/branches/statements/functions) — earned; branches preserves the prior global floor
+      //   src/screens.tsx:    1/0/0/1     (calibrated floor as of 2026-05-19)
+      //   src/modeler.tsx:    0/0/0/0     (calibrated floor as of 2026-05-19)
+      //   src/components.tsx: 7/0/0/7     (calibrated floor as of 2026-05-19)
+      //
+      // ### Ratchet schedule (Milestone 0.0.2)
+      //
+      // Mid-milestone-0.0.2 (after epics 7-12 land): each big file ≥ 30%
+      // End-milestone-0.0.2 (after epics 13-18 land): each big file ≥ 60%
+      //
+      // Each Milestone-0.0.2 story that touches one of these files SHOULD
+      // raise the relevant per-file floor in this config in the same commit,
+      // by the amount the new tests earn (re-measure: `npx vitest run
+      // --coverage`). Don't outrun the schedule — the goal is monotonic
+      // non-regression, not a race to 100%. Floors are NEVER lowered; a
+      // story that needs to drop one must also delete tests and call that
+      // out explicitly for reviewer.
+      //
+      // See story 6.5-1 for the baseline derivation.
       thresholds: {
         perFile: true,
-        lines: 60,
-        branches: 60,
-        // Keep the existing higher bar for the most-tested file —
-        // dropping it to 60 would silently regress signal.
-        "src/api.ts": {
-          lines: 70,
-          statements: 70,
-          functions: 70,
-        },
+        "src/lib/**": { lines: 60, branches: 60, functions: 60, statements: 60 },
+        "src/api.ts": { lines: 70, branches: 60, statements: 70, functions: 70 },
+        "src/components.tsx": { lines: 7, branches: 0, functions: 0, statements: 7 },
+        "src/modeler.tsx": { lines: 0, branches: 0, functions: 0, statements: 0 },
+        "src/screens.tsx": { lines: 1, branches: 0, functions: 0, statements: 1 },
       },
     },
   },
