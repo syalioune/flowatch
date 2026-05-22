@@ -72,7 +72,7 @@ Promotes \`develop\` → \`release/${VERSION}\` → \`main\` per ADR-011.
 
 ### Pre-flight
 - [x] develop CI green
-- [x] release-dryrun green
+- [x] §1 dry-run produced a clean next-version
 - [x] no in-flight develop PRs
 
 Refs milestone-0.0.1 retro / story 6.5-5 runbook.
@@ -220,7 +220,7 @@ gh workflow run release.yml --ref main   # see §7.5
 
 **Never attempt:** `gh release delete v$VERSION --cleanup-tag --yes`, `git push origin :refs/tags/v$VERSION`, `git push --force` against any tag ref. All will fail under immutability rules and the failure modes (partial deletion of the release while the tag remains, or vice-versa) leave the repo in a worse state.
 
-**Prevent recurrence:** §1 pre-flight verifies the dry-run produces a clean next-version; the release-dryrun gate from story 6.5-3 catches plugin-error regressions before merge.
+**Prevent recurrence:** §1 pre-flight verifies the dry-run produces a clean next-version, which exposes plugin-error regressions before the release branch is cut.
 
 ### 7.2 Changelog footer breaks markdown
 
@@ -254,7 +254,7 @@ gh pr create --base main --head hotfix/changelog-v$VERSION \
 
 > **Why not push directly to main?** `main` is protected; `allowed_merge_methods: ["rebase", "merge"]` means PR-based merges only. A direct push returns `protected branch hook declined` unless you toggle Admin bypass in repo settings — don't.
 
-**Prevent recurrence:** the release-dryrun gate (story 6.5-3) catches changelog generation errors (`@semantic-release/release-notes-generator` plugin crashes) before merge; a broken rendering after a successful generation is rarer but still possible — see ADR-011's themes alignment with `commitlint.config.cjs`.
+**Prevent recurrence:** §1 pre-flight catches changelog generation errors (`@semantic-release/release-notes-generator` plugin crashes) before the release branch is cut; a broken rendering after a successful generation is rarer but still possible — see ADR-011's themes alignment with `commitlint.config.cjs`.
 
 ### 7.3 Wrong base branch was used
 
