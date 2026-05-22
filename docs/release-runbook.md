@@ -23,7 +23,7 @@ export VERSION=0.0.2   # set once, reused throughout the runbook
   gh pr list --base develop --state open
   # expect: empty list (or only PRs intentionally deferred until after this release)
   ```
-- [ ] `npx semantic-release --dry-run --no-ci` from develop tip computes a next-version whose `X.Y.Z` prefix matches `$VERSION`. Develop runs on the `beta` channel, so output reads `X.Y.Z-beta.N` — verify the `X.Y.Z` portion equals `$VERSION`. A mismatch means a `feat!:` or similar landed and bumped major/minor unexpectedly. (Story 6.5-3's `release-dryrun` workflow runs this automatically on the PR to `release/*`.)
+- [ ] `npx semantic-release --dry-run --no-ci` from develop tip computes a next-version whose `X.Y.Z` prefix matches `$VERSION`. Develop runs on the `beta` channel, so output reads `X.Y.Z-beta.N` — verify the `X.Y.Z` portion equals `$VERSION`. A mismatch means a `feat!:` or similar landed and bumped major/minor unexpectedly. (Story 6.5-3's `release-dryrun` workflow runs this automatically on the release PR to `main` — see §3.)
   ```bash
   HUSKY=0 npx semantic-release --dry-run --no-ci 2>&1 | grep -E 'next release version'
   # expect: "The next release version is $VERSION-beta.N" (e.g. "0.0.2-beta.3")
