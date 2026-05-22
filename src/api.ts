@@ -218,7 +218,7 @@ const defaultCfg: FlowableConfig = {
   password: "test",
   tenantId: "",
 };
-const loadCfg = (): FlowableConfig => {
+export const loadCfg = (): FlowableConfig => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? { ...defaultCfg, ...JSON.parse(raw) } : { ...defaultCfg };
