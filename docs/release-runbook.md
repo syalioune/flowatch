@@ -23,7 +23,7 @@ export VERSION=0.0.2   # set once, reused throughout the runbook
   gh pr list --base develop --state open
   # expect: empty list (or only PRs intentionally deferred until after this release)
   ```
-- [ ] `npx semantic-release --dry-run --no-ci` from develop tip computes a next-version whose `X.Y.Z` prefix matches `$VERSION`. Develop runs on the `beta` channel, so output reads `X.Y.Z-beta.N` — verify the `X.Y.Z` portion equals `$VERSION`. A mismatch means a `feat!:` or similar landed and bumped major/minor unexpectedly. (Story 6.5-3's `release-dryrun` workflow runs this automatically on the PR to `release/*`.)
+- [ ] `npx semantic-release --dry-run --no-ci` from develop tip computes a next-version whose `X.Y.Z` prefix matches `$VERSION`. Develop runs on the `beta` channel, so output reads `X.Y.Z-beta.N` — verify the `X.Y.Z` portion equals `$VERSION`. A mismatch means a `feat!:` or similar landed and bumped major/minor unexpectedly.
   ```bash
   HUSKY=0 npx semantic-release --dry-run --no-ci 2>&1 | grep -E 'next release version'
   # expect: "The next release version is $VERSION-beta.N" (e.g. "0.0.2-beta.3")
@@ -72,7 +72,7 @@ Promotes \`develop\` → \`release/${VERSION}\` → \`main\` per ADR-011.
 
 ### Pre-flight
 - [x] develop CI green
-- [x] release-dryrun green
+- [x] §1 dry-run produced a clean next-version
 - [x] no in-flight develop PRs
 
 Refs milestone-0.0.1 retro / story 6.5-5 runbook.
@@ -220,7 +220,7 @@ gh workflow run release.yml --ref main   # see §7.5
 
 **Never attempt:** `gh release delete v$VERSION --cleanup-tag --yes`, `git push origin :refs/tags/v$VERSION`, `git push --force` against any tag ref. All will fail under immutability rules and the failure modes (partial deletion of the release while the tag remains, or vice-versa) leave the repo in a worse state.
 
-**Prevent recurrence:** §1 pre-flight verifies the dry-run produces a clean next-version; the release-dryrun gate from story 6.5-3 catches plugin-error regressions before merge.
+**Prevent recurrence:** §1 pre-flight verifies the dry-run produces a clean next-version, which exposes plugin-error regressions before the release branch is cut.
 
 ### 7.2 Changelog footer breaks markdown
 
@@ -254,7 +254,7 @@ gh pr create --base main --head hotfix/changelog-v$VERSION \
 
 > **Why not push directly to main?** `main` is protected; `allowed_merge_methods: ["rebase", "merge"]` means PR-based merges only. A direct push returns `protected branch hook declined` unless you toggle Admin bypass in repo settings — don't.
 
-**Prevent recurrence:** the release-dryrun gate (story 6.5-3) catches changelog generation errors (`@semantic-release/release-notes-generator` plugin crashes) before merge; a broken rendering after a successful generation is rarer but still possible — see ADR-011's themes alignment with `commitlint.config.cjs`.
+**Prevent recurrence:** §1 pre-flight catches changelog generation errors (`@semantic-release/release-notes-generator` plugin crashes) before the release branch is cut; a broken rendering after a successful generation is rarer but still possible — see ADR-011's themes alignment with `commitlint.config.cjs`.
 
 ### 7.3 Wrong base branch was used
 
