@@ -63,4 +63,34 @@ describe("<ErrorBox>", () => {
     render(<ErrorBox error={new Error("boom")} />);
     expect(screen.queryByRole("button", { name: /retry/i })).toBeNull();
   });
+
+  // ── Story 7.3 ────────────────────────────────────────────────────────────
+  // HTTP status surfacing + disabled Inspector hint.
+
+  it("(7.3) renders 'HTTP NNN' above the body for FlowableError", () => {
+    render(<ErrorBox error={new FlowableError("Object not found", 404)} />);
+    expect(screen.getByText("HTTP 404")).toBeInTheDocument();
+    expect(screen.getByText("Object not found")).toBeInTheDocument();
+  });
+
+  it("(7.3) does NOT render an HTTP line for a generic Error", () => {
+    render(<ErrorBox error={new Error("network failure")} />);
+    expect(screen.getByText("network failure")).toBeInTheDocument();
+    expect(screen.queryByText(/^HTTP /)).toBeNull();
+  });
+
+  it("(7.3) does NOT render an HTTP line for an unknown thrown value", () => {
+    render(<ErrorBox error="some raw string" />);
+    expect(screen.getByText("some raw string")).toBeInTheDocument();
+    expect(screen.queryByText(/^HTTP /)).toBeNull();
+  });
+
+  it("(7.3) always renders the disabled Open Inspector hint", () => {
+    render(<ErrorBox error={new Error("boom")} />);
+    const hint = screen.getByTitle("Available once the API Inspector is wired (Story 8.2)");
+    expect(hint).toBeInTheDocument();
+    expect(hint).toHaveTextContent("Open Inspector ↗");
+    expect(hint).toHaveAttribute("data-disabled", "1");
+    expect(hint.tagName.toLowerCase()).toBe("span");
+  });
 });
