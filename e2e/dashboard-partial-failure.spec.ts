@@ -64,11 +64,20 @@ test.describe("Dashboard partial failure (NFR-6)", () => {
     const deploysVal = tiles.nth(3).locator(".kpi-val");
     await expect(deploysVal).not.toHaveText("—", { timeout: 15_000 });
 
-    // No top-level ErrorBox: the ErrorBox renders the always-on Inspector
-    // hint span (Story 7.3) so we assert that hint title is absent — it is
-    // unique to the ErrorBox component.
+    // No top-level ErrorBox per AC-8. Defense in depth:
+    //   1. The literal selectors AC-8 names ('.error-box' / '[data-testid="error-box"]').
+    //      If a future contributor adds a top-level ErrorBox to the route, the
+    //      idiomatic class would be one of these.
+    //   2. The unique Story 7.3 hint title — the ErrorBox always renders this
+    //      `<span title="…">` so its presence proves an ErrorBox was rendered
+    //      (becomes load-bearing once 7.3 is merged to develop).
+    //   3. The kpi-grid is still the page's primary surface (proves the route
+    //      didn't fall back to a single error screen).
+    await expect(page.locator(".error-box")).toHaveCount(0);
+    await expect(page.locator('[data-testid="error-box"]')).toHaveCount(0);
     await expect(
       page.locator('[title="Available once the API Inspector is wired (Story 8.2)"]'),
     ).toHaveCount(0);
+    await expect(page.locator(".kpi-grid")).toBeVisible();
   });
 });
