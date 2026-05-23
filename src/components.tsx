@@ -310,7 +310,7 @@ const NAV: NavGroup[] = [
 ];
 
 interface ConnectionState {
-  state: "pending" | "ok" | "err";
+  state: "pending" | "ok" | "err" | "unset";
   host: string;
 }
 

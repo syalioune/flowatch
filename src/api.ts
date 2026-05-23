@@ -563,6 +563,7 @@ export const api = {
   setConfig: (next: Partial<FlowableConfig>): void => {
     cfg = { ...cfg, ...next };
     saveCfg(cfg);
+    window.dispatchEvent(new CustomEvent("conn:config-changed"));
   },
   log: (): ApiLogEntry[] => [...API_LOG],
   // BPMN repository
