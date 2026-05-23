@@ -385,11 +385,25 @@ a {
   background: var(--ok);
   flex-shrink: 0;
 }
-.conn-dot[data-state="mock"] {
-  background: var(--warn);
-}
 .conn-dot[data-state="err"] {
   background: var(--bad);
+}
+.conn-dot[data-state="pending"] {
+  background: var(--ok);
+  opacity: 0.6;
+  animation: conn-pulse 1.5s ease-in-out infinite;
+}
+.conn-dot[data-state="unset"] {
+  background: var(--fg-mute);
+}
+@keyframes conn-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 .conn-pill .conn-host {
   overflow: hidden;

@@ -49,7 +49,7 @@ interface Tenant {
   name: string;
 }
 interface AppConnectionState {
-  state: "pending" | "ok" | "err";
+  state: "pending" | "ok" | "err" | "unset";
   host: string;
 }
 
@@ -92,26 +92,36 @@ function App() {
     }
   }, [t.look, t.theme, t.density, t.accent]);
 
+  const probe = React.useCallback(async (): Promise<void> => {
+    const cfg = api.config();
+    const host = cfg.baseUrl.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    setConn({ state: "pending", host: "connecting…" });
+    try {
+      const r = await api.ping();
+      setConn({ state: "ok", host: `${r.name} ${r.version} @ ${host}` });
+    } catch (_e) {
+      setConn({ state: "err", host: `unreachable: ${host}` });
+    }
+  }, []);
+
   React.useEffect(() => {
+    void probe();
     (async () => {
-      const cfg = api.config();
-      const host = cfg.baseUrl.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-      try {
-        const r = await api.ping();
-        setConn({
-          state: "ok",
-          host: `${host} · ${r?.name || "engine"} ${r?.version || ""}`.trim(),
-        });
-      } catch (_e) {
-        setConn({ state: "err", host: `${host} · unreachable` });
-      }
       try {
         const tres = await api.listTenants();
         const list = [DEFAULT_TENANT, ...(tres.data || [])];
         setTenants(list);
       } catch {}
     })();
-  }, []);
+  }, [probe]);
+
+  React.useEffect(() => {
+    const handler = (): void => {
+      void probe();
+    };
+    window.addEventListener("conn:config-changed", handler);
+    return () => window.removeEventListener("conn:config-changed", handler);
+  }, [probe]);
 
   React.useEffect(() => {
     let cancelled = false;
