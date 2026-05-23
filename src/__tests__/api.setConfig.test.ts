@@ -6,6 +6,10 @@
  * <App /> to re-run without a full page reload.
  *
  * Per Pattern P-009 we exercise the real api.setConfig — no module mocks.
+ *
+ * Review patch (2026-05-23): dispatch is gated to baseUrl/username/password
+ * changes — tenant-only updates and no-op calls must not flash the conn pill
+ * or trigger a redundant /management/engine round-trip.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,6 +18,7 @@ import { api } from "../api";
 const DEFAULTS = {
   baseUrl: "http://localhost:8080/flowable-rest/service",
   username: "rest-admin",
+  // gitguardian:ignore - test fixture, not a real secret
   password: "test",
   tenantId: "",
 };
@@ -28,8 +33,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+const hasConnEvent = (calls: unknown[][]): boolean =>
+  calls.some(([ev]) => (ev as Event).type === "conn:config-changed");
+
 describe("api.setConfig — conn:config-changed event (AC-8)", () => {
-  it("dispatches a CustomEvent('conn:config-changed') on window after updating config", () => {
+  it("dispatches a CustomEvent('conn:config-changed') when baseUrl changes", () => {
     const spy = vi.spyOn(window, "dispatchEvent");
 
     api.setConfig({
@@ -40,14 +48,26 @@ describe("api.setConfig — conn:config-changed event (AC-8)", () => {
       password: "p",
     });
 
-    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ type: "conn:config-changed" }));
+    expect(hasConnEvent(spy.mock.calls)).toBe(true);
   });
 
-  it("dispatches the event even when only tenantId changes", () => {
+  it("does NOT dispatch when only tenantId changes (review patch)", () => {
     const spy = vi.spyOn(window, "dispatchEvent");
 
     api.setConfig({ tenantId: "acme" });
 
-    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ type: "conn:config-changed" }));
+    expect(hasConnEvent(spy.mock.calls)).toBe(false);
+  });
+
+  it("does NOT dispatch when called with same connection values (no-op)", () => {
+    const spy = vi.spyOn(window, "dispatchEvent");
+
+    api.setConfig({
+      baseUrl: DEFAULTS.baseUrl,
+      username: DEFAULTS.username,
+      password: DEFAULTS.password,
+    });
+
+    expect(hasConnEvent(spy.mock.calls)).toBe(false);
   });
 });
