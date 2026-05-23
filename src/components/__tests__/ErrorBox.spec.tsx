@@ -91,6 +91,24 @@ describe("<ErrorBox>", () => {
     expect(hint).toBeInTheDocument();
     expect(hint).toHaveTextContent("Open Inspector ↗");
     expect(hint).toHaveAttribute("data-disabled", "1");
-    expect(hint.tagName.toLowerCase()).toBe("span");
+    expect(hint).toHaveAttribute("aria-disabled", "true");
+    // Intentionally NOT asserting tagName — Story 8.2 will upgrade the
+    // <span> to a real <button>/<a>. The contract here is the data-disabled
+    // attribute (Story 8.2 will flip it) and the title copy, not the tag.
+  });
+
+  it("(7.3 review) preserves whitespace and newlines verbatim (P-003)", () => {
+    const noisy = "line one\n  line two (indented)\nline three";
+    render(<ErrorBox error={new FlowableError(noisy, 500)} />);
+    // toHaveTextContent strips internal whitespace, so assert against the DOM
+    // node's textContent directly to verify white-space:pre-wrap preserves it.
+    const body = screen.getByText((_, node) => node?.textContent === noisy);
+    expect(body).toBeInTheDocument();
+  });
+
+  it("(7.3 review) suppresses 'HTTP NNN' line when status is 0 (network/CORS)", () => {
+    render(<ErrorBox error={new FlowableError("Failed to fetch", 0)} />);
+    expect(screen.getByText("Failed to fetch")).toBeInTheDocument();
+    expect(screen.queryByText(/^HTTP /)).toBeNull();
   });
 });
