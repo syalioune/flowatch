@@ -27,9 +27,11 @@ const DEFAULTS = {
 };
 
 beforeEach(() => {
-  localStorage.clear();
   // Reset singleton to defaults so each test starts from a known state.
   api.setConfig(DEFAULTS);
+  // Clear AFTER setConfig: setConfig writes DEFAULTS to localStorage via saveCfg;
+  // clearing last ensures every test begins with no persisted key unless it sets one itself.
+  localStorage.clear();
 });
 
 afterEach(() => {
@@ -38,7 +40,6 @@ afterEach(() => {
 
 describe("loadCfg — missing key", () => {
   it("returns defaults when localStorage has no flowatch.connection.v1 key", () => {
-    localStorage.clear();
     const cfg = loadCfg();
     expect(cfg.baseUrl).toBe(DEFAULTS.baseUrl);
     expect(cfg.username).toBe(DEFAULTS.username);
