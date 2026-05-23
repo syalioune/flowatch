@@ -48,7 +48,11 @@ export const Route = createFileRoute("/")({
         path: "/management/jobs?size=0&withException=true",
         desc: "Failing jobs count",
       },
-      { method: "GET", path: "/runtime/tasks?size=0&assignee={user}", desc: "My tasks count" },
+      {
+        method: "GET",
+        path: "/runtime/tasks?size=0&assignee=<current-user>",
+        desc: "My tasks count",
+      },
       { method: "GET", path: "/repository/deployments?size=0", desc: "Deployments count" },
     ],
   },
@@ -78,11 +82,7 @@ function DashboardRoute() {
     <div className="page" style={{ padding: 24 }}>
       <div className="kpi-grid">
         {TILES.map((spec, i) => (
-          <KpiTile
-            key={spec.to + (spec.search?.type ?? spec.search?.assignee ?? "")}
-            spec={spec}
-            result={results?.[i] ?? null}
-          />
+          <KpiTile key={spec.label} spec={spec} result={results?.[i] ?? null} />
         ))}
       </div>
     </div>
