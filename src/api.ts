@@ -561,9 +561,19 @@ const runRaw = (method: HTTPMethod, path: string, body?: unknown) => {
 export const api = {
   config: (): FlowableConfig => ({ ...cfg }),
   setConfig: (next: Partial<FlowableConfig>): void => {
+    // Per AC-5 the re-probe fires when the *connection* changes — baseUrl,
+    // username, or password. Tenant-only updates (e.g. Topbar's cycleTenant
+    // or SettingsModal's Test button before Save) must not flash the conn
+    // pill or trigger a redundant /management/engine round-trip.
+    const connectionChanged =
+      (next.baseUrl !== undefined && next.baseUrl !== cfg.baseUrl) ||
+      (next.username !== undefined && next.username !== cfg.username) ||
+      (next.password !== undefined && next.password !== cfg.password);
     cfg = { ...cfg, ...next };
     saveCfg(cfg);
-    window.dispatchEvent(new CustomEvent("conn:config-changed"));
+    if (connectionChanged) {
+      window.dispatchEvent(new CustomEvent("conn:config-changed"));
+    }
   },
   log: (): ApiLogEntry[] => [...API_LOG],
   // BPMN repository

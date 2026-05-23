@@ -92,15 +92,33 @@ function App() {
     }
   }, [t.look, t.theme, t.density, t.accent]);
 
+  // Sequence guard: each probe() bumps the counter; commits to `setConn`
+  // only when the in-flight call's sequence still matches `latest`. Prevents
+  // (a) stale resolution from clobbering a fresher probe and (b) state
+  // updates after unmount.
+  const probeSeq = React.useRef(0);
+  const mountedRef = React.useRef(true);
+  React.useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const probe = React.useCallback(async (): Promise<void> => {
     const cfg = api.config();
     const host = cfg.baseUrl.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-    setConn({ state: "pending", host: "connecting…" });
+    const seq = ++probeSeq.current;
+    const commit = (next: AppConnectionState): void => {
+      if (!mountedRef.current || seq !== probeSeq.current) return;
+      setConn(next);
+    };
+    commit({ state: "pending", host: "connecting…" });
     try {
       const r = await api.ping();
-      setConn({ state: "ok", host: `${r.name} ${r.version} @ ${host}` });
+      commit({ state: "ok", host: `${r.name} ${r.version} @ ${host}` });
     } catch (_e) {
-      setConn({ state: "err", host: `unreachable: ${host}` });
+      commit({ state: "err", host: `unreachable: ${host}` });
     }
   }, []);
 
