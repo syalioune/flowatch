@@ -24,3 +24,5 @@ secret:
       match: "rest-admin:test"
     - name: "Dev-only Postgres user/password (docker-compose default)"
       match: "flowable:flowable"
+    - name: "Test-fixture prod config for localStorage round-trip (config.test.ts AC-1/AC-5)"
+      match: "s3cr3t"
