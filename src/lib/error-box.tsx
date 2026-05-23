@@ -8,17 +8,33 @@
  * render contract; route errorComponents (Story 3.3 onwards) and screen
  * useApi.error states both render it.
  *
+ * Story 7.3 additions: when the underlying error is a FlowableError, the
+ * HTTP status is surfaced above the body so operators can distinguish 404
+ * from 500 from 401 at a glance. A disabled "Open Inspector ↗" hint is
+ * always rendered as a forward-reference to Story 8.2, which will upgrade
+ * the <span> to a wired button/link.
+ *
  * Extracted from src/screens.tsx during Story 3.3 so route errorComponents
  * (under src/routes/) can import it without taking a dependency on screens.
  */
+
+import { FlowableError } from "../api";
 
 export interface ErrorBoxProps {
   error: unknown;
   onRetry?: (() => void) | undefined;
 }
 
+const isFlowableError = (e: unknown): e is FlowableError =>
+  e instanceof FlowableError && typeof e.status === "number";
+
 export const ErrorBox = ({ error, onRetry }: ErrorBoxProps) => (
   <div className="empty" style={{ padding: 24, color: "var(--bad)" }}>
+    {isFlowableError(error) && (
+      <div className="mono" style={{ fontSize: 11, color: "var(--fg-mute)", marginBottom: 4 }}>
+        HTTP {error.status}
+      </div>
+    )}
     <div className="mono" style={{ fontSize: 12, marginBottom: 8 }}>
       {String((error as { message?: string } | null)?.message || error)}
     </div>
@@ -27,5 +43,19 @@ export const ErrorBox = ({ error, onRetry }: ErrorBoxProps) => (
         Retry
       </button>
     )}
+    <span
+      data-disabled="1"
+      title="Available once the API Inspector is wired (Story 8.2)"
+      style={{
+        display: "block",
+        marginTop: 6,
+        opacity: 0.4,
+        cursor: "not-allowed",
+        fontSize: 11,
+        color: "var(--fg-mute)",
+      }}
+    >
+      Open Inspector ↗
+    </span>
   </div>
 );
