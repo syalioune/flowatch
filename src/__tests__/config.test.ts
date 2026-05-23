@@ -78,8 +78,8 @@ describe("setConfig + saveCfg — round-trip (AC-1, AC-5)", () => {
   it("setConfig persists all four fields to localStorage", () => {
     api.setConfig({
       baseUrl: "http://prod:8080/flowable-rest/service",
-      username: "admin", // pragma: allowlist secret
-      password: "s3cr3t", // pragma: allowlist secret
+      username: "admin",
+      password: "s3cr3t",
       tenantId: "acme",
     });
 
@@ -95,8 +95,8 @@ describe("setConfig + saveCfg — round-trip (AC-1, AC-5)", () => {
   it("api.config() reflects values saved by setConfig (in-memory singleton)", () => {
     api.setConfig({
       baseUrl: "http://prod:8080/flowable-rest/service",
-      username: "admin", // pragma: allowlist secret
-      password: "s3cr3t", // pragma: allowlist secret
+      username: "admin",
+      password: "s3cr3t",
       tenantId: "acme",
     });
 
@@ -110,8 +110,8 @@ describe("setConfig + saveCfg — round-trip (AC-1, AC-5)", () => {
   it("cold loadCfg() reads the four fields saved by setConfig (simulates page reload)", () => {
     api.setConfig({
       baseUrl: "http://prod:8080/flowable-rest/service",
-      username: "admin", // pragma: allowlist secret
-      password: "s3cr3t", // pragma: allowlist secret
+      username: "admin",
+      password: "s3cr3t",
       tenantId: "acme",
     });
 
