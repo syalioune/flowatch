@@ -3,7 +3,8 @@
 import { Link } from "@tanstack/react-router";
 import React from "react";
 import noticeContent from "../NOTICE?raw";
-import { API_LOG, type ApiLogEntry, api, type FlowableConfig } from "./api";
+import { API_LOG, type ApiLogEntry, api, type FlowableConfig, type HTTPMethod } from "./api";
+import { errorStatus } from "./lib/error";
 import { type RouteEndpoint, useRouteMeta } from "./lib/route-meta";
 
 interface ApiLogEvent extends CustomEvent<ApiLogEntry> {}
@@ -660,23 +661,57 @@ interface ApiInspectorProps {
   onClose: () => void;
   screenEndpoints?: ReadonlyArray<RouteEndpoint>;
   screenTitle: string;
+  // {id, seq} so consecutive clicks on the same ErrorBox produce a fresh
+  // object identity and re-fire the scroll/highlight effect (review patch).
+  focusEntry?: { id: string; seq: number } | null;
 }
 
 type InspectorResult =
   | { ok: true; status: number | undefined; ms: number | undefined; data: unknown }
   | { ok: false; status: number | undefined; ms: number | undefined; error: string };
 
+type MethodFilter = HTTPMethod | "All";
+type StatusFilter = "All" | "2xx" | "4xx" | "5xx/err";
+
+// Relative-time formatter used by every row in the Recent-calls list. Computed
+// at render time only — re-renders are driven by the api:log event, so a
+// setInterval/RAF tick would just churn the React tree for no UX gain.
+function timeAgo(iso: string, now: Date = new Date()): string {
+  const ms = now.getTime() - new Date(iso).getTime();
+  if (ms < 1000) return "now";
+  const sec = Math.floor(ms / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h`;
+  return `${Math.floor(hr / 24)}d`;
+}
+
+function matchStatusBucket(status: number, filter: StatusFilter): boolean {
+  if (filter === "All") return true;
+  if (filter === "2xx") return status >= 200 && status < 300;
+  if (filter === "4xx") return status >= 400 && status < 500;
+  // 5xx/err folds in the status===0 sentinel per Epic 7 retro §3.3.
+  return status >= 500 || status === 0;
+}
+
 export const ApiInspector = ({
   open,
   onClose,
   screenEndpoints,
   screenTitle,
+  focusEntry,
 }: ApiInspectorProps) => {
   const [log, setLog] = React.useState<ApiLogEntry[]>([...API_LOG]);
   const [tab, setTab] = React.useState<"endpoints" | "calls">("endpoints");
   const [snippet, setSnippet] = React.useState<"fetch" | "curl">("fetch");
   const [running, setRunning] = React.useState(false);
   const [result, setResult] = React.useState<InspectorResult | null>(null);
+  const [methodFilter, setMethodFilter] = React.useState<MethodFilter>("All");
+  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("All");
+  const [expandedId, setExpandedId] = React.useState<string | null>(null);
+  const [focusedRowId, setFocusedRowId] = React.useState<string | null>(null);
   const cfg = api.config();
   const firstEp: RouteEndpoint = (screenEndpoints && screenEndpoints[0]) || {
     method: "GET",
@@ -700,6 +735,53 @@ export const ApiInspector = ({
     };
   }, []);
 
+  // T-6.2: if the expanded entry has been evicted from the ring buffer
+  // (60-entry cap), silently clear the expanded state — the DOM node is
+  // already gone, the state would just dangle.
+  React.useEffect(() => {
+    if (expandedId && !log.some((e) => e.id === expandedId)) {
+      setExpandedId(null);
+    }
+  }, [log, expandedId]);
+
+  // T-7.2: when a focusEntry arrives while the drawer is open, switch to the
+  // "calls" tab, reset the filters so the target row is guaranteed to be in
+  // the rendered list (review patch — without the reset, a stale POST/4xx
+  // filter would silently hide the row and the user would see no feedback),
+  // scroll the matching row into view, and apply a transient .data-focused
+  // highlight that fades after 1500ms via CSS. If the entry is not in the
+  // current log, silently no-op per AC-3. The dep on focusEntry's identity
+  // (not just its id) re-fires when the same id is dispatched twice.
+  React.useEffect(() => {
+    if (!open || !focusEntry) return;
+    if (!log.some((e) => e.id === focusEntry.id)) return;
+    setTab("calls");
+    setMethodFilter("All");
+    setStatusFilter("All");
+    const handle = window.setTimeout(() => {
+      const el = document.querySelector<HTMLElement>(
+        `[data-entry-id="${CSS.escape(focusEntry.id)}"]`,
+      );
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+      setFocusedRowId(focusEntry.id);
+    }, 0);
+    return () => window.clearTimeout(handle);
+  }, [focusEntry, open, log]);
+
+  // Clear the focused-row attribute after the 1500ms CSS animation completes
+  // so a re-render doesn't reapply the keyframes.
+  React.useEffect(() => {
+    if (!focusedRowId) return;
+    const handle = window.setTimeout(() => setFocusedRowId(null), 1500);
+    return () => window.clearTimeout(handle);
+  }, [focusedRowId]);
+
+  const filteredLog = log.filter(
+    (e) =>
+      (methodFilter === "All" || e.method === methodFilter) &&
+      matchStatusBucket(e.status, statusFilter),
+  );
+
   const runRequest = async () => {
     setRunning(true);
     setResult(null);
@@ -709,9 +791,14 @@ export const ApiInspector = ({
       setResult({ ok: true, status: last?.status, ms: last?.ms, data });
     } catch (e) {
       const last = API_LOG[0];
+      // Prefer the log's recorded status (newest entry on top); fall back to
+      // errorStatus(e) for non-HTTP throws (e.g. unexpected TypeError before
+      // the funnel could record one). This is the 3rd consumer of A-3's
+      // errorStatus helper alongside ErrorBox and KpiValue.
+      const status = last?.status ?? errorStatus(e);
       setResult({
         ok: false,
-        status: last?.status,
+        status,
         ms: last?.ms,
         error: String((e as Error)?.message || e),
       });
@@ -881,25 +968,119 @@ export const ApiInspector = ({
         {tab === "calls" && (
           <>
             <div className="drawer-sect">Live request log</div>
+            <div className="log-filters">
+              <select
+                className="input"
+                value={methodFilter}
+                onChange={(e) => setMethodFilter(e.target.value as MethodFilter)}
+                aria-label="Filter by HTTP method"
+              >
+                <option value="All">All methods</option>
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="DELETE">DELETE</option>
+              </select>
+              <div className="seg-row" role="group" aria-label="Filter by status range">
+                {(["All", "2xx", "4xx", "5xx/err"] as const).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className="seg-btn"
+                    data-on={statusFilter === s ? "1" : "0"}
+                    onClick={() => setStatusFilter(s)}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
             {log.length === 0 && (
               <div className="empty" style={{ padding: 20 }}>
                 No calls yet. Navigate around — every fetch shows up here.
               </div>
             )}
-            {log.map((e) => (
-              <div key={e.id} className="log-entry">
-                <span className="ep-method" data-m={e.method}>
-                  {e.method}
-                </span>
-                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {e.path}
-                </span>
-                <span className="status" data-s={bucket(e.status)}>
-                  {e.status || "ERR"}
-                </span>
-                <span className="ms">{e.ms}ms</span>
+            {log.length > 0 && filteredLog.length === 0 && (
+              <div className="empty" style={{ padding: 20 }}>
+                No calls match this filter.
               </div>
-            ))}
+            )}
+            {filteredLog.map((e) => {
+              const isExpanded = expandedId === e.id;
+              return (
+                <React.Fragment key={e.id}>
+                  <button
+                    type="button"
+                    className="log-entry"
+                    data-entry-id={e.id}
+                    data-expanded={isExpanded ? "1" : "0"}
+                    data-focused={focusedRowId === e.id ? "1" : "0"}
+                    onClick={() => setExpandedId((prev) => (prev === e.id ? null : e.id))}
+                    aria-expanded={isExpanded}
+                    aria-controls={isExpanded ? `log-detail-${e.id}` : undefined}
+                  >
+                    <span className="ep-method" data-m={e.method}>
+                      {e.method}
+                    </span>
+                    <span
+                      className="mono"
+                      style={{
+                        flex: 1,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {e.path}
+                    </span>
+                    <span className="status" data-s={bucket(e.status)}>
+                      {e.status || "ERR"}
+                    </span>
+                    <span className="log-row-ago" title={e.at}>
+                      {timeAgo(e.at)}
+                    </span>
+                    <span className="ms">{e.ms}ms</span>
+                  </button>
+                  {isExpanded && (
+                    <div
+                      className="log-row-detail"
+                      id={`log-detail-${e.id}`}
+                      role="region"
+                      aria-label={`Details for ${e.method} ${e.path}`}
+                    >
+                      <div className="mono log-row-url">{e.url}</div>
+                      {e.headers && Object.keys(e.headers).length > 0 && (
+                        <div>
+                          {Object.entries(e.headers).map(([k, v]) => (
+                            <div key={k} className="mono">
+                              {k}: {v}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {e.body != null && (
+                        <pre
+                          className="code"
+                          style={{ maxHeight: 240, whiteSpace: "pre-wrap", overflowY: "auto" }}
+                        >
+                          {previewBody(e.body)}
+                        </pre>
+                      )}
+                      {e.error && (
+                        <pre
+                          className="code"
+                          style={{ whiteSpace: "pre-wrap", color: "var(--bad)" }}
+                        >
+                          {e.status > 0 ? `HTTP ${e.status}\n` : ""}
+                          {e.error}
+                        </pre>
+                      )}
+                      <div className="log-row-detail-actions" data-entry-id={e.id} />
+                    </div>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </>
         )}
       </div>

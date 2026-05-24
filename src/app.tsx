@@ -59,6 +59,11 @@ function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const meta = useRouteMeta();
   const [inspectorOpen, setInspectorOpen] = React.useState(false);
+  // A fresh object identity per click so consecutive ErrorBox clicks on the
+  // same id re-trigger the scroll/highlight effect (review patch — naked
+  // string state was a no-op when React saw an identical value).
+  const [focusEntry, setFocusEntry] = React.useState<{ id: string; seq: number } | null>(null);
+  const focusSeqRef = React.useRef(0);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [tenants, setTenants] = React.useState<Tenant[]>([DEFAULT_TENANT]);
   const [tenant, setTenant] = React.useState<Tenant>(DEFAULT_TENANT);
@@ -171,10 +176,25 @@ function App() {
   }, []);
 
   React.useEffect(() => {
-    const onOpen = () => setInspectorOpen(true);
+    const onOpen = (e: WindowEventMap["app:open-inspector"]) => {
+      const id = e.detail?.focusEntryId;
+      if (id) {
+        // Bump the seq counter so a click on the same ErrorBox twice creates
+        // a fresh object identity and re-fires the drawer's scroll effect.
+        focusSeqRef.current += 1;
+        setFocusEntry({ id, seq: focusSeqRef.current });
+      }
+      setInspectorOpen(true);
+    };
     window.addEventListener("app:open-inspector", onOpen);
     return () => window.removeEventListener("app:open-inspector", onOpen);
   }, []);
+
+  // Clear focusEntry when the drawer closes so the next open (without a
+  // fresh ErrorBox click) doesn't re-trigger scroll-to-row from a stale id.
+  React.useEffect(() => {
+    if (!inspectorOpen) setFocusEntry(null);
+  }, [inspectorOpen]);
 
   const handleTweaks = () => {
     window.postMessage({ type: "__activate_edit_mode" }, window.origin);
@@ -212,6 +232,7 @@ function App() {
         onClose={() => setInspectorOpen(false)}
         screenEndpoints={meta.endpoints}
         screenTitle={meta.title}
+        focusEntry={focusEntry}
       />
 
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />

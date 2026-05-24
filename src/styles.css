@@ -1310,6 +1310,16 @@ a {
   line-height: 1.55;
 }
 .log-entry {
+  /* Story 8.2: row is now a real <button> for keyboard accessibility — reset
+     native button chrome first, then re-apply the layout font/size below so
+     the row paints exactly like the previous <div>. The `font: inherit`
+     shorthand MUST precede `font-family` / `font-size` longhands. */
+  font: inherit;
+  background: transparent;
+  border: none;
+  color: inherit;
+  text-align: left;
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1321,6 +1331,9 @@ a {
 }
 .log-entry:hover {
   background: var(--bg-hover);
+}
+.log-entry[data-expanded="1"] {
+  background: var(--bg-sunken);
 }
 .log-entry .status[data-s="2xx"] {
   color: var(--ok);
@@ -1335,9 +1348,86 @@ a {
 .log-entry .status[data-s="mock"] {
   color: var(--warn);
 }
+.log-entry .log-row-ago {
+  color: var(--fg-mute);
+  font-size: 10.5px;
+  margin-left: 4px;
+}
 .log-entry .ms {
   margin-left: auto;
   color: var(--fg-mute);
+}
+
+/* Story 8.2: transient highlight when a focusEntryId scrolls into view.
+   The attribute is set for 1500ms; the keyframes fade the background back
+   to transparent over the same window. Reduced-motion users get the steady
+   tint without the animation. */
+.log-entry[data-focused="1"] {
+  animation: log-focus 1500ms ease-out forwards;
+}
+@keyframes log-focus {
+  0% {
+    background: color-mix(in oklch, var(--accent) 24%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .log-entry[data-focused="1"] {
+    animation: none;
+    background: color-mix(in oklch, var(--accent) 12%, transparent);
+  }
+}
+
+/* Story 8.2: filter row above the call list — method dropdown + status pills. */
+.log-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+/* Story 8.2: expanded row detail (full URL, redacted headers, body, error).
+   The accent stripe on the left ties the detail visually to its parent row;
+   the actions slot is empty until Story 8.3 wires Copy-as-curl. */
+.log-row-detail {
+  border-left: 2px solid var(--accent);
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-soft);
+  margin: 2px 0 6px 12px;
+}
+.log-row-detail > * + * {
+  margin-top: 6px;
+}
+.log-row-detail .log-row-url {
+  word-break: break-all;
+}
+
+/* Story 8.2: ErrorBox upgrades the disabled <span> to a real <button>.
+   Text-only chrome — no fill, no border. Matches the previous span's
+   spacing so visual snapshots only churn on the now-clickable affordance. */
+.inspector-link {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 11px;
+  color: var(--fg-mute);
+  cursor: pointer;
+  text-decoration: none;
+}
+.inspector-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.inspector-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 /* ── Empty / loading ────────────────────────────────────────── */

@@ -68,16 +68,15 @@ test.describe("Dashboard partial failure (NFR-6)", () => {
     //   1. The literal selectors AC-8 names ('.error-box' / '[data-testid="error-box"]').
     //      If a future contributor adds a top-level ErrorBox to the route, the
     //      idiomatic class would be one of these.
-    //   2. The unique Story 7.3 hint title — the ErrorBox always renders this
-    //      `<span title="…">` so its presence proves an ErrorBox was rendered
-    //      (becomes load-bearing once 7.3 is merged to develop).
+    //   2. The Story 8.2 Inspector-link button only appears inside ErrorBox;
+    //      its absence proves no ErrorBox was rendered. (Story 7.3's placeholder
+    //      `<span title="Available once the API Inspector is wired …">` was
+    //      removed by 8.2 when the hint was upgraded to a real button.)
     //   3. The kpi-grid is still the page's primary surface (proves the route
     //      didn't fall back to a single error screen).
     await expect(page.locator(".error-box")).toHaveCount(0);
     await expect(page.locator('[data-testid="error-box"]')).toHaveCount(0);
-    await expect(
-      page.locator('[title="Available once the API Inspector is wired (Story 8.2)"]'),
-    ).toHaveCount(0);
+    await expect(page.locator('[data-testid="open-inspector"]')).toHaveCount(0);
     await expect(page.locator(".kpi-grid")).toBeVisible();
   });
 });

@@ -52,6 +52,8 @@ Every `request()` call pushes an entry into the in-memory `API_LOG` array (cappe
 
 The `ApiLogEntry` shape is `{ id, method, path, url, status, ms, at, headers?, body?, error? }`. Two NFR-8 guarantees about `headers`: the `Authorization` value is redacted **scheme-preservingly** — `Basic <base64>` becomes `Basic ***`, future `Bearer <jwt>` becomes `Bearer ***` (a value with no space falls through to `***` alone) — before the entry is pushed; the headers object handed to `fetch()` is **never** mutated (the redactor clones via spread). The optional `body` field carries the original JS value of `opts.body` for JSON requests — not the stringified form — so the drawer can pretty-print structured payloads. Response bodies are intentionally **not** captured (memory: 60 × 4 KB would balloon the buffer). Multipart `uploadDeployment()` calls log only the Authorization header, never the file contents or `FormData` parts.
 
+`ErrorBox` is the canonical producer of the `app:open-inspector` event (Story 8.2): every rendered error box ships a `[data-testid="open-inspector"]` button that dispatches the event with `detail: { focusEntryId? }`, where the id is matched against `API_LOG[].error` to scroll the drawer to the offending call. The drawer's "Recent calls" tab filters by method + status bucket, expands rows on click to reveal full URL + redacted headers + request body, and applies a transient `[data-focused="1"]` highlight to the scroll target.
+
 ### Connection config
 
 Persisted in `localStorage` under `flowatch.connection.v1` (`baseUrl`, `username`, `password`, `tenantId`). Defaults: `http://localhost:8080/flowable-rest/service`, `rest-admin`/`test`. Mutated via `api.setConfig(...)` or the `SettingsModal` (gear icon).
