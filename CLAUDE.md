@@ -48,11 +48,13 @@ When adding a new endpoint, just add a wrapper in [api.js](src/api.js) and expor
 
 ### Event-driven API log (the Inspector drawer)
 
-Every `request()` call pushes an entry into the in-memory `API_LOG` array (capped at 60) and dispatches a `window` `CustomEvent('api:log', { detail: entry })`. The [ApiInspector](src/components.jsx) component listens for this event to render real-time call history. Do **not** bypass `request()` for fetches — the Inspector will go blind.
+Every `request()` call pushes an entry into the in-memory `API_LOG` array (capped at 60) and dispatches a `window` `CustomEvent('api:log', { detail: entry })`. The [ApiInspector](src/components.tsx) component listens for this event to render real-time call history. Do **not** bypass `request()` for fetches — the Inspector will go blind.
+
+The `ApiLogEntry` shape is `{ id, method, path, url, status, ms, at, headers?, body?, error? }`. Two NFR-8 guarantees about `headers`: the `Authorization` value is redacted **scheme-preservingly** — `Basic <base64>` becomes `Basic ***`, future `Bearer <jwt>` becomes `Bearer ***` (a value with no space falls through to `***` alone) — before the entry is pushed; the headers object handed to `fetch()` is **never** mutated (the redactor clones via spread). The optional `body` field carries the original JS value of `opts.body` for JSON requests — not the stringified form — so the drawer can pretty-print structured payloads. Response bodies are intentionally **not** captured (memory: 60 × 4 KB would balloon the buffer). Multipart `uploadDeployment()` calls log only the Authorization header, never the file contents or `FormData` parts.
 
 ### Connection config
 
-Persisted in `localStorage` under `flowatch.connection.v1` (`baseUrl`, `username`, `password`, `tenantId`, `offlineFallback`). Defaults: `http://localhost:8080/flowable-rest/service`, `rest-admin`/`test`. Mutated via `api.setConfig(...)` or the `SettingsModal` (gear icon).
+Persisted in `localStorage` under `flowatch.connection.v1` (`baseUrl`, `username`, `password`, `tenantId`). Defaults: `http://localhost:8080/flowable-rest/service`, `rest-admin`/`test`. Mutated via `api.setConfig(...)` or the `SettingsModal` (gear icon).
 
 ### Modelers
 
