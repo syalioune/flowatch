@@ -555,6 +555,40 @@ describe("request() — config + auth", () => {
   });
 });
 
+describe("request() — asResponse option (Story 9.6 AC-1a)", () => {
+  it("returns the raw Response object when asResponse is true", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response("xml bytes", { status: 200, headers: { "content-type": "application/xml" } }),
+    );
+    const res = await api.getDeploymentResource("dep-1", "x.bpmn");
+    expect(res).toBeInstanceOf(Response);
+    expect(await res.text()).toBe("xml bytes");
+  });
+
+  it("still logs to API_LOG when asResponse is true", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+    await api.getDeploymentResource("dep-1", "x.bpmn");
+    expect(API_LOG[0]?.status).toBe(200);
+    expect(API_LOG[0]?.headers?.Authorization).toBe("Basic ***");
+    expect(API_LOG[0]?.body).toBeUndefined();
+  });
+
+  it("throws FlowableError on 4xx with asResponse", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("not found", { status: 404 }));
+    await expect(api.getDeploymentResource("dep-x", "missing.bpmn")).rejects.toBeInstanceOf(
+      FlowableError,
+    );
+    expect(API_LOG[0]?.status).toBe(404);
+  });
+
+  it("encodes the resource name in the URL path", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+    await api.getDeploymentResource("dep-1", "file with spaces.bpmn");
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain("file%20with%20spaces.bpmn");
+  });
+});
+
 describe("uploadDeployment() — sync-throw pre-network (Story 9.2 AC-7)", () => {
   /**
    * Closes the Story 8.1 deferred-work entry. The multipart-setup block

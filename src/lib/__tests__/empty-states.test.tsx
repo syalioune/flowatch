@@ -37,6 +37,12 @@ describe("empty-states registry", () => {
     expect(emptyStates.definitions?.cta).toBeUndefined();
   });
 
+  it("exposes a deploymentResources entry (added in Story 9.6)", () => {
+    expect(emptyStates.deploymentResources).toBeDefined();
+    expect(emptyStates.deploymentResources?.title).toBe("No resources.");
+    expect(emptyStates.deploymentResources?.body).toMatch(/deployments typically bundle/);
+  });
+
   it("renders title + body for the deployments entry", () => {
     const entry = emptyStates.deployments;
     if (!entry) throw new Error("deployments entry missing");

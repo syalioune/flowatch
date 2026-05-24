@@ -42,6 +42,10 @@ export const emptyStates: Record<string, EmptyStateEntry> = {
     title: "No deployments yet.",
     body: "Upload a .bpmn file or use the BPMN modeler to deploy your first process.",
   },
+  deploymentResources: {
+    title: "No resources.",
+    body: "This deployment has no files. That's unusual — deployments typically bundle at least one BPMN / DMN file.",
+  },
 };
 
 export interface EmptyStateProps {

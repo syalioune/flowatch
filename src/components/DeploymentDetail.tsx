@@ -15,9 +15,12 @@
  */
 
 import { Link, useNavigate } from "@tanstack/react-router";
-import { api, type FlowableDeployment } from "../api";
-import { fmtTime, Icon, PageHead } from "../components";
+import React from "react";
+import { api, type FlowableDeployment, type FlowableResource } from "../api";
+import { fmtTime, Icon, PageHead, toast } from "../components";
+import { EmptyState, emptyStates } from "../lib/empty-states";
 import { ErrorBox } from "../lib/error-box";
+import { TableSkeleton } from "../lib/table-skeleton";
 import { useApi } from "../lib/useApi";
 
 interface Props {
@@ -33,11 +36,39 @@ export function DeploymentDetail({ deployment }: Props) {
   const navigate = useNavigate();
   const resources = useApi(() => api.listDeploymentResources(deployment.id), [deployment.id]);
   const d = deployment as DeploymentWide;
+  const [downloading, setDownloading] = React.useState<string | null>(null);
 
   const remove = async () => {
     if (!confirm("Delete deployment? Cascading will remove instances too.")) return;
     await api.deleteDeployment(d.id, true);
     navigate({ to: "/deployments" });
+  };
+
+  const handleDownload = async (resource: FlowableResource) => {
+    setDownloading(resource.id);
+    let url: string | null = null;
+    try {
+      const res = await api.getDeploymentResource(d.id, resource.name);
+      const blob = await res.blob();
+      url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      // a.download preserves the original (un-encoded) filename for the saved file.
+      a.download = resource.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      toast({
+        kind: "err",
+        text: "Download failed",
+        sub: (err as Error)?.message ?? String(err),
+        ttl: 8000,
+      });
+    } finally {
+      if (url) URL.revokeObjectURL(url);
+      setDownloading(null);
+    }
   };
 
   return (
@@ -116,36 +147,50 @@ export function DeploymentDetail({ deployment }: Props) {
           </span>
         </div>
         <div className="panel-body" style={{ padding: 0 }}>
-          {resources.loading && (
-            <div className="empty" style={{ padding: 20 }}>
-              Loading…
-            </div>
-          )}
+          {resources.loading && <TableSkeleton columns={3} rows={4} />}
           {resources.error && <ErrorBox error={resources.error} onRetry={resources.reload} />}
-          {resources.data && resources.data.length === 0 && (
-            <div className="empty" style={{ padding: 20 }}>
-              No resources.
-            </div>
+          {resources.data &&
+            resources.data.length === 0 &&
+            (() => {
+              const entry = emptyStates.deploymentResources;
+              return entry ? <EmptyState entry={entry} /> : null;
+            })()}
+          {resources.data && resources.data.length > 0 && (
+            <table className="tbl" data-testid="deployment-resources-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {resources.data.map((r) => (
+                  <tr key={r.id} data-resource-id={r.id}>
+                    <td className="mono">{r.name}</td>
+                    <td>
+                      <span className="badge" data-tone="neutral">
+                        {r.mediaType}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn"
+                        data-size="sm"
+                        data-testid="download-resource"
+                        onClick={() => handleDownload(r)}
+                        disabled={downloading === r.id}
+                      >
+                        <Icon name="download" size={11} />
+                        {downloading === r.id ? "Downloading…" : "Download"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
-          {resources.data?.map((r) => (
-            <div
-              key={r.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                padding: "10px 14px",
-                borderBottom: "1px solid var(--line)",
-                gap: 10,
-              }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }} className="mono">
-                {r.name}
-              </div>
-              <span className="badge" data-tone="neutral">
-                {r.mediaType}
-              </span>
-            </div>
-          ))}
         </div>
       </div>
     </div>

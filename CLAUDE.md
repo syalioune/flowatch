@@ -39,7 +39,7 @@ Empty-state copy for list screens lives in [src/lib/empty-states.tsx](src/lib/em
 
 ### API layer — single request() funnel
 
-[src/api.js](src/api.js) is a thin wrapper around `fetch()`. Every endpoint method goes through a single `request(method, path, { params, body, base, raw })` function that injects Basic auth, logs the call, and parses the response. Errors propagate to the caller — there is no offline fallback.
+[src/api.js](src/api.js) is a thin wrapper around `fetch()`. Every endpoint method goes through a single `request(method, path, { params, body, base, raw, asResponse })` function that injects Basic auth, logs the call, and parses the response. Errors propagate to the caller — there is no offline fallback. `{ asResponse: true }` short-circuits the parse step and returns the raw `Response` so binary callers (e.g. `api.getDeploymentResource`) can pick `.blob()` / `.arrayBuffer()`; mutually exclusive with `raw`.
 
 Two important details:
 
