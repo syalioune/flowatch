@@ -28,6 +28,15 @@ describe("empty-states registry", () => {
     expect(emptyStates.deployments?.cta).toBeUndefined();
   });
 
+  it("exposes a definitions entry (added in Story 9.4)", () => {
+    expect(emptyStates.definitions).toBeDefined();
+    expect(emptyStates.definitions?.title).toBe("No process definitions yet.");
+    expect(emptyStates.definitions?.body).toBe(
+      "Upload a BPMN deployment to see process definitions here.",
+    );
+    expect(emptyStates.definitions?.cta).toBeUndefined();
+  });
+
   it("renders title + body for the deployments entry", () => {
     const entry = emptyStates.deployments;
     if (!entry) throw new Error("deployments entry missing");
