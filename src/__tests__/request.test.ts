@@ -554,3 +554,31 @@ describe("request() — config + auth", () => {
     expect((init.headers as Record<string, string>).Authorization).toBe(expected);
   });
 });
+
+describe("uploadDeployment() — sync-throw pre-fetch (Story 9.2 AC-7)", () => {
+  /**
+   * Closes the Story 8.1 deferred-work entry. The multipart-setup block
+   * (FormData + Blob + redactAuthHeader) now lives INSIDE the `try`, so a
+   * Blob constructor throw lands an API_LOG entry with status=0 instead of
+   * silently stranding the event.
+   */
+  it("Blob constructor throw still lands an API_LOG entry with status=0", async () => {
+    const RealBlob = globalThis.Blob;
+    const blobSpy = vi.spyOn(globalThis, "Blob").mockImplementation(() => {
+      throw new Error("Blob constructor failed");
+    });
+    try {
+      await expect(api.deployBpmn("x.bpmn", "<bpmn/>")).rejects.toThrow("Blob constructor failed");
+      expect(API_LOG[0]).toBeDefined();
+      expect(API_LOG[0]?.error).toBe("Blob constructor failed");
+      expect(API_LOG[0]?.status).toBe(0);
+      // The throw fires before headers are set; entry.headers undefined is
+      // leak-free by construction (NFR-8 only mandates "never leak").
+      expect(API_LOG[0]?.headers).toBeUndefined();
+    } finally {
+      blobSpy.mockRestore();
+      // Defensive — vi.restoreAllMocks() in afterEach handles this too.
+      globalThis.Blob = RealBlob;
+    }
+  });
+});

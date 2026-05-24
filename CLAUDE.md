@@ -71,6 +71,8 @@ The BPMN modeler:
 
 The DMN modeler is similar but its REST calls go to the `dmn-api` sub-app (see API layer note above).
 
+The Upload modal at [src/lib/upload-deployment-modal.tsx](src/lib/upload-deployment-modal.tsx) (Story 9.2) is the GUI-driven counterpart to the modeler's Save-and-deploy — both routes ultimately call `api.deployBpmn(filename, xml)`.
+
 ### State / data fetching pattern
 
 Screens use a small `useApi(fn, deps)` hook in [src/screens.jsx](src/screens.jsx) that returns `{ loading, data, error, reload }`. Every screen renders three states: loading, error (with the actual error message — no silent fallbacks), and empty (`No records.`). When you add a screen, follow this pattern rather than introducing a state library.
