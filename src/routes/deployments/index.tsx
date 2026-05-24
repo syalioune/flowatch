@@ -9,7 +9,7 @@
  * verbatim. See _bmad-output/implementation-artifacts/9-1-*.md for the spec.
  */
 
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import React from "react";
 import { api, type FlowableDeployment } from "../../api";
 import { fmtTime, Icon, PageHead, toast } from "../../components";
@@ -101,10 +101,12 @@ function PageChrome({ children, onRefresh, onUpload }: PageChromeProps) {
 function DeploymentsRoute() {
   const data = Route.useLoaderData();
   const router = useRouter();
+  const navigate = useNavigate();
   const [uploadOpen, setUploadOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<FlowableDeployment | null>(null);
   const refresh = () => router.invalidate();
   const onUpload = () => setUploadOpen(true);
+  const openDetail = (id: string) => navigate({ to: "/deployments/$id", params: { id } });
   const handleUploadSuccess = (deployment: { id: string; name: string }) => {
     toast({
       kind: "ok",
@@ -163,7 +165,17 @@ function DeploymentsRoute() {
           </thead>
           <tbody>
             {data.data.map((d) => (
-              <tr key={d.id} data-deployment-id={d.id}>
+              <tr
+                key={d.id}
+                data-deployment-id={d.id}
+                // biome-ignore lint/a11y/noNoninteractiveTabindex: row is the nav affordance; Enter triggers via onKeyDown
+                tabIndex={0}
+                style={{ cursor: "pointer" }}
+                onClick={() => openDetail(d.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") openDetail(d.id);
+                }}
+              >
                 <td>
                   <b style={{ fontWeight: 500 }}>{d.name || "—"}</b>
                 </td>
