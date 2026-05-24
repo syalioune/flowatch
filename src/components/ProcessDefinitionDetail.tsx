@@ -48,7 +48,7 @@ export function ProcessDefinitionDetail({ definition, reload }: Props) {
               <Icon name="chevron" size={12} />
               Back
             </Link>
-            <Link to="/bpmn" search={{ defId: d.id }} className="btn">
+            <Link to="/bpmn" search={{ definitionId: d.id }} className="btn">
               <Icon name="bpmn" size={12} />
               Open in modeler
             </Link>

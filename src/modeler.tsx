@@ -241,7 +241,7 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
       .catch(() => setDefinitions([]));
   }, []);
 
-  // Deep-link: if initialDefinitionId was provided (/bpmn?defId=...), load it
+  // Deep-link: if initialDefinitionId was provided (/bpmn?definitionId=...), load it
   // once the modeler is ready. Defer until both the definitions list AND the
   // modeler instance are present.
   const loadInvokedRef = React.useRef(false);
