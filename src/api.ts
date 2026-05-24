@@ -159,11 +159,14 @@ export interface FlowableVariable {
 }
 
 export interface FlowableResource {
+  // Per the live flowable-rest 7.2 response: `id` is the filename
+  // (e.g. "Helpdesk.bpmn20.xml") and there is NO `name` field. Earlier DTO
+  // versions declared `name: string` — that field never existed on the wire.
   id: string;
-  name: string;
   mediaType: string;
   type?: string;
   url?: string;
+  contentUrl?: string;
 }
 
 export interface FlowableDecisionResult {
