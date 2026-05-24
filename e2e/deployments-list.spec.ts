@@ -85,6 +85,35 @@ test.describe("/deployments canonical list (Story 9.1)", () => {
     await expect(trigger).toBeFocused();
   });
 
+  test("clicking the row navigates to the deployment detail page", async ({ page }) => {
+    await page.goto("/deployments");
+    const firstRow = page.locator("tr[data-deployment-id]").first();
+    await expect(firstRow).toBeVisible({ timeout: 15_000 });
+    const deploymentId = await firstRow.getAttribute("data-deployment-id");
+    if (!deploymentId) throw new Error("data-deployment-id missing on the first row");
+
+    // Click somewhere on the row that isn't the ⋮ trigger (the Name cell).
+    await firstRow.locator("td").first().click();
+
+    // URL transitions to the detail page and the Resources panel renders.
+    await expect(page).toHaveURL(
+      new RegExp(`/deployments/${deploymentId.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}$`),
+    );
+    await expect(page.locator('[data-testid="deployment-resources-table"]')).toBeVisible({
+      timeout: 15_000,
+    });
+  });
+
+  test("clicking the ⋮ trigger does NOT navigate (stopPropagation)", async ({ page }) => {
+    await page.goto("/deployments");
+    const firstRow = page.locator("tr[data-deployment-id]").first();
+    await expect(firstRow).toBeVisible({ timeout: 15_000 });
+    await firstRow.locator('[data-testid="row-action-trigger"]').click();
+    // The menu opened — the URL is still /deployments.
+    await expect(page.locator('[role="menu"]')).toBeVisible();
+    await expect(page).toHaveURL(/\/deployments$/);
+  });
+
   test("Upload button opens the upload-deployment modal (Story 9.2)", async ({ page }) => {
     await page.goto("/deployments");
     // Page chrome stays consistent across pending/data — wait for the Upload
