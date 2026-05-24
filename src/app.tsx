@@ -49,7 +49,7 @@ interface Tenant {
   name: string;
 }
 interface AppConnectionState {
-  state: "pending" | "ok" | "err";
+  state: "pending" | "ok" | "err" | "unset";
   host: string;
 }
 
@@ -92,26 +92,54 @@ function App() {
     }
   }, [t.look, t.theme, t.density, t.accent]);
 
+  // Sequence guard: each probe() bumps the counter; commits to `setConn`
+  // only when the in-flight call's sequence still matches `latest`. Prevents
+  // (a) stale resolution from clobbering a fresher probe and (b) state
+  // updates after unmount.
+  const probeSeq = React.useRef(0);
+  const mountedRef = React.useRef(true);
   React.useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const probe = React.useCallback(async (): Promise<void> => {
+    const cfg = api.config();
+    const host = cfg.baseUrl.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    const seq = ++probeSeq.current;
+    const commit = (next: AppConnectionState): void => {
+      if (!mountedRef.current || seq !== probeSeq.current) return;
+      setConn(next);
+    };
+    commit({ state: "pending", host: "connecting…" });
+    try {
+      const r = await api.ping();
+      commit({ state: "ok", host: `${r.name} ${r.version} @ ${host}` });
+    } catch (_e) {
+      commit({ state: "err", host: `unreachable: ${host}` });
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void probe();
     (async () => {
-      const cfg = api.config();
-      const host = cfg.baseUrl.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-      try {
-        const r = await api.ping();
-        setConn({
-          state: "ok",
-          host: `${host} · ${r?.name || "engine"} ${r?.version || ""}`.trim(),
-        });
-      } catch (_e) {
-        setConn({ state: "err", host: `${host} · unreachable` });
-      }
       try {
         const tres = await api.listTenants();
         const list = [DEFAULT_TENANT, ...(tres.data || [])];
         setTenants(list);
       } catch {}
     })();
-  }, []);
+  }, [probe]);
+
+  React.useEffect(() => {
+    const handler = (): void => {
+      void probe();
+    };
+    window.addEventListener("conn:config-changed", handler);
+    return () => window.removeEventListener("conn:config-changed", handler);
+  }, [probe]);
 
   React.useEffect(() => {
     let cancelled = false;
