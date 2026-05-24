@@ -34,6 +34,10 @@ export interface EmptyStateEntry {
 }
 
 export const emptyStates: Record<string, EmptyStateEntry> = {
+  definitions: {
+    title: "No process definitions yet.",
+    body: "Upload a BPMN deployment to see process definitions here.",
+  },
   deployments: {
     title: "No deployments yet.",
     body: "Upload a .bpmn file or use the BPMN modeler to deploy your first process.",
