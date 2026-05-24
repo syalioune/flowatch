@@ -536,16 +536,21 @@ const uploadDeployment = async (
     ms: 0,
     at: new Date().toISOString(),
   };
-  const fd = new FormData();
-  fd.append("file", new Blob([content], { type }), filename);
-  if (cfg.tenantId) fd.append("tenantId", cfg.tenantId);
-  if (opts.deploymentName) fd.append("deploymentName", opts.deploymentName);
-
-  // Multipart uploads don't set Content-Type — fetch derives it from FormData.
-  // We mirror that in the captured headers (Authorization only), per AC-3.
-  const uploadHeaders: Record<string, string> = { Authorization: basicAuth() };
-  entry.headers = redactAuthHeader(uploadHeaders);
   try {
+    // Multipart setup lives inside the try (Story 9.2, AC-7). FormData /
+    // Blob constructors and redactAuthHeader CAN throw — moving them inside
+    // the try ensures the entry lands in API_LOG with status=0 + the
+    // engine-visible error message even on these "throw before fetch" paths.
+    // Closes the Story 8.1 deferred-work item.
+    const fd = new FormData();
+    fd.append("file", new Blob([content], { type }), filename);
+    if (cfg.tenantId) fd.append("tenantId", cfg.tenantId);
+    if (opts.deploymentName) fd.append("deploymentName", opts.deploymentName);
+
+    // Multipart uploads don't set Content-Type — fetch derives it from FormData.
+    // We mirror that in the captured headers (Authorization only), per AC-3.
+    const uploadHeaders: Record<string, string> = { Authorization: basicAuth() };
+    entry.headers = redactAuthHeader(uploadHeaders);
     const res = await fetch(url, {
       method: "POST",
       headers: uploadHeaders,
