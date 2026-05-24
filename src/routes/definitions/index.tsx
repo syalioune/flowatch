@@ -183,6 +183,10 @@ function DefinitionsRoute() {
                     ariaLabel={`Actions for definition ${d.name || d.key}`}
                     items={[
                       {
+                        label: "Open in modeler",
+                        onSelect: () => navigate({ to: "/bpmn", search: { definitionId: d.id } }),
+                      },
+                      {
                         label: isSuspended ? "Activate" : "Suspend",
                         onSelect: () => toggleSuspend(d),
                       },
