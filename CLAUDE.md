@@ -35,6 +35,8 @@ Other Makefile namespaces (see `make help`): `bootstrap-*` (one-time GitHub repo
 
 [src/app.jsx](src/app.jsx) holds a single `view` state string and renders one screen via a `switch` statement. There is no React Router — adding/renaming a screen means updating three places in [app.jsx](src/app.jsx): the `switch`, `VIEW_TITLE`, and `ENDPOINT_BY_VIEW` (the latter feeds the [ApiInspector](src/components.jsx) chips for that screen).
 
+Empty-state copy for list screens lives in [src/lib/empty-states.tsx](src/lib/empty-states.tsx) — bootstrap-and-extend: every list-screen story (Deployments first, then Process Definitions, Instances, Tasks, Jobs, History, Identity) appends its own entry to the `emptyStates` record.
+
 ### API layer — single request() funnel
 
 [src/api.js](src/api.js) is a thin wrapper around `fetch()`. Every endpoint method goes through a single `request(method, path, { params, body, base, raw })` function that injects Basic auth, logs the call, and parses the response. Errors propagate to the caller — there is no offline fallback.
@@ -72,6 +74,8 @@ The DMN modeler is similar but its REST calls go to the `dmn-api` sub-app (see A
 ### State / data fetching pattern
 
 Screens use a small `useApi(fn, deps)` hook in [src/screens.jsx](src/screens.jsx) that returns `{ loading, data, error, reload }`. Every screen renders three states: loading, error (with the actual error message — no silent fallbacks), and empty (`No records.`). When you add a screen, follow this pattern rather than introducing a state library.
+
+**v1 canonical for list screens (Story 9.1 onwards):** URL-identity list data uses TanStack Router's `loader` + `pendingComponent` + `errorComponent` slots (precedent: [src/routes/deployments/index.tsx](src/routes/deployments/index.tsx)). `useApi` remains the pattern for secondary fetches inside components. The migration of the other list screens (Process Definitions, Instances, Tasks, Jobs, History, Identity) lands in subsequent Epic 9-15 stories — until each one ships, those screens keep their `useApi` implementation.
 
 ### Vite → nginx → Flowable proxy chain
 
