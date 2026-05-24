@@ -59,7 +59,10 @@ export default defineConfig({
       //   src/api.ts:         96/92/96/93 (lines/branches/statements/functions) — raised by Story 7.1 (loadCfg + saveCfg coverage)
       //   src/screens.tsx:    1/0/0/1     (calibrated floor as of 2026-05-19)
       //   src/modeler.tsx:    0/0/0/0     (calibrated floor as of 2026-05-19)
-      //   src/components.tsx: 7/0/0/7     (calibrated floor as of 2026-05-19)
+      //   src/components.tsx: 49/70/33/49 (ratcheted by Story 8.2 from 7/0/0/7
+      //                                    when the new ApiInspector.spec.tsx
+      //                                    browser-tier suite exercised the
+      //                                    drawer for the first time)
       //
       // ### Ratchet schedule (Milestone 0.0.2)
       //
@@ -79,7 +82,7 @@ export default defineConfig({
         perFile: true,
         "src/lib/**": { lines: 60, branches: 60, functions: 60, statements: 60 },
         "src/api.ts": { lines: 96, branches: 92, statements: 96, functions: 93 },
-        "src/components.tsx": { lines: 7, branches: 0, functions: 0, statements: 7 },
+        "src/components.tsx": { lines: 49, branches: 70, functions: 33, statements: 49 },
         "src/modeler.tsx": { lines: 0, branches: 0, functions: 0, statements: 0 },
         "src/screens.tsx": { lines: 1, branches: 0, functions: 0, statements: 1 },
       },

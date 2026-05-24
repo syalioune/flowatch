@@ -17,7 +17,8 @@
 
 import { createFileRoute, Link } from "@tanstack/react-router";
 import React from "react";
-import { api, FlowableError, type FlowablePage } from "../api";
+import { api, type FlowablePage } from "../api";
+import { errorStatus } from "../lib/error";
 
 type TileResult = PromiseSettledResult<FlowablePage<unknown> | { total: number }>;
 
@@ -118,8 +119,7 @@ function KpiValue({ result }: { result: TileResult | null }) {
     return <>{result.value.total}</>;
   }
   const err = result.reason;
-  const status =
-    err instanceof FlowableError ? err.status : ((err as { status?: number })?.status ?? 0);
+  const status = errorStatus(err);
   const message = err instanceof Error ? err.message : String(err ?? "");
   return (
     <span style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}>

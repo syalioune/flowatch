@@ -24,11 +24,15 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { FlowableError } from "../../api";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { API_LOG, type ApiLogEntry, FlowableError } from "../../api";
 import { ErrorBox } from "../../screens";
 
 describe("<ErrorBox>", () => {
+  beforeEach(() => {
+    // Reset module-singleton state so per-test API_LOG seeds are deterministic.
+    API_LOG.length = 0;
+  });
   afterEach(() => {
     cleanup();
   });
@@ -85,16 +89,66 @@ describe("<ErrorBox>", () => {
     expect(screen.queryByText(/^HTTP /)).toBeNull();
   });
 
-  it("(7.3) always renders the disabled Open Inspector hint", () => {
+  // ── Story 8.2 ────────────────────────────────────────────────────────────
+  // Disabled hint upgraded to a real <button data-testid="open-inspector">.
+  // ErrorBox now also exposes data-testid="error-box" on its wrapper for
+  // the new E2E to target the box without relying on placeholder copy.
+
+  it("(8.2) renders the Open Inspector button (no longer disabled)", () => {
     render(<ErrorBox error={new Error("boom")} />);
-    const hint = screen.getByTitle("Available once the API Inspector is wired (Story 8.2)");
-    expect(hint).toBeInTheDocument();
-    expect(hint).toHaveTextContent("Open Inspector ↗");
-    expect(hint).toHaveAttribute("data-disabled", "1");
-    expect(hint).toHaveAttribute("aria-disabled", "true");
-    // Intentionally NOT asserting tagName — Story 8.2 will upgrade the
-    // <span> to a real <button>/<a>. The contract here is the data-disabled
-    // attribute (Story 8.2 will flip it) and the title copy, not the tag.
+    const btn = screen.getByTestId("open-inspector");
+    expect(btn).toBeInTheDocument();
+    expect(btn).toHaveTextContent("Open Inspector ↗");
+    expect(btn.tagName).toBe("BUTTON");
+    expect(btn).not.toHaveAttribute("data-disabled");
+    expect(btn).not.toHaveAttribute("aria-disabled");
+    expect(btn).toHaveAttribute("title", "Open API Inspector");
+    expect(screen.getByTestId("error-box")).toBeInTheDocument();
+  });
+
+  it("(8.2) clicking Open Inspector dispatches app:open-inspector with focusEntryId from API_LOG", async () => {
+    const seeded: ApiLogEntry = {
+      id: "seed-id-42",
+      method: "GET",
+      path: "/x",
+      url: "http://localhost:8080/x",
+      status: 404,
+      ms: 5,
+      at: new Date().toISOString(),
+      error: "Object not found",
+    };
+    API_LOG.unshift(seeded);
+
+    const spy = vi.fn();
+    window.addEventListener("app:open-inspector", spy as EventListener);
+
+    const user = userEvent.setup();
+    render(<ErrorBox error={new FlowableError("Object not found", 404)} />);
+    await user.click(screen.getByTestId("open-inspector"));
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    const ev = spy.mock.calls[0]?.[0] as CustomEvent<{ focusEntryId?: string } | undefined>;
+    expect(ev.detail?.focusEntryId).toBe("seed-id-42");
+
+    window.removeEventListener("app:open-inspector", spy as EventListener);
+  });
+
+  it("(8.2) Open Inspector still fires when API_LOG has no matching entry — focusEntryId is absent", async () => {
+    const spy = vi.fn();
+    window.addEventListener("app:open-inspector", spy as EventListener);
+
+    const user = userEvent.setup();
+    render(<ErrorBox error={new FlowableError("unmatched body", 500)} />);
+    await user.click(screen.getByTestId("open-inspector"));
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    const ev = spy.mock.calls[0]?.[0] as CustomEvent<{ focusEntryId?: string } | undefined>;
+    // CustomEvent({ detail: undefined }) coerces to null per WHATWG DOM spec —
+    // the contract the listener actually reads is `ev.detail?.focusEntryId`,
+    // which is `undefined` for both null and undefined detail.
+    expect(ev.detail?.focusEntryId).toBeUndefined();
+
+    window.removeEventListener("app:open-inspector", spy as EventListener);
   });
 
   it("(7.3 review) preserves whitespace and newlines verbatim (P-003)", () => {
