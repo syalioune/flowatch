@@ -59,10 +59,17 @@ export default defineConfig({
       //   src/api.ts:         96/92/96/93 (lines/branches/statements/functions) — raised by Story 7.1 (loadCfg + saveCfg coverage)
       //   src/screens.tsx:    1/0/0/1     (calibrated floor as of 2026-05-19)
       //   src/modeler.tsx:    0/0/0/0     (calibrated floor as of 2026-05-19)
-      //   src/components.tsx: 49/70/33/49 (ratcheted by Story 8.2 from 7/0/0/7
-      //                                    when the new ApiInspector.spec.tsx
-      //                                    browser-tier suite exercised the
-      //                                    drawer for the first time)
+      //   src/components.tsx: 51/72/38/51 (ratcheted by Story 8.3 from 49/70/33/49
+      //                                    when the (8.3) copy-as-curl browser-
+      //                                    tier cases extended the drawer suite;
+      //                                    8.2 had previously ratcheted from
+      //                                    7/0/0/7 when ApiInspector.spec.tsx
+      //                                    first exercised the drawer. Branch
+      //                                    floor stays at 72 because the
+      //                                    review-patch CopyAsCurlButton adds
+      //                                    feature-detect + busy-state branches
+      //                                    that aren't yet tested — kept above
+      //                                    the 70 baseline 8.2 established.)
       //
       // ### Ratchet schedule (Milestone 0.0.2)
       //
@@ -82,7 +89,7 @@ export default defineConfig({
         perFile: true,
         "src/lib/**": { lines: 60, branches: 60, functions: 60, statements: 60 },
         "src/api.ts": { lines: 96, branches: 92, statements: 96, functions: 93 },
-        "src/components.tsx": { lines: 49, branches: 70, functions: 33, statements: 49 },
+        "src/components.tsx": { lines: 51, branches: 72, functions: 38, statements: 51 },
         "src/modeler.tsx": { lines: 0, branches: 0, functions: 0, statements: 0 },
         "src/screens.tsx": { lines: 1, branches: 0, functions: 0, statements: 1 },
       },
