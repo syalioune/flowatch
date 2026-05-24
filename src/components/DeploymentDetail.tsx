@@ -48,13 +48,15 @@ export function DeploymentDetail({ deployment }: Props) {
     setDownloading(resource.id);
     let url: string | null = null;
     try {
-      const res = await api.getDeploymentResource(d.id, resource.name);
+      // Per flowable-rest 7.2: resource.id IS the filename (e.g.
+      // "Helpdesk.bpmn20.xml"). The engine has no separate `name` field —
+      // id is the human-readable filename AND the resourcedata path segment.
+      const res = await api.getDeploymentResource(d.id, resource.id);
       const blob = await res.blob();
       url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      // a.download preserves the original (un-encoded) filename for the saved file.
-      a.download = resource.name;
+      a.download = resource.id;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -167,7 +169,7 @@ export function DeploymentDetail({ deployment }: Props) {
               <tbody>
                 {resources.data.map((r) => (
                   <tr key={r.id} data-resource-id={r.id}>
-                    <td className="mono">{r.name}</td>
+                    <td className="mono">{r.id}</td>
                     <td>
                       <span className="badge" data-tone="neutral">
                         {r.mediaType}

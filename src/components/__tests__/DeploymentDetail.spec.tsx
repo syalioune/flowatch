@@ -30,8 +30,8 @@ const deployment: FlowableDeployment = {
 };
 
 const resources: FlowableResource[] = [
-  { id: "r-1", name: "orders.bpmn", mediaType: "application/xml" },
-  { id: "r-2", name: "orders-form.json", mediaType: "application/json" },
+  { id: "orders.bpmn", mediaType: "application/xml" },
+  { id: "orders-form.json", mediaType: "application/json" },
 ];
 
 type ListFn = (id: string) => Promise<FlowableResource[]>;
