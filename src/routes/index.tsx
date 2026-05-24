@@ -15,7 +15,7 @@
  * Story 7.4 / Epic 7.
  */
 
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import React from "react";
 import { api, FlowableError, type FlowablePage } from "../api";
 
