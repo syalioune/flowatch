@@ -65,6 +65,11 @@ export interface RequestOpts {
   body?: unknown;
   base?: string | undefined;
   raw?: boolean | undefined;
+  // Story 9.6: when set, request() returns the raw `Response` object instead
+  // of a parsed body. Used by binary downloads where the caller picks the body
+  // method (`.blob()` / `.arrayBuffer()`). Mutually exclusive with `raw` — if
+  // both are set, `asResponse` wins.
+  asResponse?: boolean | undefined;
 }
 
 export class FlowableError extends Error {
@@ -314,7 +319,7 @@ async function request<T = unknown>(
   path: string,
   opts: RequestOpts = {},
 ): Promise<T> {
-  const { params, body, base, raw } = opts;
+  const { params, body, base, raw, asResponse } = opts;
   const root = (base || cfg.baseUrl).replace(/\/$/, "");
   const url = root + path + qs(params);
   const t0 = performance.now();
@@ -359,6 +364,14 @@ async function request<T = unknown>(
       logCall(entry);
       throw new FlowableError(entry.error, res.status);
     }
+    // Story 9.6: when asResponse is set, log the entry and hand the caller the
+    // raw Response so they pick the body method (.blob() for binary, .text()
+    // for XML, etc.). NFR-8 is preserved — entry.body stays undefined; the
+    // response bytes never enter API_LOG.
+    if (asResponse) {
+      logCall(entry);
+      return res as unknown as T;
+    }
     const data: T = raw
       ? ((await res.text()) as unknown as T)
       : res.headers.get("content-type")?.includes("application/json")
@@ -391,6 +404,15 @@ const deleteDeployment = (id: string, cascade?: boolean) =>
   );
 const listDeploymentResources = (id: string) =>
   request<FlowableResource[]>("GET", `/repository/deployments/${id}/resources`);
+// Story 9.6: binary download path. Returns the raw Response so callers pick
+// the body method (.blob() for octet-stream, .text() for XML). Mirrors
+// getProcessDefinitionResource but at the deployment-resource level.
+const getDeploymentResource = (deploymentId: string, resourceName: string) =>
+  request<Response>(
+    "GET",
+    `/repository/deployments/${deploymentId}/resourcedata/${encodeURIComponent(resourceName)}`,
+    { asResponse: true },
+  );
 const listProcessDefinitions = (params?: QueryParams) =>
   request<FlowablePage<FlowableProcessDefinition>>("GET", "/repository/process-definitions", {
     params,
@@ -617,6 +639,7 @@ export const api = {
   createDeployment,
   deleteDeployment,
   listDeploymentResources,
+  getDeploymentResource,
   listProcessDefinitions,
   getProcessDefinition,
   suspendProcessDefinition,
