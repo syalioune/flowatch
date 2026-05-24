@@ -57,15 +57,17 @@ test.describe("Upload BPMN deployment (Story 9.2)", () => {
     // Modal closes on success.
     await expect(modal).toBeHidden({ timeout: 15_000 });
 
-    // Success toast appears with the filename.
-    await expect(page.getByText(/Deployed: test-upload\.bpmn/)).toBeVisible({
+    // Success toast appears. Flowable strips the .bpmn extension from the
+    // deployment name on the server side, so the toast reads "Deployed:
+    // test-upload" (not "test-upload.bpmn"). Be lenient on the suffix.
+    await expect(page.getByText(/Deployed: test-upload/)).toBeVisible({
       timeout: 10_000,
     });
 
     // New row appears in the table.
     const newRow = page
       .locator("tr[data-deployment-id]")
-      .filter({ hasText: "test-upload.bpmn" })
+      .filter({ hasText: "test-upload" })
       .first();
     await expect(newRow).toBeVisible({ timeout: 10_000 });
   });

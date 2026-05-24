@@ -1,18 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * Unit suite for <DeploymentDetail> — Story 9.6 Resources panel rewrite.
+ * Browser-tier suite for <DeploymentDetail> — Story 9.6 Resources panel.
  *
- * The panel now uses canonical primitives: <TableSkeleton> in the loading
- * state, <EmptyState entry={emptyStates.deploymentResources}> for empty,
- * <ErrorBox onRetry> for errors, and a <table className="tbl"> with a
- * per-row Download button that streams the resource via
- * api.getDeploymentResource + Response.blob().
- *
- * Authored as jsdom `.test.tsx` so it contributes to the
- * src/components.tsx coverage gate (browser-tier `.spec.tsx` files run
- * under a separate Vitest project that doesn't report into the same
- * coverage).
+ * Authored as `.spec.tsx` (browser tier / Chromium) so the test mounts the
+ * component inside a real TanStack Router context without distorting the
+ * unit-tier per-file coverage gate on src/components.tsx (which the jsdom
+ * tier measures). The four-state panel + Download flow is the contract.
  */
 
 import "@testing-library/jest-dom/vitest";
@@ -45,8 +39,6 @@ type DownloadFn = (deploymentId: string, resourceName: string) => Promise<Respon
 type Host = { listDeploymentResources: ListFn; getDeploymentResource: DownloadFn };
 
 const renderDetail = () => {
-  // <DeploymentDetail> uses useNavigate() — mount inside a TanStack Router
-  // memory history harness so the hook resolves at runtime.
   const rootRoute = createRootRoute({
     component: () => <DeploymentDetail deployment={deployment} />,
   });

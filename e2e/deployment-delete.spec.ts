@@ -62,17 +62,19 @@ test.describe("Delete deployment (Story 9.3)", () => {
     await row.locator('[data-testid="row-action-trigger"]').click();
     await page.getByRole("menuitem", { name: "Delete" }).click();
 
-    // Modal opens with the deployment name + Delete button.
+    // Modal opens with the deployment name + Delete button. Flowable strips
+    // the .bpmn extension server-side, so the modal shows "test-upload".
     const modal = page.locator('[data-testid="delete-deployment-modal"]');
     await expect(modal).toBeVisible();
-    await expect(modal).toContainText("test-upload.bpmn");
+    await expect(modal).toContainText("test-upload");
 
     // Submit (cascade unchecked is fine — no running instances).
     await page.locator('[data-testid="delete-confirm"]').click();
 
     // Modal closes; success toast appears; row disappears.
     await expect(modal).toBeHidden({ timeout: 10_000 });
-    await expect(page.getByText(/Deleted: test-upload\.bpmn/)).toBeVisible({ timeout: 10_000 });
+    // Flowable strips the .bpmn extension server-side.
+    await expect(page.getByText(/Deleted: test-upload/)).toBeVisible({ timeout: 10_000 });
     await expect(row).toBeHidden({ timeout: 10_000 });
   });
 

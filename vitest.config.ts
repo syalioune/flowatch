@@ -109,7 +109,7 @@ export default defineConfig({
         perFile: true,
         "src/lib/**": { lines: 60, branches: 60, functions: 60, statements: 60 },
         "src/api.ts": { lines: 96, branches: 92, statements: 96, functions: 93 },
-        "src/components.tsx": { lines: 51, branches: 72, functions: 38, statements: 51 },
+        "src/components.tsx": { lines: 53, branches: 75, functions: 45, statements: 53 },
         "src/modeler.tsx": { lines: 0, branches: 0, functions: 0, statements: 0 },
         "src/screens.tsx": { lines: 1, branches: 0, functions: 0, statements: 1 },
       },

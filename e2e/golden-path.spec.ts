@@ -77,7 +77,7 @@ test("operator golden path: definitions → start → instance → claim → com
   // Sidebar shows the Dashboard label on initial load.
   await expect(page.getByText("Dashboard", { exact: true }).first()).toBeVisible();
 
-  // ── 1. Process definitions: locate the deployed Loan Approval row and start it
+  // ── 1. Process definitions: locate the deployed Loan Approval row.
   await page.locator(".nav-item").filter({ hasText: "Process definitions" }).click();
   const defRow = page
     .locator("table.tbl tbody tr")
@@ -85,15 +85,20 @@ test("operator golden path: definitions → start → instance → claim → com
     .first();
   await expect(defRow).toBeVisible({ timeout: 15_000 });
 
-  // Click the per-row Start button — opens the StartProcessDialog.
-  await defRow.getByRole("button", { name: /^Start$/ }).click();
-
-  // The modal-ft contains the dialog's Start button (data-variant="primary").
-  const startDialog = page.locator(".modal");
-  await expect(startDialog).toBeVisible();
-  await startDialog.getByRole("button", { name: /^Start$/ }).click();
-  // Modal closes on success.
-  await expect(startDialog).toBeHidden({ timeout: 10_000 });
+  // Story 9.4 replaced the inline per-row Start button with a placeholder
+  // menu item that toasts the forward-reference to Story 10.2. Until the
+  // real Start Instance modal lands, this E2E starts the instance via the
+  // REST API directly — the value of the golden path is the
+  // claim/complete/history surface, not the Start UI (which 10.2 owns).
+  const defKey = "loanApproval";
+  const startRes = await fetch(`${FLOWABLE}/runtime/process-instances`, {
+    method: "POST",
+    headers: { Authorization: BASIC, "Content-Type": "application/json" },
+    body: JSON.stringify({ processDefinitionKey: defKey }),
+  });
+  if (!startRes.ok) {
+    throw new Error(`Failed to start instance: ${startRes.status} ${await startRes.text()}`);
+  }
 
   // ── 2. Process instances: confirm the new instance is in the list
   await page.locator(".nav-item").filter({ hasText: "Process instances" }).click();
