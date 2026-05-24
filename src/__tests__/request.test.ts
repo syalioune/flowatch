@@ -239,6 +239,45 @@ describe("request() — api:log event bus", () => {
     expect(ev.detail.error).toBe("bad request");
   });
 
+  it("entry includes headers with Authorization redacted to 'Basic ***'", async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 200,
+        json: { data: [], total: 0, start: 0, size: 0, sort: "", order: "" },
+      }),
+    );
+    await api.listDeployments();
+
+    expect(API_LOG[0]?.headers?.Authorization).toBe("Basic ***");
+    expect(API_LOG[0]?.headers?.Accept).toBe("application/json");
+  });
+
+  it("entry includes the original opts.body when provided as a JS value", async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 201, json: { id: "pi-1" } }));
+    const payload = {
+      processDefinitionId: "def-1",
+      variables: [{ name: "x", value: 1 }],
+    };
+    await api.startProcessInstance(payload);
+
+    expect(API_LOG[0]?.body).toEqual(payload);
+    // Identity preserved — no defensive JSON.parse(JSON.stringify).
+    expect(API_LOG[0]?.body).toBe(payload);
+  });
+
+  it("entry leaves body undefined for GET requests", async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 200,
+        json: { data: [], total: 0, start: 0, size: 0, sort: "", order: "" },
+      }),
+    );
+    await api.listDeployments();
+
+    expect(API_LOG[0]?.body).toBeUndefined();
+  });
+
+  // AC-4 / Story 8.1: ring buffer cap re-asserted here (do not duplicate).
   it("API_LOG ring buffer caps at 60 entries, newest first", async () => {
     // Response body is single-use, so build a fresh Response per call.
     fetchMock.mockImplementation(() =>
@@ -404,6 +443,88 @@ describe("api.* wrappers smoke (P-001 — every call goes through request())", (
     const r = await api.ping();
     expect(r.name).toBe("flowable");
     expect(r.version).toBe("7.2.0");
+  });
+});
+
+describe("request() — NFR-8 credential redaction", () => {
+  it("raw Basic-auth credential never appears in API_LOG (success / 4xx / network)", async () => {
+    const credential = btoa("rest-admin:test");
+
+    // (a) success
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, json: { ok: true } }));
+    await api.runRaw("GET", "/probe-ok");
+    expect(JSON.stringify(API_LOG)).not.toContain(credential);
+    expect(JSON.stringify(API_LOG)).toContain('"Authorization":"Basic ***"');
+
+    // (b) 4xx
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 400, body: "bad" }));
+    await expect(api.runRaw("GET", "/probe-bad")).rejects.toBeInstanceOf(FlowableError);
+    expect(JSON.stringify(API_LOG)).not.toContain(credential);
+    expect(JSON.stringify(API_LOG)).toContain('"Authorization":"Basic ***"');
+
+    // (c) network
+    fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
+    await expect(api.runRaw("GET", "/probe-net")).rejects.toBeInstanceOf(TypeError);
+    expect(JSON.stringify(API_LOG)).not.toContain(credential);
+    expect(JSON.stringify(API_LOG)).toContain('"Authorization":"Basic ***"');
+  });
+
+  it("redaction survives setConfig() with new credentials", async () => {
+    api.setConfig({
+      baseUrl: DEFAULT_BASE,
+      username: "alice",
+      password: "s3cret!",
+      tenantId: "",
+    });
+    // Defensive: setConfig does not log, but reset to keep AT-the-test indices unambiguous.
+    API_LOG.length = 0;
+
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, json: { ok: true } }));
+    await api.runRaw("GET", "/probe");
+
+    const newCredential = btoa("alice:s3cret!");
+    expect(JSON.stringify(API_LOG)).not.toContain(newCredential);
+    expect(API_LOG[0]?.headers?.Authorization).toBe("Basic ***");
+    // The username itself MAY appear in url/path/body if the caller intentionally
+    // puts it there — only the *header* value is in scope for redaction.
+  });
+
+  it("uploadDeployment() entries also redact Authorization (success + failure)", async () => {
+    const credential = btoa("rest-admin:test");
+
+    // success
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ status: 201, json: { id: "dep-1", name: "x", deploymentTime: "" } }),
+    );
+    await api.deployBpmn("x.bpmn", "<bpmn/>");
+    expect(API_LOG[0]?.headers?.Authorization).toBe("Basic ***");
+    expect(API_LOG[0]?.headers?.["Content-Type"]).toBeUndefined();
+    expect(JSON.stringify(API_LOG)).not.toContain(credential);
+
+    // failure (4xx body propagates verbatim into entry.error; no header leak)
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 400, body: "bad model" }));
+    await expect(api.deployBpmn("bad.bpmn", "<bpmn/>")).rejects.toBeInstanceOf(FlowableError);
+    expect(API_LOG[0]?.headers?.Authorization).toBe("Basic ***");
+    expect(JSON.stringify(API_LOG)).not.toContain(credential);
+
+    // network failure (status: 0 in log)
+    fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
+    await expect(api.deployBpmn("bad.bpmn", "<bpmn/>")).rejects.toBeInstanceOf(TypeError);
+    expect(API_LOG[0]?.status).toBe(0);
+    expect(API_LOG[0]?.headers?.Authorization).toBe("Basic ***");
+  });
+
+  it("redactor preserves the auth scheme prefix (forward-compat with Bearer)", async () => {
+    // Branch-coverage helper: the redactor must split on the first space and
+    // preserve the scheme. Today only Basic is sent, so we exercise the helper
+    // via a successful Basic call and assert the prefix is preserved.
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, json: { ok: true } }));
+    await api.runRaw("GET", "/probe");
+
+    const auth = API_LOG[0]?.headers?.Authorization ?? "";
+    expect(auth.startsWith("Basic ")).toBe(true);
+    expect(auth.endsWith(" ***")).toBe(true);
+    expect(auth).not.toContain(btoa("rest-admin:test"));
   });
 });
 

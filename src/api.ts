@@ -53,6 +53,8 @@ export interface ApiLogEntry {
   status: number;
   ms: number;
   at: string;
+  headers?: Record<string, string>;
+  body?: unknown;
   error?: string;
 }
 
@@ -249,6 +251,20 @@ const logCall = (entry: ApiLogEntry): void => {
   window.dispatchEvent(new CustomEvent<ApiLogEntry>("api:log", { detail: entry }));
 };
 
+// NFR-8: scheme-preserving redaction of the Authorization header before the
+// entry lands in API_LOG. Splits on the first space so "Basic <base64>" becomes
+// "Basic ***" and a future "Bearer <jwt>" becomes "Bearer ***". The clone via
+// spread is what makes this safe — the headers object passed to fetch() is
+// never mutated; only the captured copy is.
+function redactAuthHeader(headers: Record<string, string>): Record<string, string> {
+  const out = { ...headers };
+  if (out.Authorization) {
+    const space = out.Authorization.indexOf(" ");
+    out.Authorization = space > 0 ? `${out.Authorization.slice(0, space)} ***` : "***";
+  }
+  return out;
+}
+
 // Dev-only seed hook: lets Playwright visual tests inject deterministic API_LOG
 // entries without going through the real request() funnel. Guarded by Vite's
 // DEV flag so production bundles never expose it. (Story 2.4 / Path B.)
@@ -321,8 +337,18 @@ async function request<T = unknown>(
       headers["Content-Type"] = "application/json";
     }
     const init: RequestInit = { method, headers };
+    // Per AC-2/AC-6/AC-7: redact the Authorization header on the captured
+    // copy before any further work so success, 4xx, 5xx, network-error, AND
+    // body-serialization-error (circular ref, BigInt, throwing toJSON) paths
+    // all surface the redacted form in API_LOG. The `headers` object handed
+    // to fetch() is untouched — redactAuthHeader clones via spread.
+    entry.headers = redactAuthHeader(headers);
     if (body) {
       init.body = JSON.stringify(body);
+      // Per AC-3: capture the original JS value (not the stringified form) so
+      // the Inspector can pretty-print structured bodies. Placed before fetch
+      // so network-error paths (status: 0) still see the body in API_LOG.
+      entry.body = body;
     }
     const res = await fetch(url, init);
     entry.status = res.status;
@@ -515,10 +541,14 @@ const uploadDeployment = async (
   if (cfg.tenantId) fd.append("tenantId", cfg.tenantId);
   if (opts.deploymentName) fd.append("deploymentName", opts.deploymentName);
 
+  // Multipart uploads don't set Content-Type — fetch derives it from FormData.
+  // We mirror that in the captured headers (Authorization only), per AC-3.
+  const uploadHeaders: Record<string, string> = { Authorization: basicAuth() };
+  entry.headers = redactAuthHeader(uploadHeaders);
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: { Authorization: basicAuth() },
+      headers: uploadHeaders,
       body: fd,
     });
     entry.status = res.status;
