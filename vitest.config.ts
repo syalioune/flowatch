@@ -80,9 +80,29 @@ export default defineConfig({
       // raise the relevant per-file floor in this config in the same commit,
       // by the amount the new tests earn (re-measure: `npx vitest run
       // --coverage`). Don't outrun the schedule — the goal is monotonic
-      // non-regression, not a race to 100%. Floors are NEVER lowered; a
-      // story that needs to drop one must also delete tests and call that
-      // out explicitly for reviewer.
+      // non-regression, not a race to 100%.
+      //
+      // ### Ratchet-down policy (Epic 8 retro A-2, 2026-05-24)
+      //
+      // The ratchet is monotonic-upward by default. A downward nudge is
+      // allowed ONLY when ALL THREE conditions hold:
+      //
+      //   (a) The dropped coverage is from NEW code that isn't yet tested
+      //       (not from regressing existing tests).
+      //   (b) The gap is booked as a `deferred-work.md` entry with either a
+      //       named follow-up story OR a "next story touching this file"
+      //       tag, so the gap doesn't decay silently.
+      //   (c) The downward nudge is ≤ 2 percentage points per metric.
+      //
+      // Larger nudges, multi-metric drops, or unexplained nudges BLOCK the
+      // PR. The downward case must be called out explicitly in the story's
+      // `## Completion Notes List` with the conditions evidenced — reviewers
+      // gate on this comment, not on the diff alone. The ratchet's value as
+      // a forcing function depends on it being a one-way ratchet by default.
+      //
+      // Precedent: Story 8.3 nudged `src/components.tsx` branches 73 → 72
+      // for `CopyAsCurlButton`'s untested feature-detect + busy-state
+      // branches (deferred-work entry filed, < 2pp drop, new code only).
       //
       // See story 6.5-1 for the baseline derivation.
       thresholds: {
