@@ -26,3 +26,5 @@ secret:
       match: "flowable:flowable"
     - name: "Test-fixture prod config for localStorage round-trip (config.test.ts AC-1/AC-5)"
       match: "s3cr3t"
+    - name: "Test-fixture credential for NFR-8 redaction-after-setConfig case (request.test.ts Story 8.1)"
+      match: "s3cret!"
