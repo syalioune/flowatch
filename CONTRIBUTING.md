@@ -86,6 +86,28 @@ Known behavior to be aware of:
   style. If a Biome rule fights with project conventions, raise it as a PR
   against `biome.json` instead.
 
+## Pattern P-001 enforcement (fetch funnel)
+
+Every Flowable REST call must go through `request()` in [src/api.ts](src/api.ts) (the funnel that populates `API_LOG` and dispatches the `api:log` event the Inspector listens to). A direct `fetch()` call anywhere else makes the Inspector go blind for that call — operators relying on the live REST log lose visibility. CI enforces this via [scripts/ci/check-fetch-funnel.sh](scripts/ci/check-fetch-funnel.sh).
+
+Run the check locally:
+
+```bash
+npm run check:p-001
+```
+
+The script greps for `fetch(` in `src/**/*.ts(x)`, allowlists `src/api.ts`, and ignores any line carrying a `p-001-allow` comment. The escape-hatch comment is only acceptable when the `fetch(` token is inside a **string literal** (the canonical example is `buildFetchSnippet`'s template literal in `src/components.tsx` — the snippet text shown in the Inspector's "Try it" tab) or JSX text content (the "fetch()" tab label). Both `// p-001-allow` (JS context) and `{/* p-001-allow */}` (JSX text context) are accepted. Adding the comment to bypass enforcement on an actual `fetch()` call is grounds for a code-review block.
+
+Failing CI output looks like:
+
+```
+✗ src/screens.tsx:42:  return await fetch(url);
+
+1 violation(s) — every fetch() call must funnel through src/api.ts (Pattern P-001). See CONTRIBUTING.md.
+```
+
+Pattern P-001 is documented in the private companion repo `flowatch-bmad` (architecture.md §P-001) — public-facing rationale is the one-paragraph summary above: every REST call must go through `request()` so the API Inspector reflects the truth of what the app is doing.
+
 ## What goes where
 
 | You want to… | Open this template | Land it in… |
