@@ -11,8 +11,9 @@
 
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import React from "react";
-import { api } from "../../api";
+import { api, type FlowableDeployment } from "../../api";
 import { fmtTime, Icon, PageHead, toast } from "../../components";
+import { DeleteDeploymentModal } from "../../lib/delete-deployment-modal";
 import { EmptyState, emptyStates } from "../../lib/empty-states";
 import { ErrorBox } from "../../lib/error-box";
 import { RowActionMenu } from "../../lib/row-action-menu";
@@ -101,6 +102,7 @@ function DeploymentsRoute() {
   const data = Route.useLoaderData();
   const router = useRouter();
   const [uploadOpen, setUploadOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<FlowableDeployment | null>(null);
   const refresh = () => router.invalidate();
   const onUpload = () => setUploadOpen(true);
   const handleUploadSuccess = (deployment: { id: string; name: string }) => {
@@ -112,31 +114,23 @@ function DeploymentsRoute() {
     });
     router.invalidate({ filter: (r) => r.routeId === "/deployments/" });
   };
-
-  const deleteDeployment = async (id: string, cascade: boolean) => {
-    const label = cascade
-      ? "Delete this deployment AND every running instance it produced?"
-      : "Delete this deployment? (no cascade — fails if instances exist)";
-    if (!confirm(label)) return;
-    try {
-      await api.deleteDeployment(id, cascade);
-      router.invalidate();
-    } catch (err) {
-      toast({
-        kind: "err",
-        text: "Delete failed",
-        sub: (err as Error)?.message ?? String(err),
-        ttl: 8000,
-      });
-    }
+  const handleDeleteSettled = () => {
+    router.invalidate({ filter: (r) => r.routeId === "/deployments/" });
   };
 
   const modal = (
-    <UploadDeploymentModal
-      open={uploadOpen}
-      onClose={() => setUploadOpen(false)}
-      onSuccess={handleUploadSuccess}
-    />
+    <>
+      <UploadDeploymentModal
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        onSuccess={handleUploadSuccess}
+      />
+      <DeleteDeploymentModal
+        deployment={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onSettled={handleDeleteSettled}
+      />
+    </>
   );
 
   if (data.data.length === 0) {
@@ -181,14 +175,9 @@ function DeploymentsRoute() {
                     ariaLabel={`Actions for deployment ${d.name || d.id}`}
                     items={[
                       {
-                        label: "Delete (cascade)",
+                        label: "Delete",
                         danger: true,
-                        onSelect: () => deleteDeployment(d.id, true),
-                      },
-                      {
-                        label: "Delete (no cascade)",
-                        danger: true,
-                        onSelect: () => deleteDeployment(d.id, false),
+                        onSelect: () => setDeleteTarget(d),
                       },
                     ]}
                   />

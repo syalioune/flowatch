@@ -589,6 +589,14 @@ a {
 .btn[data-variant="danger"] {
   color: var(--bad);
 }
+.btn[data-variant="danger-strong"] {
+  background: var(--bad);
+  border-color: var(--bad);
+  color: var(--accent-fg);
+}
+.btn[data-variant="danger-strong"]:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
 .btn[data-size="sm"] {
   height: 26px;
   padding: 0 8px;
