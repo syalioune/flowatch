@@ -555,7 +555,7 @@ describe("request() — config + auth", () => {
   });
 });
 
-describe("uploadDeployment() — sync-throw pre-fetch (Story 9.2 AC-7)", () => {
+describe("uploadDeployment() — sync-throw pre-network (Story 9.2 AC-7)", () => {
   /**
    * Closes the Story 8.1 deferred-work entry. The multipart-setup block
    * (FormData + Blob + redactAuthHeader) now lives INSIDE the `try`, so a
