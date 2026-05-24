@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import React from "react";
 import noticeContent from "../NOTICE?raw";
 import { API_LOG, type ApiLogEntry, api, type FlowableConfig, type HTTPMethod } from "./api";
+import { buildCurlCommand, CURL_MULTIPART, CURL_UNSERIALIZABLE } from "./lib/curl";
 import { errorStatus } from "./lib/error";
 import { type RouteEndpoint, useRouteMeta } from "./lib/route-meta";
 
@@ -696,6 +697,56 @@ function matchStatusBucket(status: number, filter: StatusFilter): boolean {
   return status >= 500 || status === 0;
 }
 
+// Per-row Copy-as-curl button. Lives outside ApiInspector so each row carries
+// its own `busy` state — double-clicks during the in-flight writeText don't
+// fire two clipboard writes / two toasts (review patch). Also feature-detects
+// navigator.clipboard.writeText and renders a disabled state with explanatory
+// note when the API is unavailable (HTTP non-localhost contexts; review patch).
+const CopyAsCurlButton = ({ command }: { command: string }) => {
+  const [busy, setBusy] = React.useState(false);
+  const clipboardAvailable =
+    typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function";
+
+  if (!clipboardAvailable) {
+    return (
+      <span
+        className="log-row-detail-note"
+        title="navigator.clipboard requires a secure context (HTTPS or localhost)"
+      >
+        Clipboard unavailable — use HTTPS or localhost
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="btn"
+      data-size="sm"
+      data-testid="copy-as-curl"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          await navigator.clipboard.writeText(command);
+          toast({ kind: "ok", text: "Copied curl command", ttl: 3000 });
+        } catch (err) {
+          toast({
+            kind: "bad",
+            text: "Copy failed",
+            sub: err instanceof Error ? err.message : String(err),
+            ttl: 5000,
+          });
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      Copy as curl
+    </button>
+  );
+};
+
 export const ApiInspector = ({
   open,
   onClose,
@@ -1075,7 +1126,26 @@ export const ApiInspector = ({
                           {e.error}
                         </pre>
                       )}
-                      <div className="log-row-detail-actions" data-entry-id={e.id} />
+                      <div className="log-row-detail-actions" data-entry-id={e.id}>
+                        {(() => {
+                          const cmd = buildCurlCommand(e, api.config());
+                          if (cmd === CURL_MULTIPART) {
+                            return (
+                              <span className="log-row-detail-note">
+                                Multipart upload — reproduce via the modeler
+                              </span>
+                            );
+                          }
+                          if (cmd === CURL_UNSERIALIZABLE) {
+                            return (
+                              <span className="log-row-detail-note">
+                                Body not serializable to JSON — copy manually
+                              </span>
+                            );
+                          }
+                          return <CopyAsCurlButton command={cmd} />;
+                        })()}
+                      </div>
                     </div>
                   )}
                 </React.Fragment>

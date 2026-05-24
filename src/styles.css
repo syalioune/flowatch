@@ -1405,6 +1405,17 @@ a {
 .log-row-detail .log-row-url {
   word-break: break-all;
 }
+.log-row-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.log-row-detail-note {
+  font-style: italic;
+  color: var(--fg-mute);
+  font-size: 11px;
+}
 
 /* Story 8.2: ErrorBox upgrades the disabled <span> to a real <button>.
    Text-only chrome — no fill, no border. Matches the previous span's

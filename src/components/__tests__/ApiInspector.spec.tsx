@@ -168,6 +168,95 @@ describe("<ApiInspector> (Story 8.2)", () => {
     expect(detail).toHaveTextContent('"processDefinitionId": "def-1"');
   });
 
+  it("(8.3) clicking Copy as curl writes the curl command to the clipboard and dispatches a success toast", async () => {
+    seed([
+      {
+        id: "curl-row",
+        method: "GET",
+        path: "/repository/deployments",
+        url: "http://localhost:8080/flowable-rest/service/repository/deployments",
+        status: 200,
+      },
+    ]);
+    const writeSpy = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
+    const toastSpy = vi.fn();
+    window.addEventListener("app:toast", toastSpy as EventListener);
+    const user = userEvent.setup();
+    render(<ApiInspector open={true} onClose={() => {}} screenEndpoints={[]} screenTitle="Test" />);
+    await user.click(screen.getByText("Recent calls"));
+    await user.click(document.querySelector('[data-entry-id="curl-row"]') as HTMLElement);
+    await user.click(screen.getByTestId("copy-as-curl"));
+
+    // Let the async onClick microtask drain.
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(writeSpy).toHaveBeenCalledTimes(1);
+    expect(writeSpy.mock.calls[0]?.[0] as string).toMatch(/^curl -u 'rest-admin:test'/);
+    expect(toastSpy).toHaveBeenCalledTimes(1);
+    const ev = toastSpy.mock.calls[0]?.[0] as CustomEvent<{ kind?: string; text: string }>;
+    expect(ev.detail.text).toBe("Copied curl command");
+    expect(ev.detail.kind).toBe("ok");
+
+    window.removeEventListener("app:toast", toastSpy as EventListener);
+    writeSpy.mockRestore();
+  });
+
+  it("(8.3) Copy as curl failure path dispatches a 'Copy failed' toast with the error message", async () => {
+    seed([
+      {
+        id: "curl-fail",
+        method: "GET",
+        path: "/probe",
+        url: "http://localhost:8080/probe",
+        status: 200,
+      },
+    ]);
+    const writeSpy = vi
+      .spyOn(navigator.clipboard, "writeText")
+      .mockRejectedValue(new Error("permission denied"));
+    const toastSpy = vi.fn();
+    window.addEventListener("app:toast", toastSpy as EventListener);
+    const user = userEvent.setup();
+    render(<ApiInspector open={true} onClose={() => {}} screenEndpoints={[]} screenTitle="Test" />);
+    await user.click(screen.getByText("Recent calls"));
+    await user.click(document.querySelector('[data-entry-id="curl-fail"]') as HTMLElement);
+    await user.click(screen.getByTestId("copy-as-curl"));
+
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(toastSpy).toHaveBeenCalledTimes(1);
+    const ev = toastSpy.mock.calls[0]?.[0] as CustomEvent<{
+      kind?: string;
+      text: string;
+      sub?: string;
+    }>;
+    expect(ev.detail.kind).toBe("bad");
+    expect(ev.detail.text).toBe("Copy failed");
+    expect(ev.detail.sub).toBe("permission denied");
+
+    window.removeEventListener("app:toast", toastSpy as EventListener);
+    writeSpy.mockRestore();
+  });
+
+  it("(8.3) multipart deploy entries hide the Copy as curl button and show a note instead", async () => {
+    seed([
+      {
+        id: "multipart",
+        method: "POST",
+        path: "/repository/deployments",
+        url: "http://localhost:8080/flowable-rest/service/repository/deployments",
+        status: 201,
+      },
+    ]);
+    const user = userEvent.setup();
+    render(<ApiInspector open={true} onClose={() => {}} screenEndpoints={[]} screenTitle="Test" />);
+    await user.click(screen.getByText("Recent calls"));
+    await user.click(document.querySelector('[data-entry-id="multipart"]') as HTMLElement);
+
+    expect(screen.queryByTestId("copy-as-curl")).toBeNull();
+    expect(screen.getByText("Multipart upload — reproduce via the modeler")).toBeInTheDocument();
+  });
+
   it("registers exactly one api:log + one api:log-cleared listener per mount (AC-10)", () => {
     const addSpy = vi.spyOn(window, "addEventListener");
     const removeSpy = vi.spyOn(window, "removeEventListener");
