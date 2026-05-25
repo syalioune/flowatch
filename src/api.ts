@@ -126,6 +126,26 @@ export interface FlowableTask {
   tenantId?: string;
 }
 
+// Story 11.3 (closes the Story 1.1 deferred-work entry for FlowableTaskForm).
+// Per the Flowable FormProperty contract, `type` is a curated union; the
+// trailing `string` keeps unknown engine-extension types type-checking so
+// the form panel can fall through to a text-input render.
+export interface FlowableFormProperty {
+  id: string;
+  name?: string;
+  type: "string" | "long" | "double" | "enum" | "date" | "boolean" | string;
+  value?: string;
+  required?: boolean;
+  readable?: boolean;
+  writable?: boolean;
+  enumValues?: Array<string | { id?: string; name?: string }>;
+}
+
+export interface FlowableTaskForm {
+  formKey?: string;
+  formProperties?: FlowableFormProperty[];
+}
+
 export interface FlowableJob {
   id: string;
   processInstanceId?: string;
@@ -490,9 +510,15 @@ const getTaskVariables = (taskId: string) =>
 
 // ── Form ──────────────────────────────────────────────────────────────────
 const getTaskForm = (taskId: string) =>
-  request<Record<string, unknown>>("GET", "/form/form-data", { params: { taskId } });
-const submitTaskForm = (taskId: string, properties: unknown) =>
-  request<Record<string, unknown>>("POST", "/form/form-data", { body: { taskId, properties } });
+  request<FlowableTaskForm>("GET", "/form/form-data", { params: { taskId } });
+// Story 11.3: body shape is `{ taskId, properties }` per the Flowable contract;
+// `properties` is an array of `{ id, value }` envelopes (value is always a
+// string at the wire — booleans become "true" / "false"; numbers serialise
+// via their JS string form).
+const submitTaskForm = (
+  taskId: string,
+  body: { properties: Array<{ id: string; value: string }> },
+) => request<FlowableTaskForm>("POST", "/form/form-data", { body: { taskId, ...body } });
 
 // ── Management ───────────────────────────────────────────────────────────
 const listJobs = (params?: QueryParams) =>
