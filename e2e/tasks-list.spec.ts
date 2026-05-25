@@ -131,9 +131,9 @@ test.describe("/tasks list (Story 11.1)", () => {
   });
 
   test("AC-6: warning toast when assignee=me has empty username", async ({ page }) => {
-    // Seed an empty username in localStorage before the app boots so loadTasks
-    // sees `cfg.username === ""` and the warning toast fires on mount. Keep
-    // the rest of the canonical config so the engine probe stays green.
+    // Seed an empty username in localStorage AND install a toast collector
+    // before the app boots so we don't miss the warning toast even if the
+    // rendered `.toast` element TTL elapses before the assertion catches it.
     await page.addInitScript(() => {
       localStorage.setItem(
         "flowatch.connection.v1",
@@ -144,11 +144,25 @@ test.describe("/tasks list (Story 11.1)", () => {
           tenantId: "",
         }),
       );
+      const w = window as unknown as { __captured?: Array<{ text?: string; kind?: string }> };
+      w.__captured = [];
+      window.addEventListener("app:toast", (e) => {
+        const detail = (e as CustomEvent<{ text?: string; kind?: string }>).detail;
+        w.__captured?.push(detail);
+      });
     });
     await page.goto("/tasks?assignee=me");
-    // Warning toast text per AC-6.
-    await expect(page.locator(".toast").filter({ hasText: "No username configured" })).toBeVisible({
-      timeout: 10_000,
-    });
+    // Assert via the captured event log — the loader fires the toast via
+    // setTimeout(0) at route-resolution time, before TasksRoute mounts.
+    await page.waitForFunction(
+      () => {
+        const w = window as unknown as { __captured?: Array<{ text?: string; kind?: string }> };
+        return (w.__captured ?? []).some(
+          (t) => t.kind === "warn" && (t.text ?? "").includes("No username configured"),
+        );
+      },
+      undefined,
+      { timeout: 10_000 },
+    );
   });
 });

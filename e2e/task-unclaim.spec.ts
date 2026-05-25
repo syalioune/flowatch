@@ -132,17 +132,45 @@ test.describe("/tasks Unclaim (Story 11.5)", () => {
     const row = page.locator(`tr[data-task-id="${seedTaskId}"]`).first();
     await expect(row).toBeVisible({ timeout: 15_000 });
 
+    // Capture toasts via the window event — the rendered `.toast` element has
+    // a 3s TTL and may have disappeared before the assertion catches it.
+    await page.evaluate(() => {
+      const w = window as unknown as { __captured?: string[] };
+      w.__captured = [];
+      window.addEventListener("app:toast", (e) => {
+        const detail = (e as CustomEvent<{ text?: string }>).detail;
+        if (detail?.text) w.__captured?.push(detail.text);
+      });
+    });
+
     // Open the ⋮ menu; Unclaim should be visible because the operator is the
-    // current assignee.
+    // current assignee. Use Playwright's native click (which dispatches a
+    // proper mousedown → mouseup → click sequence matching the React event
+    // model). The mousedown-close handler in RowActionMenu checks if the
+    // event target is inside menuRef — since the `<li>` IS inside the menu,
+    // the close path doesn't fire.
     await row.locator('[data-testid="row-action-trigger"]').click();
     const unclaim = page.getByRole("menuitem", { name: "Unclaim" });
     await expect(unclaim).toBeVisible();
     await unclaim.click();
 
-    // Success toast.
-    await expect(page.locator(".toast").filter({ hasText: /Unclaimed:/ })).toBeVisible({
-      timeout: 10_000,
-    });
+    // Wait for any toast event to fire then verify it's the success toast.
+    // If the unclaim succeeded, we see "Unclaimed: <name>". If the engine
+    // rejected, we see "Unclaim failed" — log it for debug.
+    await page.waitForFunction(
+      () => {
+        const w = window as unknown as { __captured?: string[] };
+        return (w.__captured ?? []).length > 0;
+      },
+      undefined,
+      { timeout: 10_000 },
+    );
+    const captured = (await page.evaluate(
+      () => (window as unknown as { __captured?: string[] }).__captured ?? [],
+    )) as string[];
+    expect(captured, `captured toasts: ${JSON.stringify(captured)}`).toEqual(
+      expect.arrayContaining([expect.stringMatching(/Unclaimed:/)]),
+    );
 
     // Task should now be in the unassigned filter (engine cleared assignee).
     await page.goto("/tasks?assignee=unassigned");

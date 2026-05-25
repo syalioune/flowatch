@@ -133,10 +133,17 @@ test.describe("/tasks/$id form submit (Story 11.3)", () => {
     await expect(page.getByTestId("task-form-field-comment")).toBeVisible();
 
     // The legacy Complete button is hidden when a form is present (AC-9).
-    await expect(page.getByRole("button", { name: "Complete" })).toHaveCount(0);
+    // `exact: true` so we don't false-match the form panel's "Submit and
+    // complete: <name>" button.
+    await expect(page.getByRole("button", { name: "Complete", exact: true })).toHaveCount(0);
 
-    // Select the "approve" enum and type a comment.
-    await page.getByRole("button", { name: "Approve" }).click();
+    // Select the "approve" enum and type a comment. Scope the Approve click to
+    // the decision field's seg-row to avoid matching the form Submit button
+    // (which contains "Approve loan with form" in its accessible name).
+    await page
+      .getByTestId("task-form-field-decision")
+      .getByRole("button", { name: "Approve" })
+      .click();
     await page.getByLabel("Comment").fill("Looks good — approving.");
 
     // Submit. Atomically completes the task — navigation lands back at /tasks.

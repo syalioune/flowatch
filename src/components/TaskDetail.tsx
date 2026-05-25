@@ -46,7 +46,12 @@ export function TaskDetail({ task, reload }: Props) {
     () => api.getTaskForm(t.id).catch(() => null) as Promise<ParentTaskForm>,
     [t.id],
   );
-  const hasForm = !!form.data;
+  // hasForm gates the legacy Complete button (AC-9). Flowable 7.2 returns a
+  // truthy payload (e.g. `{ formKey: null }`) even for tasks without
+  // declared form properties, so we additionally require non-empty
+  // formProperties before considering the form "real" — otherwise the
+  // operator loses access to the Complete button on no-form tasks.
+  const hasForm = !!form.data?.formProperties && form.data.formProperties.length > 0;
   const variables = useApi(() => api.getTaskVariables(t.id), [t.id]);
 
   // Story 11.4: Delegate modal + Resolve handler state.

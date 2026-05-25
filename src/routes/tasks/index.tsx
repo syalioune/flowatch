@@ -43,6 +43,22 @@ export const loadTasks = (assignee: TasksAssignee) => {
   // as "missing" per AC-1's "empty / missing" wording. Otherwise we'd forward
   // `assignee=" "` to the engine and get an empty list silently.
   const username = api.config().username?.trim() ?? "";
+  // AC-6: fire the warning toast at loader time (not inside TasksRoute) so it
+  // reaches the operator even when the loader call subsequently rejects (e.g.
+  // engine 401 on empty username). The loader is invoked once per route
+  // visit, so this also gives the natural "once per mount" semantics AC-6
+  // requires. Defer to next tick so the Toaster's `app:toast` listener
+  // (mounted as part of <App>) is registered before the event fires.
+  if (assignee === "me" && !username) {
+    setTimeout(() => {
+      toast({
+        kind: "warn",
+        text: "No username configured — showing all tasks.",
+        sub: "Set a username in Settings to filter by 'Mine'.",
+        ttl: 6000,
+      });
+    }, 0);
+  }
   if (assignee === "me" && username) return api.listTasks({ size: 50, assignee: username });
   if (assignee === "unassigned") return api.listTasks({ size: 50, unassigned: true });
   return api.listTasks({ size: 50 });
@@ -233,10 +249,16 @@ function TasksRoute() {
   // engine's assignee with `""` during the optimistic window. No new state
   // structure; the Claim/Unclaim toggle is closed by symmetric reuse of the
   // existing Map (intentional — do not refactor into two Maps).
+  //
+  // Live-engine note: Flowable 7.2 does NOT expose an `action: "unclaim"`
+  // verb (the engine returns `{"exception": "Invalid action: 'unclaim'."}`).
+  // The supported pattern is `action: "claim"` with `assignee: null`, which
+  // re-claims the task with a cleared assignee. Verified by direct REST
+  // probe against `flowable-rest:7.2.0` on 2026-05-25.
   const handleUnclaim = async (t: TaskWide) => {
     setOptimisticClaimed((m) => new Map(m).set(t.id, ""));
     try {
-      await api.taskAction(t.id, "unclaim");
+      await api.taskAction(t.id, "claim", { assignee: null });
       toast({ kind: "ok", text: `Unclaimed: ${t.name || t.id}`, ttl: 3000 });
       await router.invalidate({ filter: (r) => r.routeId === "/tasks/" });
       window.dispatchEvent(new CustomEvent("nav:invalidate-counts"));
@@ -292,19 +314,8 @@ function TasksRoute() {
     }
   };
 
-  // AC-6: one-shot warning toast when the operator selected "Mine" but has no
-  // username configured. Keyed on [assignee, cfgUsername] so it fires exactly
-  // once per route mount (not on every render).
-  React.useEffect(() => {
-    if (assignee === "me" && !cfgUsername) {
-      toast({
-        kind: "warn",
-        text: "No username configured — showing all tasks.",
-        sub: "Set a username in Settings to filter by 'Mine'.",
-        ttl: 6000,
-      });
-    }
-  }, [assignee, cfgUsername]);
+  // AC-6 warning toast lives in the loader now — fires once per route visit
+  // even when the loader call subsequently rejects on engine 401.
 
   if (data.data.length === 0) {
     return (
