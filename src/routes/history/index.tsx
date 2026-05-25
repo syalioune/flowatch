@@ -1,32 +1,43 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * History list route (Story 13.1) — sixth application of the Story 9.1
- * canonical list archetype (loader + four-state contract + EmptyState +
- * TableSkeleton). Structural copy of src/routes/jobs/index.tsx (12.1) with
- * one new shape: the URL-driven `<seg-row>` dispatches between the
- * canonical archetype (Instances tab) AND a transitional `<LegacyHistoryShim>`
- * for the remaining three tabs. Story 13.3 migrates the Variables + Tasks
- * tabs to real canonical loaders and deletes the shim.
+ * History list route — seventh application of the Story 9.1 canonical list
+ * archetype with multi-endpoint loader dispatch (mirrors src/routes/jobs/
+ * index.tsx 12.1's tab-aware dispatch shape, now applied to a READ-only
+ * surface).
  *
- * Routing identity: the old `src/routes/history.tsx` is DELETED in the same
- * PR — TanStack Router treats `routes/history.tsx` and `routes/history/index.tsx`
- * as the same `/history` route, so the directory form is a structural
- * relocation (no URL change).
+ * 13.1 introduced the route file with a single `instances` branch + a
+ * transitional <LegacyHistoryShim> for `activities|variables|tasks`. 13.3
+ * adds canonical-archetype dispatch for `variables` and `tasks` (in this
+ * commit) and leaves `activities` routed through the shim. The follow-up
+ * `chore(refactor):` commit drops the activities tab, the shim, and the
+ * legacy <History> block from src/screens.tsx in a single
+ * pure-deletion commit per Epic 12 retro §3.4.
  */
 
-import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
-import React from "react";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import type React from "react";
 import { z } from "zod";
-import { api, type FlowableHistoricProcessInstance } from "../../api";
+import {
+  api,
+  type FlowableHistoricProcessInstance,
+  type FlowableHistoricTask,
+  type FlowableHistoricVariable,
+  type FlowablePage,
+} from "../../api";
 import { fmtMs, fmtTime, Icon, PageHead } from "../../components";
-import { EmptyState, emptyStates } from "../../lib/empty-states";
+import { typeTone } from "../../components/InstanceVariablesPanel";
+import { EmptyState, type EmptyStateEntry, emptyStates } from "../../lib/empty-states";
 import { ErrorBox } from "../../lib/error-box";
 import { LegacyHistoryShim } from "../../lib/legacy-history-shim";
 import { TableSkeleton } from "../../lib/table-skeleton";
 
-type HistoricWide = FlowableHistoricProcessInstance & {
+type HistoricInstanceWide = FlowableHistoricProcessInstance & {
   processDefinitionName?: string;
+};
+
+type HistoricTaskWide = FlowableHistoricTask & {
+  startTime?: string;
 };
 
 const historySearch = z.object({
@@ -35,30 +46,46 @@ const historySearch = z.object({
 
 export type HistoryType = "instances" | "activities" | "variables" | "tasks";
 
-// Exported for unit testing of the AC-1 type-branch behaviour. The loader
-// returns null when the type is not `instances` so the legacy shim renders
-// without re-fetching at the route level.
-export const loadHistoricInstances = (type: HistoryType) => {
-  if (type !== "instances") return null;
-  return api.listHistoricInstances({
-    size: 50,
-    finished: true,
-    sort: "endTime",
-    order: "desc",
-  });
+// Loader dispatches between three historic endpoints + the legacy
+// `activities` tab (which still routes through <LegacyHistoryShim> until
+// the follow-up chore(refactor) commit). Exported for unit testing of the
+// branch behaviour.
+export const loadHistoryByType = (type: HistoryType) => {
+  if (type === "instances") {
+    return api.listHistoricInstances({
+      size: 50,
+      finished: true,
+      sort: "endTime",
+      order: "desc",
+    });
+  }
+  if (type === "variables") return api.listHistoricVariables({ size: 50 });
+  if (type === "tasks") return api.listHistoricTasks({ size: 50, finished: true });
+  // `activities` tab is handled by the legacy shim — no route-level fetch.
+  return null;
 };
 
 export const Route = createFileRoute("/history/")({
   validateSearch: historySearch,
   loaderDeps: ({ search: { type } }) => ({ type }),
-  loader: ({ deps }) => loadHistoricInstances(deps.type),
+  loader: ({ deps }) => loadHistoryByType(deps.type),
   staticData: {
     title: "History",
     endpoints: [
       {
         method: "GET",
         path: "/history/historic-process-instances",
-        desc: "List completed instances",
+        desc: "Completed instances",
+      },
+      {
+        method: "GET",
+        path: "/history/historic-variable-instances",
+        desc: "Historic variables",
+      },
+      {
+        method: "GET",
+        path: "/history/historic-task-instances",
+        desc: "Historic tasks",
       },
     ],
   },
@@ -81,7 +108,13 @@ function PageChrome({ children, onRefresh, type, onTypeChange }: PageChromeProps
         title="History"
         subtitle="Completed process instances and audit trail."
         actions={
-          <button type="button" className="btn" onClick={onRefresh} disabled={!onRefresh}>
+          <button
+            type="button"
+            className="btn"
+            data-testid="history-refresh"
+            onClick={onRefresh}
+            disabled={!onRefresh}
+          >
             <Icon name="refresh" size={13} />
             Refresh
           </button>
@@ -136,9 +169,11 @@ function useTypeNav() {
 
 function HistoryPending() {
   const { type, onTypeChange } = useTypeNav();
+  // Column count differs by tab; default to 5 (matches instances + tasks).
+  const cols = type === "variables" ? 4 : 5;
   return (
     <PageChrome type={type} onTypeChange={onTypeChange}>
-      <TableSkeleton columns={5} rows={6} />
+      <TableSkeleton columns={cols} rows={6} />
     </PageChrome>
   );
 }
@@ -157,6 +192,13 @@ function HistoryError({ error, reset }: HistoryErrorProps) {
   );
 }
 
+const emptyStateByType = (type: HistoryType): EmptyStateEntry | undefined => {
+  if (type === "instances") return emptyStates.historicInstances;
+  if (type === "variables") return emptyStates.historicVariables;
+  if (type === "tasks") return emptyStates.historicTasks;
+  return undefined;
+};
+
 function HistoryRoute() {
   const data = Route.useLoaderData();
   const { type, onTypeChange } = useTypeNav();
@@ -166,7 +208,10 @@ function HistoryRoute() {
   const refresh = () => router.invalidate({ filter: (r) => r.routeId === "/history/" });
   const openDetail = (id: string) => navigate({ to: "/instances/$id", params: { id } });
 
-  if (type !== "instances") {
+  // `activities` tab keeps routing through the legacy shim until the
+  // follow-up chore(refactor) commit drops the legacy block + the
+  // tab from the seg-row + the Zod schema atomically.
+  if (type === "activities") {
     return (
       <PageChrome type={type} onTypeChange={onTypeChange}>
         <LegacyHistoryShim type={type} />
@@ -175,48 +220,142 @@ function HistoryRoute() {
   }
 
   if (!data || data.data.length === 0) {
+    const entry = emptyStateByType(type);
     return (
       <PageChrome onRefresh={refresh} type={type} onTypeChange={onTypeChange}>
-        {(() => {
-          const entry = emptyStates.historicInstances;
-          if (!entry) return null;
-          return <EmptyState entry={entry} />;
-        })()}
+        {entry ? <EmptyState entry={entry} /> : null}
       </PageChrome>
     );
   }
 
+  if (type === "instances") {
+    const page = data as FlowablePage<FlowableHistoricProcessInstance>;
+    return (
+      <PageChrome onRefresh={refresh} type={type} onTypeChange={onTypeChange}>
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>Business key</th>
+              <th>Definition</th>
+              <th>Duration</th>
+              <th>Started</th>
+              <th>Ended</th>
+            </tr>
+          </thead>
+          <tbody>
+            {page.data.map((raw) => {
+              const p = raw as HistoricInstanceWide;
+              return (
+                <tr
+                  key={p.id}
+                  data-historic-instance-id={p.id}
+                  tabIndex={0}
+                  style={{ cursor: "pointer" }}
+                  onClick={() => openDetail(p.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") openDetail(p.id);
+                  }}
+                >
+                  <td className="mono">{p.businessKey || p.id}</td>
+                  <td>{p.processDefinitionName || p.processDefinitionKey}</td>
+                  <td className="mono">{fmtMs(p.durationInMillis)}</td>
+                  <td className="mute mono">{fmtTime(p.startTime)}</td>
+                  <td className="mute mono">{fmtTime(p.endTime)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </PageChrome>
+    );
+  }
+
+  if (type === "variables") {
+    const page = data as FlowablePage<FlowableHistoricVariable>;
+    return (
+      <PageChrome onRefresh={refresh} type={type} onTypeChange={onTypeChange}>
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>Variable</th>
+              <th>Type</th>
+              <th>Instance</th>
+              <th>Task</th>
+            </tr>
+          </thead>
+          <tbody>
+            {page.data.map((v) => (
+              <tr key={v.id} data-historic-variable-id={v.id}>
+                <td>
+                  <span className="mono">{v.variableName}</span>
+                </td>
+                <td>
+                  <span className="badge" data-tone={typeTone(v.variableType)}>
+                    {v.variableType ?? "—"}
+                  </span>
+                </td>
+                <td>
+                  {v.processInstanceId ? (
+                    <Link
+                      to="/instances/$id"
+                      params={{ id: v.processInstanceId }}
+                      className="mono"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {v.processInstanceId}
+                    </Link>
+                  ) : (
+                    <span className="mute">—</span>
+                  )}
+                </td>
+                <td className="mono mute">{v.taskId || <span className="mute">—</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </PageChrome>
+    );
+  }
+
+  // type === "tasks"
+  const page = data as FlowablePage<FlowableHistoricTask>;
   return (
     <PageChrome onRefresh={refresh} type={type} onTypeChange={onTypeChange}>
       <table className="tbl">
         <thead>
           <tr>
-            <th>Business key</th>
-            <th>Definition</th>
-            <th>Duration</th>
+            <th>Name</th>
+            <th>Assignee</th>
+            <th>Instance</th>
             <th>Started</th>
             <th>Ended</th>
           </tr>
         </thead>
         <tbody>
-          {data.data.map((raw) => {
-            const p = raw as HistoricWide;
+          {page.data.map((raw) => {
+            const t = raw as HistoricTaskWide;
             return (
-              <tr
-                key={p.id}
-                data-historic-instance-id={p.id}
-                tabIndex={0}
-                style={{ cursor: "pointer" }}
-                onClick={() => openDetail(p.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") openDetail(p.id);
-                }}
-              >
-                <td className="mono">{p.businessKey || p.id}</td>
-                <td>{p.processDefinitionName || p.processDefinitionKey}</td>
-                <td className="mono">{fmtMs(p.durationInMillis)}</td>
-                <td className="mute mono">{fmtTime(p.startTime)}</td>
-                <td className="mute mono">{fmtTime(p.endTime)}</td>
+              <tr key={t.id} data-historic-task-id={t.id}>
+                <td>{t.name || <span className="mute">—</span>}</td>
+                <td className="mono">{t.assignee || <span className="mute">unassigned</span>}</td>
+                <td>
+                  {t.processInstanceId ? (
+                    <Link
+                      to="/instances/$id"
+                      params={{ id: t.processInstanceId }}
+                      className="mono"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {t.processInstanceId}
+                    </Link>
+                  ) : (
+                    <span className="mute">—</span>
+                  )}
+                </td>
+                <td className="mute mono">{fmtTime(t.startTime ?? t.createTime)}</td>
+                <td className="mute mono">
+                  {t.endTime ? fmtTime(t.endTime) : <span className="mute">—</span>}
+                </td>
               </tr>
             );
           })}

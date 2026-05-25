@@ -58,6 +58,14 @@ export const emptyStates: Record<string, EmptyStateEntry> = {
     title: "No historic record yet.",
     body: "The instance is still running — see the runtime section above. A historic record appears when the engine archives the instance lifecycle.",
   },
+  historicTasks: {
+    title: "No historic tasks yet.",
+    body: "Completed tasks across all instances appear here. Try waiting for a workflow to be claimed and completed.",
+  },
+  historicVariables: {
+    title: "No historic variables yet.",
+    body: "Variables appear here once a process instance ends and the engine archives its variable history.",
+  },
   instances: {
     title: "No running process instances.",
     body: "Start an instance from a process definition to see it listed here.",

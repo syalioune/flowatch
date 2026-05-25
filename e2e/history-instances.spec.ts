@@ -117,20 +117,44 @@ test.describe("/history?type=instances + dual-fetch on /instances/$id (Story 13.
     await expect(page.getByTestId("historic-instance-panel").getByText("ended")).toBeVisible();
   });
 
-  test("switching tabs updates the URL and active segment", async ({ page }) => {
+  test("switching tabs updates the URL and active segment (Story 13.3)", async ({ page }) => {
     await page.goto("/history?type=instances");
     const seg = page.locator('[data-testid="history-type-filter"] .seg-btn');
-    await seg.nth(1).click();
-    await expect(page).toHaveURL(/[?&]type=activities/);
-    await expect(seg.nth(1)).toHaveAttribute("data-on", "1");
-    await seg.nth(2).click();
+    // Story 13.3 ships three canonical-archetype tabs: Instances / Variables /
+    // Tasks. The Activities tab is dropped in the follow-up chore(refactor)
+    // commit; the assertion below pins that exactly three buttons are
+    // rendered.
+    await expect(seg).toHaveCount(3);
+    // Variables tab
+    await page
+      .locator('[data-testid="history-type-filter"] .seg-btn', { hasText: "Variables" })
+      .click();
     await expect(page).toHaveURL(/[?&]type=variables/);
-    await expect(seg.nth(2)).toHaveAttribute("data-on", "1");
-    await seg.nth(3).click();
+    await expect(page.getByRole("columnheader", { name: "Variable" })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole("columnheader", { name: "Type" })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Instance" })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Task" })).toBeVisible();
+    // Tasks tab
+    await page
+      .locator('[data-testid="history-type-filter"] .seg-btn', { hasText: "Tasks" })
+      .click();
     await expect(page).toHaveURL(/[?&]type=tasks/);
-    await expect(seg.nth(3)).toHaveAttribute("data-on", "1");
-    await seg.nth(0).click();
+    await expect(page.getByRole("columnheader", { name: "Name" })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole("columnheader", { name: "Assignee" })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Started" })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Ended" })).toBeVisible();
+    // Back to Instances
+    await page
+      .locator('[data-testid="history-type-filter"] .seg-btn', { hasText: "Instances" })
+      .click();
     await expect(page).toHaveURL(/[?&]type=instances/);
-    await expect(seg.nth(0)).toHaveAttribute("data-on", "1");
+    // No Activities button present in the seg-row after the follow-up commit.
+    await expect(
+      page.locator('[data-testid="history-type-filter"] .seg-btn', { hasText: "Activities" }),
+    ).toHaveCount(0);
   });
 });
