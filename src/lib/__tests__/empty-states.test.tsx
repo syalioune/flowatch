@@ -100,6 +100,20 @@ describe("empty-states registry", () => {
     expect(emptyStates.historicNoRecord?.cta).toBeUndefined();
   });
 
+  it("exposes a historicTasks entry (added in Story 13.3)", () => {
+    expect(emptyStates.historicTasks).toBeDefined();
+    expect(emptyStates.historicTasks?.title).toBe("No historic tasks yet.");
+    expect(emptyStates.historicTasks?.body).toMatch(/Completed tasks/);
+    expect(emptyStates.historicTasks?.cta).toBeUndefined();
+  });
+
+  it("exposes a historicVariables entry (added in Story 13.3)", () => {
+    expect(emptyStates.historicVariables).toBeDefined();
+    expect(emptyStates.historicVariables?.title).toBe("No historic variables yet.");
+    expect(emptyStates.historicVariables?.body).toMatch(/archives its variable history/);
+    expect(emptyStates.historicVariables?.cta).toBeUndefined();
+  });
+
   it("exposes a runtimeEnded entry (added in Story 13.1)", () => {
     expect(emptyStates.runtimeEnded).toBeDefined();
     expect(emptyStates.runtimeEnded?.title).toBe("This instance has ended.");
