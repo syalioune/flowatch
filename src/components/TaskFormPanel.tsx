@@ -24,11 +24,31 @@
  */
 
 import React from "react";
-import { api, type FlowableFormProperty, type FlowableTask, type FlowableTaskForm } from "../api";
+import {
+  api,
+  FlowableError,
+  type FlowableFormProperty,
+  type FlowableTask,
+  type FlowableTaskForm,
+} from "../api";
 import { Icon } from "../components";
 import { ErrorBox } from "../lib/error-box";
 import { TableSkeleton } from "../lib/table-skeleton";
 import { useApi } from "../lib/useApi";
+
+// Differentiate "no form attached" (engine 404) from real engine failures
+// (e.g. 400 "unknown type 'custom-widget'" — a parse error on a BPMN form
+// definition that references an unrecognised property type). 404 → null
+// (the panel renders the empty state); everything else propagates so the
+// operator sees the verbatim engine message in an ErrorBox.
+const fetchTaskForm = async (taskId: string): Promise<FlowableTaskForm | null> => {
+  try {
+    return await api.getTaskForm(taskId);
+  } catch (err) {
+    if (err instanceof FlowableError && err.status === 404) return null;
+    throw err;
+  }
+};
 
 interface Props {
   taskId: string;
@@ -88,10 +108,7 @@ export const buildSubmitProperties = (values: Values): Array<{ id: string; value
   }));
 
 export function TaskFormPanel({ taskId, task, onSubmitted }: Props) {
-  const form = useApi<FlowableTaskForm | null>(
-    () => api.getTaskForm(taskId).catch(() => null) as Promise<FlowableTaskForm | null>,
-    [taskId],
-  );
+  const form = useApi<FlowableTaskForm | null>(() => fetchTaskForm(taskId), [taskId]);
   const formProperties = form.data?.formProperties;
   const [values, setValues] = React.useState<Values>(() => initialFormValues(formProperties));
   const [fieldErrors, setFieldErrors] = React.useState<FieldErrors>({});
