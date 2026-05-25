@@ -15,6 +15,7 @@ import React from "react";
 import { z } from "zod";
 import { api, type FlowableTask } from "../../api";
 import { fmtDue, Icon, PageHead, toast } from "../../components";
+import { DelegateTaskModal } from "../../lib/delegate-task-modal";
 import { EmptyState, emptyStates } from "../../lib/empty-states";
 import { ErrorBox } from "../../lib/error-box";
 import { type RowActionItem, RowActionMenu } from "../../lib/row-action-menu";
@@ -179,6 +180,11 @@ function TasksRoute() {
   //   - Complete uses busy-flag-then-reload (remove-with-confirmation-from-engine)
   const [optimisticClaimed, setOptimisticClaimed] = React.useState<Map<string, string>>(new Map());
   const [optimisticComplete, setOptimisticComplete] = React.useState<Set<string>>(new Set());
+  // Story 11.4: Delegate modal target. Per CLAUDE.md modal triggerRef
+  // convention, the focus-restore target is the last-clicked row's
+  // RowActionMenu trigger.
+  const [delegateTarget, setDelegateTarget] = React.useState<FlowableTask | null>(null);
+  const delegateTriggerRef = React.useRef<HTMLElement | null>(null);
 
   const refresh = () => router.invalidate({ filter: (r) => r.routeId === "/tasks/" });
   const openDetail = (id: string) => navigate({ to: "/tasks/$id", params: { id } });
@@ -318,9 +324,7 @@ function TasksRoute() {
               },
               {
                 label: "Delegate…",
-                testId: "delegate-task-placeholder",
-                onSelect: () =>
-                  toast({ kind: "info", text: "Delegate arrives in Story 11.4", ttl: 4000 }),
+                onSelect: () => setDelegateTarget(t),
               },
               isMine && {
                 label: "Unclaim",
@@ -381,7 +385,18 @@ function TasksRoute() {
                     {t.priority ?? 50}
                   </span>
                 </td>
-                <td>
+                <td
+                  // Capture the actually-clicked row's RowActionMenu trigger
+                  // for focus-restore on modal close (Story 11.4 / CLAUDE.md
+                  // modal triggerRef convention).
+                  onClickCapture={(e) => {
+                    const target = e.target as HTMLElement | null;
+                    const trigger = target?.closest(
+                      '[data-testid="row-action-trigger"]',
+                    ) as HTMLElement | null;
+                    if (trigger) delegateTriggerRef.current = trigger;
+                  }}
+                >
                   {/* `items` is always ≥ 2 (Complete + Delegate are unconditional). */}
                   <RowActionMenu ariaLabel={`Actions for task ${t.name || t.id}`} items={items} />
                 </td>
@@ -390,6 +405,15 @@ function TasksRoute() {
           })}
         </tbody>
       </table>
+      <DelegateTaskModal
+        task={delegateTarget}
+        triggerRef={delegateTriggerRef}
+        onClose={() => setDelegateTarget(null)}
+        onSubmitted={() => {
+          setDelegateTarget(null);
+          void router.invalidate({ filter: (r) => r.routeId === "/tasks/" });
+        }}
+      />
     </PageChrome>
   );
 }

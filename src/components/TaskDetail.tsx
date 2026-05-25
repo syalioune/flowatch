@@ -11,8 +11,10 @@
  */
 
 import { Link, useNavigate } from "@tanstack/react-router";
+import React from "react";
 import { api, type FlowableTask, type FlowableTaskForm } from "../api";
-import { fmtDue, fmtTime, Icon, PageHead } from "../components";
+import { fmtDue, fmtTime, Icon, PageHead, toast } from "../components";
+import { DelegateTaskModal } from "../lib/delegate-task-modal";
 import { ErrorBox } from "../lib/error-box";
 import { useApi } from "../lib/useApi";
 import { TaskFormPanel } from "./TaskFormPanel";
@@ -47,6 +49,17 @@ export function TaskDetail({ task, reload }: Props) {
   const hasForm = !!form.data;
   const variables = useApi(() => api.getTaskVariables(t.id), [t.id]);
 
+  // Story 11.4: Delegate modal + Resolve handler state.
+  const [delegateTarget, setDelegateTarget] = React.useState<FlowableTask | null>(null);
+  const delegateButtonRef = React.useRef<HTMLButtonElement>(null);
+  const [resolveBusy, setResolveBusy] = React.useState(false);
+
+  const cfgUsername = api.config().username?.trim() ?? "";
+  // AC-5: Resolve is visible only when the operator is the delegated assignee
+  // (assignee === cfg.username) AND the task has an owner who isn't the same.
+  const canResolve =
+    !!t.assignee && t.assignee === cfgUsername && !!t.owner && t.owner !== t.assignee;
+
   const claim = async () => {
     const cfg = api.config();
     await api.taskAction(t.id, "claim", { assignee: cfg.username });
@@ -56,11 +69,26 @@ export function TaskDetail({ task, reload }: Props) {
     await api.taskAction(t.id, "complete");
     navigate({ to: "/tasks" });
   };
-  const delegate = async () => {
-    const assignee = prompt("Delegate to whom?");
-    if (!assignee) return;
-    await api.taskAction(t.id, "delegate", { assignee });
-    reload();
+
+  // Story 11.4 AC-5: Resolve handler — one-shot, no input, toast on settle.
+  const resolve = async () => {
+    setResolveBusy(true);
+    try {
+      await api.taskAction(t.id, "resolve");
+      toast({ kind: "ok", text: `Resolved: ${t.name || t.id}`, ttl: 3000 });
+      window.dispatchEvent(new CustomEvent("nav:invalidate-counts"));
+    } catch (err) {
+      toast({
+        kind: "err",
+        text: "Resolve failed",
+        sub: (err as Error)?.message ?? String(err),
+        ttl: 8000,
+      });
+    } finally {
+      setResolveBusy(false);
+      // Engine is source of truth; reload regardless to converge.
+      reload();
+    }
   };
 
   return (
@@ -91,7 +119,27 @@ export function TaskDetail({ task, reload }: Props) {
                 Complete
               </button>
             )}
-            <button type="button" className="btn" data-variant="ghost" onClick={delegate}>
+            {/* Story 11.4 AC-5: Resolve appears only when the operator is the
+                delegated assignee and there's a distinct owner. */}
+            {canResolve && (
+              <button
+                type="button"
+                className="btn"
+                data-variant="primary"
+                data-testid="resolve-task"
+                onClick={resolve}
+                disabled={resolveBusy}
+              >
+                {resolveBusy ? "Resolving…" : "Resolve"}
+              </button>
+            )}
+            <button
+              ref={delegateButtonRef}
+              type="button"
+              className="btn"
+              data-variant="ghost"
+              onClick={() => setDelegateTarget(task)}
+            >
               Delegate…
             </button>
           </>
@@ -200,6 +248,15 @@ export function TaskDetail({ task, reload }: Props) {
           )}
         </div>
       </div>
+      <DelegateTaskModal
+        task={delegateTarget}
+        triggerRef={delegateButtonRef}
+        onClose={() => setDelegateTarget(null)}
+        onSubmitted={() => {
+          setDelegateTarget(null);
+          reload();
+        }}
+      />
     </div>
   );
 }
