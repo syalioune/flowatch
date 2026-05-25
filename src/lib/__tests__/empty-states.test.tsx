@@ -19,6 +19,13 @@ import { EmptyState, emptyStates } from "../empty-states";
 describe("empty-states registry", () => {
   afterEach(cleanup);
 
+  it("exposes an activeActivities entry (added with InstanceActiveActivitiesPanel)", () => {
+    expect(emptyStates.activeActivities).toBeDefined();
+    expect(emptyStates.activeActivities?.title).toBe("No active activities right now.");
+    expect(emptyStates.activeActivities?.body).toMatch(/idle/);
+    expect(emptyStates.activeActivities?.cta).toBeUndefined();
+  });
+
   it("bootstraps a deployments entry with the documented copy", () => {
     expect(emptyStates.deployments).toBeDefined();
     expect(emptyStates.deployments?.title).toBe("No deployments yet.");

@@ -42,6 +42,10 @@ export const emptyStates: Record<string, EmptyStateEntry> = {
     title: "No deployments yet.",
     body: "Upload a .bpmn file or use the BPMN modeler to deploy your first process.",
   },
+  activeActivities: {
+    title: "No active activities right now.",
+    body: "This instance is idle (awaiting a timer, a message, or a parallel branch to converge) — or all branches have completed.",
+  },
   deploymentResources: {
     title: "No resources.",
     body: "This deployment has no files. That's unusual — deployments typically bundle at least one BPMN / DMN file.",

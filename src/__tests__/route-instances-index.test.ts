@@ -9,37 +9,69 @@
  * by the E2E suite (e2e/instances-list.spec.ts). Here we lock the request
  * shape (size 50, sort startTime desc, tenantId-omission) so a future
  * refactor can't silently change it.
+ *
+ * Extended: the loader now also runs a PARALLEL fetch of
+ * `historic-activity-instances?finished=false` so the Activity column can
+ * show the real active-activities summary (the engine's lead `activityId`
+ * is often null on parallel-branch instances). The two fetches go via
+ * `Promise.all`; the loader returns `{ instances, activeActivities }`.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { FlowableHistoricActivity, FlowablePage, FlowableProcessInstance } from "../api";
 import * as apiModule from "../api";
-import { loadProcessInstances } from "../routes/instances/index";
+import { groupActivitiesByInstance, loadProcessInstances } from "../routes/instances/index";
+
+type ListInstancesFn = typeof apiModule.api.listProcessInstances;
+type ListActivitiesFn = typeof apiModule.api.listHistoricActivities;
+
+const instancesPage: FlowablePage<FlowableProcessInstance> = {
+  data: [],
+  total: 0,
+  start: 0,
+  size: 50,
+  sort: "startTime",
+  order: "desc",
+};
+
+const activitiesPage: FlowablePage<FlowableHistoricActivity> = {
+  data: [],
+  total: 0,
+  start: 0,
+  size: 500,
+  sort: "startTime",
+  order: "asc",
+};
 
 describe("/instances route loader", () => {
   const realConfig = apiModule.api.config;
   const realList = apiModule.api.listProcessInstances;
-  let lastParams: unknown = null;
+  const realListActivities = apiModule.api.listHistoricActivities;
+  let lastInstancesParams: unknown = null;
+  let lastActivitiesParams: unknown = null;
 
   beforeEach(() => {
-    lastParams = null;
+    lastInstancesParams = null;
+    lastActivitiesParams = null;
+    (apiModule.api as unknown as { listProcessInstances: ListInstancesFn }).listProcessInstances =
+      vi.fn((p: unknown) => {
+        lastInstancesParams = p;
+        return Promise.resolve(instancesPage);
+      }) as unknown as ListInstancesFn;
     (
-      apiModule.api as unknown as { listProcessInstances: (p: unknown) => Promise<unknown> }
-    ).listProcessInstances = vi.fn((p: unknown) => {
-      lastParams = p;
-      return Promise.resolve({
-        data: [],
-        total: 0,
-        start: 0,
-        size: 50,
-        sort: "startTime",
-        order: "desc",
-      });
-    });
+      apiModule.api as unknown as { listHistoricActivities: ListActivitiesFn }
+    ).listHistoricActivities = vi.fn((p: unknown) => {
+      lastActivitiesParams = p;
+      return Promise.resolve(activitiesPage);
+    }) as unknown as ListActivitiesFn;
   });
 
   afterEach(() => {
     (apiModule.api as unknown as { listProcessInstances: typeof realList }).listProcessInstances =
       realList;
+    (
+      apiModule.api as unknown as { listHistoricActivities: typeof realListActivities }
+    ).listHistoricActivities = realListActivities;
     (apiModule.api as unknown as { config: typeof realConfig }).config = realConfig;
   });
 
@@ -50,8 +82,9 @@ describe("/instances route loader", () => {
       password: "p",
       tenantId: "",
     });
-    await loadProcessInstances();
-    expect(lastParams).toMatchObject({ size: 50, sort: "startTime", order: "desc" });
+    const out = await loadProcessInstances();
+    expect(lastInstancesParams).toMatchObject({ size: 50, sort: "startTime", order: "desc" });
+    expect(out.instances).toBe(instancesPage);
   });
 
   it("OMITS tenantId when cfg.tenantId is empty", async () => {
@@ -62,7 +95,7 @@ describe("/instances route loader", () => {
       tenantId: "",
     });
     await loadProcessInstances();
-    expect(Object.keys(lastParams as object)).not.toContain("tenantId");
+    expect(Object.keys(lastInstancesParams as object)).not.toContain("tenantId");
   });
 
   it("PASSES tenantId when cfg.tenantId is non-empty", async () => {
@@ -73,6 +106,52 @@ describe("/instances route loader", () => {
       tenantId: "acme",
     });
     await loadProcessInstances();
-    expect((lastParams as { tenantId?: string }).tenantId).toBe("acme");
+    expect((lastInstancesParams as { tenantId?: string }).tenantId).toBe("acme");
+  });
+
+  it("ALSO fetches active historic-activity-instances (finished=false) in parallel", async () => {
+    (apiModule.api as unknown as { config: () => apiModule.FlowableConfig }).config = () => ({
+      baseUrl: "http://x/y",
+      username: "u",
+      password: "p",
+      tenantId: "",
+    });
+    const out = await loadProcessInstances();
+    expect(lastActivitiesParams).toEqual({
+      finished: false,
+      size: 500,
+      sort: "startTime",
+    });
+    expect(out.activeActivities).toBe(activitiesPage);
+  });
+});
+
+describe("groupActivitiesByInstance helper", () => {
+  const mk = (id: string, processInstanceId: string | undefined): FlowableHistoricActivity => ({
+    id,
+    activityId: `act_${id}`,
+    activityType: "userTask",
+    startTime: "2026-05-26T10:00:00.000Z",
+    ...(processInstanceId !== undefined ? { processInstanceId } : {}),
+  });
+
+  it("returns an empty map for no activities", () => {
+    expect(groupActivitiesByInstance([]).size).toBe(0);
+  });
+
+  it("buckets by processInstanceId, preserving order", () => {
+    const a = mk("1", "pi-1");
+    const b = mk("2", "pi-2");
+    const c = mk("3", "pi-1");
+    const grouped = groupActivitiesByInstance([a, b, c]);
+    expect(grouped.get("pi-1")).toEqual([a, c]);
+    expect(grouped.get("pi-2")).toEqual([b]);
+    expect(grouped.size).toBe(2);
+  });
+
+  it("drops activities without a processInstanceId", () => {
+    const a = mk("1", undefined);
+    const grouped = groupActivitiesByInstance([a]);
+    expect(grouped.size).toBe(0);
   });
 });
