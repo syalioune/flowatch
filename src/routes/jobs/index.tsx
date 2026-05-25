@@ -155,6 +155,11 @@ function JobsRoute() {
   // (success AND failure). The list reconciliation comes from
   // router.invalidate on both paths — engine is source of truth.
   const [optimisticExecuting, setOptimisticExecuting] = React.useState<Set<string>>(new Set());
+  // Story 12.3: third consumer of the optimistic busy-Set archetype (after
+  // 11.2 optimisticComplete + 12.2 optimisticExecuting). Same shape, new
+  // instance. Extraction deferred — see Story 12.3 AC-9 rationale (three
+  // handlers diverge meaningfully).
+  const [optimisticMoving, setOptimisticMoving] = React.useState<Set<string>>(new Set());
 
   const refresh = () => router.invalidate({ filter: (r) => r.routeId === "/jobs/" });
 
@@ -194,6 +199,40 @@ function JobsRoute() {
     }
   };
 
+  // Story 12.3 AC-1: Move a dead-letter job back to executable.
+  // Deliberate variance from handleExecute (AC-4): NO NAV_INVALIDATE_COUNTS
+  // dispatch — the badge counts withException=true executable jobs, and a
+  // freshly-moved row is queued (not failing), so the count is unchanged.
+  // router.invalidate({ filter }) invalidates ALL /jobs/ matches regardless
+  // of loaderDeps key (Result A from AC-3 probe), so the executable tab
+  // also picks up the moved row on next visit.
+  const handleMove = async (j: FlowableJob) => {
+    setOptimisticMoving((s) => new Set(s).add(j.id));
+    try {
+      await api.moveDeadLetterJob(j.id);
+      toast({ kind: "ok", text: `Moved to executable: ${j.id}`, ttl: 3000 });
+      await router.invalidate({ filter: (r) => r.routeId === "/jobs/" });
+      setOptimisticMoving((s) => {
+        const copy = new Set(s);
+        copy.delete(j.id);
+        return copy;
+      });
+    } catch (err) {
+      setOptimisticMoving((s) => {
+        const copy = new Set(s);
+        copy.delete(j.id);
+        return copy;
+      });
+      toast({
+        kind: "err",
+        text: "Move failed",
+        sub: (err as Error)?.message ?? String(err),
+        ttl: 8000,
+      });
+      void router.invalidate({ filter: (r) => r.routeId === "/jobs/" });
+    }
+  };
+
   if (data.data.length === 0) {
     return (
       <PageChrome onRefresh={refresh} type={type} onTypeChange={onTypeChange}>
@@ -224,6 +263,8 @@ function JobsRoute() {
           {data.data.map((raw) => {
             const j = raw as JobWide;
             const isExecuting = optimisticExecuting.has(j.id);
+            const isMoving = optimisticMoving.has(j.id);
+            const isBusy = isExecuting || isMoving;
             // Jobs has no detail page — row click would have no destination.
             // Stacktrace inspection lands inside the row in Story 12.4.
             const items: RowActionItem[] = [
@@ -234,13 +275,8 @@ function JobsRoute() {
               },
               type === "deadletter" && {
                 label: "Move to executable",
-                onSelect: () =>
-                  toast({
-                    kind: "info",
-                    text: "Move to executable arrives in Story 12.3",
-                    ttl: 4000,
-                  }),
-                testId: "move-deadletter-placeholder",
+                disabled: isMoving,
+                onSelect: () => handleMove(j),
               },
               !!j.exceptionMessage && {
                 label: "View stacktrace",
@@ -254,8 +290,8 @@ function JobsRoute() {
               <tr
                 key={j.id}
                 data-job-id={j.id}
-                data-busy={isExecuting ? "1" : undefined}
-                style={isExecuting ? { opacity: 0.6 } : undefined}
+                data-busy={isBusy ? "1" : undefined}
+                style={isBusy ? { opacity: 0.6 } : undefined}
               >
                 <td className="mono">{j.id}</td>
                 <td className="mono mute">{j.elementId || j.elementName || "—"}</td>
