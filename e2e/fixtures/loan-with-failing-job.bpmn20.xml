@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://flowatch.test/e2e">
+  <!--
+    Fixture for Stories 12.3 (Move dead-letter) + 12.4 (View stacktrace).
+    The async service task references a class that doesn't exist on the
+    classpath, so the engine throws a FlowableClassLoadingException on each
+    attempt. With R1/PT1S retry policy: 1 quick retry then the job moves to
+    the dead-letter queue with a verbatim stacktrace.
+  -->
+  <process id="loanWithFailingJob" name="Loan with failing service task" isExecutable="true">
+    <startEvent id="start"/>
+    <sequenceFlow id="flow1" sourceRef="start" targetRef="failingService"/>
+    <serviceTask id="failingService"
+                 name="Always fails (class missing)"
+                 flowable:async="true"
+                 flowable:class="com.example.IntentionallyMissingService">
+      <extensionElements>
+        <flowable:failedJobRetryTimeCycle>R1/PT1S</flowable:failedJobRetryTimeCycle>
+      </extensionElements>
+    </serviceTask>
+    <sequenceFlow id="flow2" sourceRef="failingService" targetRef="end"/>
+    <endEvent id="end"/>
+  </process>
+</definitions>
