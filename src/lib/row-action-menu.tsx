@@ -19,6 +19,7 @@
  */
 
 import React from "react";
+import { createPortal } from "react-dom";
 
 export interface RowActionItem {
   label: string;
@@ -60,24 +61,80 @@ const lastEnabled = (items: RowActionItem[]): number => {
   return items.length - 1;
 };
 
+// The menu renders below the trigger by default; flip upward when the trigger
+// sits too close to the viewport bottom to fit the menu.
+interface MenuPosition {
+  top: number;
+  left: number;
+  // When the menu is flipped above the trigger, `top` is the upper edge of
+  // the menu (so callers don't need to know the orientation).
+  placement: "below" | "above";
+}
+
+// Estimate the menu's height so we can pick the placement before paint.
+// Per-item ≈ 28px (padding 6 × 2 + line ≈ 16); container padding 4 × 2 = 8.
+const estimateMenuHeight = (itemCount: number): number => Math.max(36, itemCount * 28 + 8);
+
 export const RowActionMenu: React.FC<RowActionMenuProps> = ({
   items,
   ariaLabel = "Open row actions",
 }) => {
   const [open, setOpen] = React.useState(false);
   const [activeIndex, setActiveIndex] = React.useState(0);
+  const [position, setPosition] = React.useState<MenuPosition | null>(null);
   const triggerRef = React.useRef<HTMLButtonElement | null>(null);
   const menuRef = React.useRef<HTMLUListElement | null>(null);
   const itemRefs = React.useRef<Array<HTMLLIElement | null>>([]);
+
+  // Compute the portal-anchored position so the menu escapes `.tbl-wrap`'s
+  // `overflow: hidden` (which would otherwise clip the menu on bottom-row
+  // triggers). The menu is rendered to document.body via createPortal; the
+  // position is recomputed on every open + on scroll/resize while open.
+  const computePosition = React.useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const menuHeight = estimateMenuHeight(items.length);
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    // Flip upward only when below doesn't fit AND above fits better. The
+    // 8px buffer keeps the menu off the viewport edge.
+    const flipAbove = spaceBelow < menuHeight + 8 && spaceAbove > spaceBelow;
+    const menuWidth = 160; // matches `.row-action-menu-list min-width`
+    setPosition({
+      top: flipAbove
+        ? Math.max(8, rect.top - menuHeight - 4)
+        : Math.min(window.innerHeight - menuHeight - 8, rect.bottom + 4),
+      // Anchor to the trigger's right edge (matching the old absolute layout)
+      // while keeping the menu inside the viewport horizontally.
+      left: Math.max(8, Math.min(window.innerWidth - menuWidth - 8, rect.right - menuWidth)),
+      placement: flipAbove ? "above" : "below",
+    });
+  }, [items.length]);
 
   const openMenu = React.useCallback(
     (preferLast = false) => {
       const start = preferLast ? lastEnabled(items) : firstEnabled(items);
       setActiveIndex(start);
+      computePosition();
       setOpen(true);
     },
-    [items],
+    [items, computePosition],
   );
+
+  // Re-position on scroll / resize while open so the menu tracks its trigger.
+  // Capture-phase listener so nested-scroll containers (e.g. `.tbl-wrap`) bubble
+  // their scroll events to us before we compute the new position.
+  React.useEffect(() => {
+    if (!open) return;
+    const onScrollOrResize = () => computePosition();
+    window.addEventListener("scroll", onScrollOrResize, true);
+    window.addEventListener("resize", onScrollOrResize);
+    return () => {
+      window.removeEventListener("scroll", onScrollOrResize, true);
+      window.removeEventListener("resize", onScrollOrResize);
+    };
+  }, [open, computePosition]);
 
   const closeMenu = React.useCallback((restoreFocus: boolean) => {
     setOpen(false);
@@ -184,40 +241,52 @@ export const RowActionMenu: React.FC<RowActionMenuProps> = ({
       >
         ⋮
       </button>
-      {open && (
-        <ul
-          ref={menuRef}
-          // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: WAI-ARIA Authoring Practices specify role="menu" on the container of a menu widget
-          role="menu"
-          className="row-action-menu-list"
-          onKeyDown={handleMenuKey}
-          aria-label={ariaLabel}
-        >
-          {items.map((item, i) => (
-            <li
-              ref={(node) => {
-                itemRefs.current[i] = node;
-              }}
-              // biome-ignore lint/suspicious/noArrayIndexKey: menu items are ephemeral and have no persistent identity beyond their position
-              key={`${item.label}-${i}`}
-              // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: WAI-ARIA Authoring Practices specify role="menuitem" on each menu child
-              role="menuitem"
-              tabIndex={activeIndex === i ? 0 : -1}
-              aria-disabled={item.disabled || undefined}
-              data-danger={item.danger ? "1" : undefined}
-              data-testid={item.testId}
-              className="row-action-menu-item"
+      {open &&
+        position &&
+        createPortal(
+          <ul
+            ref={menuRef}
+            // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: WAI-ARIA Authoring Practices specify role="menu" on the container of a menu widget
+            role="menu"
+            className="row-action-menu-list"
+            data-placement={position.placement}
+            onKeyDown={handleMenuKey}
+            aria-label={ariaLabel}
+            style={{
+              // Override the CSS defaults (`position: absolute; top: calc(100% + 4px); right: 0;`)
+              // so the portal-mounted menu is anchored to the viewport instead.
+              position: "fixed",
+              top: position.top,
+              left: position.left,
+              right: "auto",
+            }}
+          >
+            {items.map((item, i) => (
               // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard activation lives on the parent <ul> via handleMenuKey (Enter/Space dispatches to invoke())
-              onClick={(e) => {
-                e.stopPropagation();
-                invoke(i);
-              }}
-            >
-              {item.label}
-            </li>
-          ))}
-        </ul>
-      )}
+              <li
+                ref={(node) => {
+                  itemRefs.current[i] = node;
+                }}
+                // biome-ignore lint/suspicious/noArrayIndexKey: menu items are ephemeral and have no persistent identity beyond their position
+                key={`${item.label}-${i}`}
+                // biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: WAI-ARIA Authoring Practices specify role="menuitem" on each menu child
+                role="menuitem"
+                tabIndex={activeIndex === i ? 0 : -1}
+                aria-disabled={item.disabled || undefined}
+                data-danger={item.danger ? "1" : undefined}
+                data-testid={item.testId}
+                className="row-action-menu-item"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  invoke(i);
+                }}
+              >
+                {item.label}
+              </li>
+            ))}
+          </ul>,
+          document.body,
+        )}
     </span>
   );
 };

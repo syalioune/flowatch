@@ -10,7 +10,7 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, type FlowableTask, type FlowableTaskForm } from "../../api";
+import { api, FlowableError, type FlowableTask, type FlowableTaskForm } from "../../api";
 import {
   buildSubmitProperties,
   initialFormValues,
@@ -165,6 +165,25 @@ describe("<TaskFormPanel>", () => {
     getSpy.mockResolvedValue(null as unknown as FlowableTaskForm);
     render(<TaskFormPanel taskId="t-1" task={sampleTask} onSubmitted={onSubmitted} />);
     await waitFor(() => expect(screen.getByText(/No form attached/)).toBeInTheDocument());
+  });
+
+  it("renders the No-form-attached empty state on FlowableError 404", async () => {
+    getSpy.mockRejectedValue(new FlowableError("Not found", 404));
+    render(<TaskFormPanel taskId="t-1" task={sampleTask} onSubmitted={onSubmitted} />);
+    await waitFor(() => expect(screen.getByText(/No form attached/)).toBeInTheDocument());
+  });
+
+  it("renders the in-panel ErrorBox with the verbatim engine message on FlowableError 400", async () => {
+    // Real-world example: Flowable 7.2 returns this when a BPMN form definition
+    // references an unrecognised property type (e.g. `type="custom-widget"`).
+    getSpy.mockRejectedValue(new FlowableError("unknown type 'custom-widget' attachmentRef", 400));
+    render(<TaskFormPanel taskId="t-1" task={sampleTask} onSubmitted={onSubmitted} />);
+    await waitFor(() =>
+      expect(screen.getByText(/unknown type 'custom-widget'/)).toBeInTheDocument(),
+    );
+    // The "No form attached" empty state should NOT also render — the engine
+    // told us the form IS there, just unparseable.
+    expect(screen.queryByText(/No form attached/)).toBeNull();
   });
 
   it("renders the populated form with each AC-2 field type", async () => {
