@@ -61,6 +61,15 @@ describe("empty-states registry", () => {
     expect(emptyStates.instanceVariables?.cta).toBeUndefined();
   });
 
+  it("exposes a jobs entry (added in Story 12.1)", () => {
+    expect(emptyStates.jobs).toBeDefined();
+    expect(emptyStates.jobs?.title).toBe("No jobs on this tab.");
+    expect(emptyStates.jobs?.body).toBe(
+      "Try switching to Timers or Dead-letter, or trigger a workflow that schedules background work.",
+    );
+    expect(emptyStates.jobs?.cta).toBeUndefined();
+  });
+
   it("exposes a tasks entry (added in Story 11.1)", () => {
     expect(emptyStates.tasks).toBeDefined();
     expect(emptyStates.tasks?.title).toBe("No tasks for this filter.");
