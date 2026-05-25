@@ -88,7 +88,9 @@ Apply by operator-intent: "stop this" vs "I'm building this". Future task / job 
 
 ### Panel-as-sibling-component (Story 10.4)
 
-Detail pages with multiple panels use sibling components rather than inline panel logic. Each panel owns its own `useApi`, its own four-state rendering, its own refresh affordance, and its own row-count badge. The parent component mounts the panel with a single stable identifier prop (e.g. `<InstanceVariablesPanel instanceId={id} />`) — no callbacks, no state-threading. See [src/components/InstanceVariablesPanel.tsx](src/components/InstanceVariablesPanel.tsx). Future multi-panel detail pages (Historic Activity Instances, task detail with form + variables + history) follow this shape.
+Detail pages with multiple panels use sibling components rather than inline panel logic. Each panel owns its own `useApi`, its own four-state rendering, its own refresh affordance, and its own row-count badge. The parent component mounts the panel with a single stable identifier prop (e.g. `<InstanceVariablesPanel instanceId={id} />`) — no callbacks, no state-threading. See [src/components/InstanceVariablesPanel.tsx](src/components/InstanceVariablesPanel.tsx) and [src/components/TaskFormPanel.tsx](src/components/TaskFormPanel.tsx). Future multi-panel detail pages (Historic Activity Instances, task detail with form + variables + history) follow this shape.
+
+**Parent-level state-gating fetches are an acceptable duplication, not a refactor target (Story 11.3).** When the parent needs the panel's loaded state to gate its own UI — e.g. `<TaskDetail>` hides the legacy Complete button when a form is present (Story 11.3 AC-9) — the parent runs its OWN `useApi` against the same endpoint. Both calls go through the funnel; the Inspector shows two entries. Do NOT thread the panel's internal state up via a callback prop; that breaks the single-stable-identifier contract above and tightly couples parent UI to panel internals.
 
 ### Cross-story sequencing conventions
 
