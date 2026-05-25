@@ -16,9 +16,11 @@ import React from "react";
 import { z } from "zod";
 import { api, type FlowableJob } from "../../api";
 import { fmtDue, Icon, PageHead, toast } from "../../components";
+import { JobStacktracePanel } from "../../components/JobStacktracePanel";
 import { EmptyState, emptyStates } from "../../lib/empty-states";
 import { ErrorBox } from "../../lib/error-box";
 import { NAV_INVALIDATE_COUNTS } from "../../lib/nav-events";
+import { RescheduleTimerModal } from "../../lib/reschedule-timer-modal";
 import { type RowActionItem, RowActionMenu } from "../../lib/row-action-menu";
 import { TableSkeleton } from "../../lib/table-skeleton";
 
@@ -160,8 +162,29 @@ function JobsRoute() {
   // instance. Extraction deferred — see Story 12.3 AC-9 rationale (three
   // handlers diverge meaningfully).
   const [optimisticMoving, setOptimisticMoving] = React.useState<Set<string>>(new Set());
+  // Story 12.4: single-row stacktrace expansion. `string | null` is
+  // deliberate — clicking View stacktrace on a second row collapses the
+  // first; clicking the same row again toggles the panel closed; the panel
+  // also exposes an explicit close button (review patch).
+  const [expandedStacktraceId, setExpandedStacktraceId] = React.useState<string | null>(null);
+  // Reset the expanded panel when the operator switches tabs — the panel's
+  // jobId belongs to a job in the previous tab's list and isn't part of the
+  // new tab's data set. Skipping the reset would orphan the state and
+  // confuse the toggle on the next visit.
+  React.useEffect(() => {
+    setExpandedStacktraceId(null);
+  }, [type]);
+  // Story 12.2 review patch: Reschedule modal target (null is closed).
+  // Visible only on the timer tab — pairs with `Execute now` (move-to-
+  // executable) for the two timer-job action verbs Flowable supports.
+  const [rescheduleTarget, setRescheduleTarget] = React.useState<FlowableJob | null>(null);
+  const rescheduleTriggerRef = React.useRef<HTMLElement | null>(null);
 
   const refresh = () => router.invalidate({ filter: (r) => r.routeId === "/jobs/" });
+
+  const toggleStacktrace = (j: FlowableJob) => {
+    setExpandedStacktraceId((prev) => (prev === j.id ? null : j.id));
+  };
 
   // Story 12.2 AC-1: Execute on demand with optimistic busy-flag.
   // Live-engine review patch: timer-job IDs do NOT resolve at
@@ -273,6 +296,10 @@ function JobsRoute() {
                 disabled: isExecuting,
                 onSelect: () => handleExecute(j),
               },
+              type === "timer" && {
+                label: "Reschedule…",
+                onSelect: () => setRescheduleTarget(j),
+              },
               type === "deadletter" && {
                 label: "Move to executable",
                 disabled: isMoving,
@@ -280,71 +307,101 @@ function JobsRoute() {
               },
               !!j.exceptionMessage && {
                 label: "View stacktrace",
-                onSelect: () =>
-                  toast({ kind: "info", text: "View stacktrace arrives in Story 12.4", ttl: 4000 }),
-                testId: "view-stacktrace-placeholder",
+                onSelect: () => toggleStacktrace(j),
               },
             ].filter(Boolean) as RowActionItem[];
 
+            const isStacktraceOpen = expandedStacktraceId === j.id;
             return (
-              <tr
-                key={j.id}
-                data-job-id={j.id}
-                data-busy={isBusy ? "1" : undefined}
-                style={isBusy ? { opacity: 0.6 } : undefined}
-              >
-                <td className="mono">{j.id}</td>
-                <td className="mono mute">{j.elementId || j.elementName || "—"}</td>
-                <td className="mono">
-                  {j.processInstanceId ? (
-                    <Link
-                      to="/instances/$id"
-                      params={{ id: j.processInstanceId }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {j.processInstanceId}
-                    </Link>
-                  ) : (
-                    <span className="mute">—</span>
-                  )}
-                </td>
-                <td className="mute mono">{j.dueDate ? fmtDue(j.dueDate) : "—"}</td>
-                <td className="mono">
-                  <span
-                    className="badge"
-                    data-tone={j.retries === 0 ? "bad" : j.retries === 1 ? "warn" : "ok"}
-                  >
-                    {j.retries}
-                  </span>
-                </td>
-                <td className="mono">
-                  {j.exceptionMessage ? (
+              <React.Fragment key={j.id}>
+                <tr
+                  data-job-id={j.id}
+                  data-busy={isBusy ? "1" : undefined}
+                  style={isBusy ? { opacity: 0.6 } : undefined}
+                >
+                  <td className="mono">{j.id}</td>
+                  <td className="mono mute">{j.elementId || j.elementName || "—"}</td>
+                  <td className="mono">
+                    {j.processInstanceId ? (
+                      <Link
+                        to="/instances/$id"
+                        params={{ id: j.processInstanceId }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {j.processInstanceId}
+                      </Link>
+                    ) : (
+                      <span className="mute">—</span>
+                    )}
+                  </td>
+                  <td className="mute mono">{j.dueDate ? fmtDue(j.dueDate) : "—"}</td>
+                  <td className="mono">
                     <span
                       className="badge"
-                      data-tone="bad"
-                      style={{
-                        maxWidth: 240,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                      title={j.exceptionMessage}
+                      data-tone={j.retries === 0 ? "bad" : j.retries === 1 ? "warn" : "ok"}
                     >
-                      {j.exceptionMessage}
+                      {j.retries}
                     </span>
-                  ) : (
-                    <span className="mute">—</span>
-                  )}
-                </td>
-                <td>
-                  {items.length > 0 && (
-                    <RowActionMenu ariaLabel={`Actions for job ${j.id}`} items={items} />
-                  )}
-                </td>
-              </tr>
+                  </td>
+                  <td className="mono">
+                    {j.exceptionMessage ? (
+                      <span
+                        className="badge"
+                        data-tone="bad"
+                        style={{
+                          maxWidth: 240,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                        title={j.exceptionMessage}
+                      >
+                        {j.exceptionMessage}
+                      </span>
+                    ) : (
+                      <span className="mute">—</span>
+                    )}
+                  </td>
+                  <td
+                    // Capture the actually-clicked row's RowActionMenu trigger
+                    // for focus-restore (per the modal triggerRef convention).
+                    onClickCapture={(e) => {
+                      const target = e.target as HTMLElement | null;
+                      const trigger = target?.closest(
+                        '[data-testid="row-action-trigger"]',
+                      ) as HTMLElement | null;
+                      if (trigger) rescheduleTriggerRef.current = trigger;
+                    }}
+                  >
+                    {items.length > 0 && (
+                      <RowActionMenu ariaLabel={`Actions for job ${j.id}`} items={items} />
+                    )}
+                  </td>
+                </tr>
+                {isStacktraceOpen && (
+                  <tr data-stacktrace-row-for={j.id}>
+                    <td colSpan={7} style={{ padding: 0 }}>
+                      <JobStacktracePanel
+                        jobId={j.id}
+                        jobType={type}
+                        onClose={() => setExpandedStacktraceId(null)}
+                      />
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
             );
           })}
         </tbody>
       </table>
+      <RescheduleTimerModal
+        job={rescheduleTarget}
+        triggerRef={rescheduleTriggerRef}
+        onClose={() => setRescheduleTarget(null)}
+        onSubmitted={() => {
+          setRescheduleTarget(null);
+          void router.invalidate({ filter: (r) => r.routeId === "/jobs/" });
+        }}
+      />
     </PageChrome>
   );
 }

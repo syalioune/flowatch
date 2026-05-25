@@ -58,6 +58,10 @@ export const emptyStates: Record<string, EmptyStateEntry> = {
     title: "No jobs on this tab.",
     body: "Try switching to Timers or Dead-letter, or trigger a workflow that schedules background work.",
   },
+  stacktrace: {
+    title: "No stacktrace available.",
+    body: "The engine has no recorded exception for this job. It may have succeeded after retries, or never raised.",
+  },
   tasks: {
     title: "No tasks for this filter.",
     body: "Try switching the filter, or wait for a workflow to assign one.",

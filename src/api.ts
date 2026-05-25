@@ -548,6 +548,13 @@ const moveDeadLetterJob = (id: string) =>
   request<FlowableJob>("POST", `/management/deadletter-jobs/${id}`, { body: { action: "move" } });
 const jobStacktrace = (id: string): Promise<string> =>
   request<string>("GET", `/management/jobs/${id}/exception-stacktrace`, { raw: true });
+// Timer / dead-letter jobs live in separate namespaces — their stacktrace
+// endpoints are NOT under /management/jobs/{id}. Mirrors the executeJob /
+// executeTimerJob / moveDeadLetterJob namespace separation.
+const timerJobStacktrace = (id: string): Promise<string> =>
+  request<string>("GET", `/management/timer-jobs/${id}/exception-stacktrace`, { raw: true });
+const deadLetterJobStacktrace = (id: string): Promise<string> =>
+  request<string>("GET", `/management/deadletter-jobs/${id}/exception-stacktrace`, { raw: true });
 
 // ── History ──────────────────────────────────────────────────────────────
 const listHistoricInstances = (params?: QueryParams) =>
@@ -746,6 +753,8 @@ export const api = {
   rescheduleTimerJob,
   moveDeadLetterJob,
   jobStacktrace,
+  timerJobStacktrace,
+  deadLetterJobStacktrace,
   // History
   listHistoricInstances,
   listHistoricActivities,
