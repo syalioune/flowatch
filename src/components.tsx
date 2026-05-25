@@ -1280,3 +1280,15 @@ export const fmtDue = (iso: string | null | undefined): string => {
   if (diff < 86400) return `in ${Math.round(diff / 3600)}h`;
   return `in ${Math.round(diff / 86400)}d`;
 };
+
+export const fmtMs = (ms: number | null | undefined): string => {
+  if (ms == null) return "—";
+  const s = ms / 1000;
+  if (s < 1) return `${ms}ms`;
+  if (s < 60) return `${s.toFixed(1)}s`;
+  const m = s / 60;
+  if (m < 60) return `${m.toFixed(0)}m`;
+  const h = m / 60;
+  if (h < 24) return `${h.toFixed(1)}h`;
+  return `${(h / 24).toFixed(1)}d`;
+};

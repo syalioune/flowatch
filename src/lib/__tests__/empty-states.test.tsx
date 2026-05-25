@@ -77,6 +77,27 @@ describe("empty-states registry", () => {
     expect(emptyStates.stacktrace?.cta).toBeUndefined();
   });
 
+  it("exposes a historicInstances entry (added in Story 13.1)", () => {
+    expect(emptyStates.historicInstances).toBeDefined();
+    expect(emptyStates.historicInstances?.title).toBe("No completed instances yet.");
+    expect(emptyStates.historicInstances?.body).toMatch(/historic record/);
+    expect(emptyStates.historicInstances?.cta).toBeUndefined();
+  });
+
+  it("exposes a historicNoRecord entry (added in Story 13.1)", () => {
+    expect(emptyStates.historicNoRecord).toBeDefined();
+    expect(emptyStates.historicNoRecord?.title).toBe("No historic record yet.");
+    expect(emptyStates.historicNoRecord?.body).toMatch(/still running/);
+    expect(emptyStates.historicNoRecord?.cta).toBeUndefined();
+  });
+
+  it("exposes a runtimeEnded entry (added in Story 13.1)", () => {
+    expect(emptyStates.runtimeEnded).toBeDefined();
+    expect(emptyStates.runtimeEnded?.title).toBe("This instance has ended.");
+    expect(emptyStates.runtimeEnded?.body).toMatch(/historic record below/);
+    expect(emptyStates.runtimeEnded?.cta).toBeUndefined();
+  });
+
   it("exposes a tasks entry (added in Story 11.1)", () => {
     expect(emptyStates.tasks).toBeDefined();
     expect(emptyStates.tasks?.title).toBe("No tasks for this filter.");

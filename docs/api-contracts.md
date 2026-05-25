@@ -62,6 +62,7 @@ Every call — success or failure — pushes an entry into `API_LOG` and fires a
 | Wrapper                              | Method | Path                                              | Notes                                                            |
 | ------------------------------------ | ------ | ------------------------------------------------- | ---------------------------------------------------------------- |
 | `listHistoricInstances(params)`      | GET    | `/history/historic-process-instances`             |                                                                  |
+| `getHistoricProcessInstance(id)`     | GET    | `/history/historic-process-instances/{id}`        | Per-id GET for the historic detail panel (Story 13.1).            |
 | `listHistoricActivities(params)`     | GET    | `/history/historic-activity-instances`            | Common filter: `processInstanceId={id}` for an instance's audit trail |
 | `listHistoricVariables(params)`      | GET    | `/history/historic-variable-instances`            |                                                                  |
 | `listHistoricTasks(params)`          | GET    | `/history/historic-task-instances`                |                                                                  |

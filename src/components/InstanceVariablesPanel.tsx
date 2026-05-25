@@ -3,8 +3,9 @@
 /**
  * Instance Variables panel (Story 10.4).
  *
- * Replaces the inline two-column-grid panel that lived in
- * ProcessInstanceDetail. Renders the canonical panel-tier four-state
+ * Replaces the inline two-column-grid panel that lived in the legacy
+ * ProcessInstanceDetail component (since Story 13.1 the runtime panel is
+ * `InstanceRuntimePanel`). Renders the canonical panel-tier four-state
  * contract (loading skeleton → ErrorBox → EmptyState → table) — same
  * shape Story 9.6 used for the Resources panel.
  *
