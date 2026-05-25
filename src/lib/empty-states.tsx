@@ -46,6 +46,10 @@ export const emptyStates: Record<string, EmptyStateEntry> = {
     title: "No resources.",
     body: "This deployment has no files. That's unusual — deployments typically bundle at least one BPMN / DMN file.",
   },
+  instances: {
+    title: "No running process instances.",
+    body: "Start an instance from a process definition to see it listed here.",
+  },
 };
 
 export interface EmptyStateProps {
