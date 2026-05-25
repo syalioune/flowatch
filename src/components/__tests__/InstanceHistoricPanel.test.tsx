@@ -75,15 +75,29 @@ describe("fetchHistoricOrNull status-aware probe", () => {
 
 describe("<InstanceHistoricPanel>", () => {
   const real = api.getHistoricProcessInstance;
+  const realListVars = api.listHistoricVariables;
   let spy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     spy = vi.fn();
     (api as unknown as Host).getHistoricProcessInstance = spy as unknown as GetFn;
+    // The data branch mounts <InstanceHistoricVariablesPanel> which fires
+    // listHistoricVariables; stub to an empty page so the existing
+    // assertions stay focused on the historic-record properties table.
+    vi.spyOn(api, "listHistoricVariables").mockResolvedValue({
+      data: [],
+      total: 0,
+      start: 0,
+      size: 200,
+      sort: "variableName",
+      order: "asc",
+    });
   });
 
   afterEach(() => {
     (api as unknown as Host).getHistoricProcessInstance = real;
+    api.listHistoricVariables = realListVars;
+    vi.restoreAllMocks();
     cleanup();
   });
 

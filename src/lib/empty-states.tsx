@@ -54,6 +54,10 @@ export const emptyStates: Record<string, EmptyStateEntry> = {
     title: "No completed instances yet.",
     body: "Once a process instance ends — by completion, cancellation, or admin delete — it appears here as a historic record.",
   },
+  historicInstanceVariables: {
+    title: "No historic variables for this instance.",
+    body: "Variables appear here once the engine archives them — typically after the instance ends. Running instances may show fewer variables than their runtime counterpart until the engine flushes.",
+  },
   historicNoRecord: {
     title: "No historic record yet.",
     body: "The instance is still running — see the runtime section above. A historic record appears when the engine archives the instance lifecycle.",

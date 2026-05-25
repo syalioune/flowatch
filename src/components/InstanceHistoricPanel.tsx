@@ -22,6 +22,7 @@ import { EmptyState, emptyStates } from "../lib/empty-states";
 import { ErrorBox } from "../lib/error-box";
 import { TableSkeleton } from "../lib/table-skeleton";
 import { useApi } from "../lib/useApi";
+import { InstanceHistoricVariablesPanel } from "./InstanceHistoricVariablesPanel";
 
 // Engine-returned fields not on the typed FlowableHistoricProcessInstance
 // DTO — mirrors the Loose<T> pattern.
@@ -145,6 +146,7 @@ export function InstanceHistoricPanel({ instanceId }: Props) {
           </div>
         )}
       </div>
+      {h && <InstanceHistoricVariablesPanel instanceId={h.id} />}
     </div>
   );
 }

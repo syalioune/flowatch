@@ -32,8 +32,18 @@ export const Route = createFileRoute("/instances/$id")({
       { method: "GET", path: "/runtime/process-instances/{id}", desc: "Get runtime instance" },
       {
         method: "GET",
+        path: "/runtime/process-instances/{id}/variables",
+        desc: "Runtime variables",
+      },
+      {
+        method: "GET",
         path: "/history/historic-process-instances/{id}",
         desc: "Get historic record",
+      },
+      {
+        method: "GET",
+        path: "/history/historic-variable-instances",
+        desc: "Historic variables (per instance)",
       },
       {
         method: "GET",
