@@ -167,6 +167,76 @@ allowing the `status: 0` network-error sentinel).
 
 **Surfaced by:** Story 8.2 P3 review patch ([Epic 8 retro §3.1](../_bmad-output/implementation-artifacts/epic-8-retro-2026-05-24.md#31-spec--implementation-deviations-multiplied-eight-across-four-stories)).
 
+## RC-9 — `File.text()` does not resolve under jsdom + `userEvent.upload`
+
+**Naive intuition:** in a browser-tier (or jsdom-tier) test, `await file.text()` on a `File` constructed in JS returns the file contents.
+
+**Actual behaviour:** under jsdom, the `File` polyfill exposes a `text()` method
+that returns a `Promise` which **never resolves** when the file was attached
+via `@testing-library/user-event`'s `userEvent.upload(input, file)`. The
+upload helper stashes the file in `input.files` correctly but does not run
+the spec-prescribed read-the-blob path; downstream consumer code that does
+`await file.text()` hangs the test until the harness timeout. The failure
+surfaces as a test that never resolves rather than a clear assertion error.
+
+**Workaround:** shim `File.prototype.text` (or the specific instance) before
+attaching:
+
+```ts
+const file = new File([content], "process.bpmn", { type: "application/xml" });
+Object.defineProperty(file, "text", {
+  value: () => Promise.resolve(content),
+});
+await userEvent.upload(input, file);
+```
+
+This applies to all upload-modal tests (`UploadDeploymentModal`,
+future task-attachment modals) that read file contents in the same
+component as the upload.
+
+**Surfaced by:** Story 9.2 F-2 review patch ([Epic 9 retro §3.1](../_bmad-output/implementation-artifacts/epic-9-retro-2026-05-25.md)).
+
+## RC-10 — TanStack Router test-mount requires an explicit Router harness for components using routing hooks
+
+**Naive intuition:** rendering a component with `render(<Component />)` works
+even if the component calls `useNavigate()` / `useRouter()` / `useLoaderData()`
+— the router will no-op or fall back to a default.
+
+**Actual behaviour:** TanStack Router's hooks throw `Invariant failed:
+useRouter must be used within a RouterProvider` when there is no enclosing
+provider. The test-mount fails at the top of the component before any
+assertion can run; the error message is helpful, but the workaround
+boilerplate is non-trivial to reconstruct from memory each time.
+
+**Workaround:** extract or inline a `renderWithRouter()` helper that wires
+`createMemoryHistory + createRootRoute + createRouter + RouterProvider`:
+
+```ts
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+  RouterProvider,
+} from "@tanstack/react-router";
+import { render } from "@testing-library/react";
+
+function renderWithRouter(ui: React.ReactElement) {
+  const root = createRootRoute({ component: () => ui });
+  const router = createRouter({
+    routeTree: root,
+    history: createMemoryHistory({ initialEntries: ["/"] }),
+  });
+  return render(<RouterProvider router={router} />);
+}
+```
+
+Use this for any component test where the component (directly or via a
+deep child) calls a TanStack Router hook. The instance-detail panel
+tests, modal triggers wired with `Link`, and the row-action navigation
+tests all need it.
+
+**Surfaced by:** Story 9.6 F-2 review patch ([Epic 9 retro §3.1](../_bmad-output/implementation-artifacts/epic-9-retro-2026-05-25.md)).
+
 ---
 
 ## How to extend this file

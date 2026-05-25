@@ -57,11 +57,18 @@ while IFS= read -r f; do
     */node_modules/*|*/dist/*|*/coverage/*) continue ;; # nested vendor dirs
     src/api.ts) continue ;; # allowlisted: the funnel file itself
   esac
-  # `(^|[^A-Za-z0-9_])fetch[[:space:]]*\(` — POSIX-portable equivalent of
+  # `(^|[^A-Za-z0-9_-])fetch[[:space:]]*\(` — POSIX-portable equivalent of
   # `\b`. BSD/macOS grep doesn't support `\b` as a word boundary in ERE,
   # so the GNU-style escape was a silent false-pass on local Mac runs of
   # `npm run check:p-001`. The character-class alternation works on both
   # GNU and BSD grep — review patch.
+  #
+  # The negated class includes `-` (Epic 10 retro A-1 hardening): hyphenated
+  # `fetch`-adjacent identifiers like `pre-fetch`, `post-fetch`, or a
+  # describe-label `"sync-throw pre-fetch"` would have matched the previous
+  # `[^A-Za-z0-9_]` class because `-` was considered a non-word char.
+  # Adding `-` to the class makes such identifiers part of a word boundary
+  # and they no longer trigger false positives.
   #
   # Filter out lines whose escape-hatch comment carries the `p-001-allow`
   # token bounded by non-word chars (so a typo like `p-001-allowed` does
@@ -73,7 +80,7 @@ while IFS= read -r f; do
     lineno="${match%%:*}"
     body="${match#*:}"
     violations+=("${f}:${lineno}:${body}")
-  done < <(grep -nE '(^|[^A-Za-z0-9_])fetch[[:space:]]*\(' "$f" 2>/dev/null || true)
+  done < <(grep -nE '(^|[^A-Za-z0-9_-])fetch[[:space:]]*\(' "$f" 2>/dev/null || true)
 done <<< "$candidates"
 
 if [ ${#violations[@]} -gt 0 ]; then

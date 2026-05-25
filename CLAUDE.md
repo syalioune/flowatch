@@ -54,6 +54,8 @@ Every `request()` call pushes an entry into the in-memory `API_LOG` array (cappe
 
 The `ApiLogEntry` shape is `{ id, method, path, url, status, ms, at, headers?, body?, error? }`. Two NFR-8 guarantees about `headers`: the `Authorization` value is redacted **scheme-preservingly** — `Basic <base64>` becomes `Basic ***`, future `Bearer <jwt>` becomes `Bearer ***` (a value with no space falls through to `***` alone) — before the entry is pushed; the headers object handed to `fetch()` is **never** mutated (the redactor clones via spread). The optional `body` field carries the original JS value of `opts.body` for JSON requests — not the stringified form — so the drawer can pretty-print structured payloads. Response bodies are intentionally **not** captured (memory: 60 × 4 KB would balloon the buffer). Multipart `uploadDeployment()` calls log only the Authorization header, never the file contents or `FormData` parts.
 
+**Body byte-budget in the API funnel (Story 10.2).** Request bodies passed to `request()` are funneled through `captureBody(body)` ([src/api.ts](src/api.ts)). Bodies whose stringified form is ≤ `BODY_BYTE_BUDGET` (16 KB) are captured by reference; larger bodies are captured as `{ __preview: <first 16 KB>, __truncated: <total bytes> }`. The ring buffer stays bounded regardless of payload size. Future bulk-input flows (variable edit, batch operations) inherit this without re-decision. `captureBody` also catches `JSON.stringify` throws (BigInt / circular refs / throwing `toJSON`, per RC-7) and falls through to the envelope shape rather than crashing the funnel.
+
 `ErrorBox` is the canonical producer of the `app:open-inspector` event (Story 8.2): every rendered error box ships a `[data-testid="open-inspector"]` button that dispatches the event with `detail: { focusEntryId? }`, where the id is matched against `API_LOG[].error` to scroll the drawer to the offending call. The drawer's "Recent calls" tab filters by method + status bucket, expands rows on click to reveal full URL + redacted headers + request body, and applies a transient `[data-focused="1"]` highlight to the scroll target. "Copy as curl" puts real creds in the clipboard by design — NFR-8 only governs `API_LOG`; clipboard access is gated by explicit user intent (Story 8.3).
 
 ### Connection config
@@ -72,6 +74,27 @@ The BPMN modeler:
 The DMN modeler is similar but its REST calls go to the `dmn-api` sub-app (see API layer note above).
 
 The Upload modal at [src/lib/upload-deployment-modal.tsx](src/lib/upload-deployment-modal.tsx) (Story 9.2) is the GUI-driven counterpart to the modeler's Save-and-deploy — both routes ultimately call `api.deployBpmn(filename, xml)`.
+
+### Modal conventions
+
+**Modal focus-restore via `triggerRef` (Story 10.2).** Modals accept `triggerRef?: React.RefObject<HTMLElement | null>` and call `triggerRef.current?.focus()` on Esc / Cancel / successful submit. Callers pass `useRef` on the trigger button (the menuitem or the explicit Open button); a single `triggerRef` per surface is enough since only one modal can be open at a time. All current modals — [upload-deployment-modal.tsx](src/lib/upload-deployment-modal.tsx), [delete-deployment-modal.tsx](src/lib/delete-deployment-modal.tsx), [start-instance-modal.tsx](src/lib/start-instance-modal.tsx), [cancel-instance-modal.tsx](src/lib/cancel-instance-modal.tsx) — use this shape. New modals MUST as well.
+
+**Navigate-on-both vs in-modal-ErrorBox decision (Stories 10.2 / 10.3).** Two failure-path shapes are codified for modal-driven actions:
+
+- **One-shot destructive** (cancel, delete) — modal closes and a toast carries the outcome regardless of success or failure. The engine is the source of truth; the list view shows the current state of the world. See `CancelInstanceModal` (10.3) called from `/instances/$id` which navigates to `/instances` on both success and failure.
+- **Retryable creation** (start, deploy) — failure renders an in-modal `ErrorBox` so the operator can fix-and-resubmit without re-typing. See `StartInstanceModal` (10.2) which preserves the operator's Variables JSON on engine error.
+
+Apply by operator-intent: "stop this" vs "I'm building this". Future task / job stories will encounter this fork — match the recipe.
+
+### Panel-as-sibling-component (Story 10.4)
+
+Detail pages with multiple panels use sibling components rather than inline panel logic. Each panel owns its own `useApi`, its own four-state rendering, its own refresh affordance, and its own row-count badge. The parent component mounts the panel with a single stable identifier prop (e.g. `<InstanceVariablesPanel instanceId={id} />`) — no callbacks, no state-threading. See [src/components/InstanceVariablesPanel.tsx](src/components/InstanceVariablesPanel.tsx). Future multi-panel detail pages (Historic Activity Instances, task detail with form + variables + history) follow this shape.
+
+### Cross-story sequencing conventions
+
+**Placeholder-then-real (multi-epic pattern).** When a story references functionality that arrives in a later story, ship a `data-testid`-anchored placeholder in the earlier story (e.g. a toast that says "X arrives in Story Y.Z"). The `data-testid` is the swap point — the downstream dev replaces the handler without changing markup. Precedents: 9.1's `data-testid="upload-deployment"` (swapped by 9.2), 9.1's two-Delete-items (collapsed by 9.3), 9.4's `Start instance` toast (swapped by 10.2), 10.1's `Cancel` toast (swapped by 10.3). **The swap PR MUST also drop the placeholder-toast E2E assertion from the earlier story's spec file in the same PR** — otherwise the earlier story's E2E asserts a toast text that no longer fires and CI red-builds until the cleanup commit lands (Epic 10 retro §3.5).
+
+**UX-polish cadence is opt-in by next story.** Canonical archetype stories ship working `window.confirm()` / native form elements / default styles. The polish story swaps to design-system equivalents. See 9.1 (`confirm()` for delete) → 9.3 (`DeleteDeploymentModal`); `prompt()` on instance detail → 10.3 (`CancelInstanceModal`). Don't preempt polish in the archetype; don't skip polish in the polish story.
 
 ### State / data fetching pattern
 

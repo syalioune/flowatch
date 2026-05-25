@@ -109,4 +109,45 @@ if [ "$phase2_code" -ne 0 ]; then
   exit 1
 fi
 
-echo "✓ check-fetch-funnel.sh self-test passed (phase 1 + phase 2)."
+# Phase 3 — hyphenated `fetch`-adjacent identifiers must NOT produce
+# violations. Epic 10 retro A-1 hardened the regex's negated class to
+# include `-`, so a describe label like `"sync-throw pre-fetch"` or an
+# identifier like `pre-fetch(` no longer matches as a real fetch( call.
+#
+# We rebuild the offending screens.tsx so it has NO real fetch( call
+# (the only previous offender carried `// p-001-allow`); the new content
+# carries only the hyphenated false-positive bait. The script must pass.
+cat > src/screens.tsx <<'EOF'
+// No real fetch — only hyphenated identifiers that previously tripped
+// the regex because `-` was outside the negated class.
+describe("sync-throw pre-fetch (regex bait)", () => {
+  it("does not trigger P-001", () => {});
+});
+// Tokens that used to false-positive before Epic 10 retro A-1:
+//   pre-fetch( … )
+//   post-fetch( … )
+// They are part of a hyphenated word boundary now and the script
+// MUST NOT name this file.
+EOF
+git add -A
+git commit -q -m "phase 3 fixture: hyphenated fetch-adjacent identifiers"
+
+set +e
+phase3_out=$(bash "$test_script" 2>&1)
+phase3_code=$?
+set -e
+
+if [ "$phase3_code" -ne 0 ]; then
+  echo "✗ Phase 3 expected exit 0 (hyphenated identifiers must not trip the regex); got ${phase3_code}" >&2
+  echo "stdout:" >&2
+  echo "$phase3_out" >&2
+  exit 1
+fi
+
+if echo "$phase3_out" | grep -qE '^✗ src/screens\.tsx:[0-9]+:'; then
+  echo "✗ Phase 3 unexpectedly flagged hyphenated identifiers as P-001 violations:" >&2
+  echo "$phase3_out" >&2
+  exit 1
+fi
+
+echo "✓ check-fetch-funnel.sh self-test passed (phase 1 + phase 2 + phase 3)."
