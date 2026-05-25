@@ -3,7 +3,7 @@
 
 import { useNavigate } from "@tanstack/react-router";
 import React from "react";
-import { api, type FlowableJob, type FlowableProcessInstance } from "./api";
+import { api, type FlowableJob } from "./api";
 import { fmtDue, fmtTime, Icon, PageHead } from "./components";
 import { ErrorBox } from "./lib/error-box";
 import { useApi } from "./lib/useApi";
@@ -21,7 +21,6 @@ export { ErrorBox };
 type Loose<T> = T & Record<string, unknown>;
 
 type RuntimeJob = Loose<FlowableJob>;
-type RuntimeInstance = Loose<FlowableProcessInstance>;
 
 interface TenantsScreenProps {
   tenants?: { id: string; name: string }[];
@@ -47,9 +46,6 @@ const fmtMs = (ms: number | null | undefined): string => {
   return `${(h / 24).toFixed(1)}d`;
 };
 
-const stateOf = (pi: { suspended?: boolean; ended?: boolean }): string =>
-  pi.suspended ? "suspended" : pi.ended ? "ended" : "active";
-
 // Dashboard moved to src/routes/index.tsx (Story 7.4): four
 // Promise.allSettled KPI tiles with per-tile state handling per NFR-6.
 // The previous rich Dashboard (tables + panels) is intentionally gone:
@@ -64,79 +60,9 @@ const stateOf = (pi: { suspended?: boolean; ended?: boolean }): string =>
 // inline Start Instance modal is deferred to Story 10.2; 9.4 ships a placeholder
 // menu item that toasts a forward-reference until 10.2 lands.
 
-// ── Process Instances ─────────────────────────────────────────────
-export const ProcessInstances = () => {
-  const navigate = useNavigate();
-  const instances = useApi(
-    () => api.listProcessInstances({ size: 200, sort: "startTime", order: "desc" }),
-    [],
-  );
-  const list = (instances.data?.data || []) as RuntimeInstance[];
-  const openDetail = (id: string) => navigate({ to: "/instances/$id", params: { id } });
-
-  return (
-    <div className="page" style={{ paddingBottom: 24 }}>
-      <PageHead
-        title="Process instances"
-        subtitle="Currently-running instances across all definitions."
-        actions={
-          <button type="button" className="btn" onClick={instances.reload}>
-            <Icon name="refresh" size={13} />
-            Refresh
-          </button>
-        }
-      />
-      <div className="tbl-wrap">
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>Business key</th>
-              <th>Definition</th>
-              <th>Activity</th>
-              <th>Started by</th>
-              <th>Started</th>
-              <th>State</th>
-            </tr>
-          </thead>
-          <tbody>
-            {instances.loading && <EmptyRow cols={6} msg="Loading…" />}
-            {instances.error && (
-              <EmptyRow cols={6} msg={String(instances.error.message || instances.error)} />
-            )}
-            {!instances.loading && !instances.error && list.length === 0 && (
-              <EmptyRow cols={6} msg="No running process instances." />
-            )}
-            {list.map((p) => (
-              <tr
-                key={p.id}
-                style={{ cursor: "pointer" }}
-                tabIndex={0}
-                onClick={() => openDetail(p.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") openDetail(p.id);
-                }}
-              >
-                <td className="mono">{p.businessKey || p.id}</td>
-                <td>{(p.processDefinitionName as string | undefined) || p.processDefinitionKey}</td>
-                <td className="soft">{(p.activityId as string | undefined) || "—"}</td>
-                <td className="mono mute">
-                  {(p.startUserId as string | undefined) || <span className="mute">—</span>}
-                </td>
-                <td className="mute mono">{fmtTime(p.startTime)}</td>
-                <td>
-                  <span className="badge" data-tone={stateOf(p) === "active" ? "ok" : "warn"}>
-                    <span className="dot" />
-                    {stateOf(p)}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-};
+// ── Process Instances — moved to src/routes/instances/index.tsx (Story 10.1) ──
+// Canonical list archetype (loader + four-state). The Cancel menu item is a
+// placeholder forward-referencing Story 10.3.
 
 // ── Jobs ──────────────────────────────────────────────────────────
 

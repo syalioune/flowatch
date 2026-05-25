@@ -43,6 +43,15 @@ describe("empty-states registry", () => {
     expect(emptyStates.deploymentResources?.body).toMatch(/deployments typically bundle/);
   });
 
+  it("exposes an instances entry (added in Story 10.1)", () => {
+    expect(emptyStates.instances).toBeDefined();
+    expect(emptyStates.instances?.title).toBe("No running process instances.");
+    expect(emptyStates.instances?.body).toBe(
+      "Start an instance from a process definition to see it listed here.",
+    );
+    expect(emptyStates.instances?.cta).toBeUndefined();
+  });
+
   it("renders title + body for the deployments entry", () => {
     const entry = emptyStates.deployments;
     if (!entry) throw new Error("deployments entry missing");
