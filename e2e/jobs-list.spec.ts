@@ -6,8 +6,8 @@
  * empty against a freshly-seeded engine — that's OK; this spec exercises
  * the route-level navigation surface and the placeholder forward-references).
  *
- * Placeholder cluster status: all three Epic 12 placeholders ship in 12.1.
- *   - Execute now → real handler in Story 12.2.
+ * Placeholder cluster status (post-12.2): two placeholders remain.
+ *   - Execute now → real handler in Story 12.2 (closed).
  *   - Move to executable → real handler in Story 12.3.
  *   - View stacktrace → real handler in Story 12.4.
  *
@@ -141,25 +141,18 @@ test.describe("/jobs list (Story 12.1)", () => {
     ).toHaveAttribute("data-on", "1");
   });
 
-  test("⋮ menu surfaces the Execute now placeholder on executable tab when rows exist", async ({
+  test("empty-state shows when the executable tab has no rows for the canonical fixture", async ({
     page,
   }) => {
     await page.goto("/jobs?type=executable");
     await expect(page.getByTestId("jobs-type-filter")).toBeVisible({ timeout: 15_000 });
-    // The loan-approval fixture has no async/service tasks → may be empty. Guard.
+    // The loan-approval fixture has no async/service tasks → executable tab is
+    // expected to be empty. The Execute placeholder click is replaced by the
+    // real-handler E2E in e2e/job-execute.spec.ts (Story 12.2).
     const rows = page.locator("tr[data-job-id]");
     const count = await rows.count();
     if (count === 0) {
-      // Canonical fixture produces no executable jobs — empty state visible.
       await expect(page.getByTestId("empty-state")).toBeVisible();
-      return;
     }
-    await rows.first().locator('[data-testid="row-action-trigger"]').click();
-    await expect(page.getByTestId("execute-job-placeholder")).toBeVisible();
-    await page.getByTestId("execute-job-placeholder").click();
-    // Toast: "Execute now arrives in Story 12.2"
-    await expect(page.getByText(/Execute now arrives in Story 12\.2/i)).toBeVisible({
-      timeout: 5_000,
-    });
   });
 });

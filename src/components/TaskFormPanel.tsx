@@ -33,6 +33,7 @@ import {
 } from "../api";
 import { Icon } from "../components";
 import { ErrorBox } from "../lib/error-box";
+import { NAV_INVALIDATE_COUNTS } from "../lib/nav-events";
 import { TableSkeleton } from "../lib/table-skeleton";
 import { useApi } from "../lib/useApi";
 
@@ -138,7 +139,7 @@ export function TaskFormPanel({ taskId, task, onSubmitted }: Props) {
       await api.submitTaskForm(taskId, { properties });
       // Best-effort: badge invalidation dispatch races with onSubmitted's
       // navigation. Both end up consistent.
-      window.dispatchEvent(new CustomEvent("nav:invalidate-counts"));
+      window.dispatchEvent(new CustomEvent(NAV_INVALIDATE_COUNTS));
       onSubmitted();
     } catch (err) {
       setSubmitError(err instanceof Error ? err : new Error(String(err)));

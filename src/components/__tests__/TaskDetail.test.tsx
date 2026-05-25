@@ -19,6 +19,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, type FlowableTask, type FlowableTaskForm, type FlowableVariable } from "../../api";
+import { NAV_INVALIDATE_COUNTS } from "../../lib/nav-events";
 import { TaskDetail } from "../TaskDetail";
 
 // TanStack Router stubs — TaskDetail uses useNavigate + Link, and PageHead
@@ -153,7 +154,7 @@ describe("<TaskDetail> — Story 11.4 surface", () => {
       taskActionSpy.mockResolvedValue(baseTask);
       const navEvents: string[] = [];
       const navHandler = (e: Event) => navEvents.push(e.type);
-      window.addEventListener("nav:invalidate-counts", navHandler);
+      window.addEventListener(NAV_INVALIDATE_COUNTS, navHandler);
       try {
         render(
           <TaskDetail
@@ -163,13 +164,13 @@ describe("<TaskDetail> — Story 11.4 surface", () => {
         );
         await user.click(screen.getByTestId("resolve-task"));
         await waitFor(() => expect(taskActionSpy).toHaveBeenCalledWith("task-1", "resolve"));
-        expect(navEvents).toContain("nav:invalidate-counts");
+        expect(navEvents).toContain(NAV_INVALIDATE_COUNTS);
         expect(reload).toHaveBeenCalledTimes(1);
         expect(toastCollector.toasts.some((t) => t.kind === "ok" && /Resolved:/.test(t.text))).toBe(
           true,
         );
       } finally {
-        window.removeEventListener("nav:invalidate-counts", navHandler);
+        window.removeEventListener(NAV_INVALIDATE_COUNTS, navHandler);
       }
     });
 

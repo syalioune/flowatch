@@ -16,6 +16,7 @@ import { api, type FlowableTask, type FlowableTaskForm } from "../api";
 import { fmtDue, fmtTime, Icon, PageHead, toast } from "../components";
 import { DelegateTaskModal } from "../lib/delegate-task-modal";
 import { ErrorBox } from "../lib/error-box";
+import { NAV_INVALIDATE_COUNTS } from "../lib/nav-events";
 import { useApi } from "../lib/useApi";
 import { TaskFormPanel } from "./TaskFormPanel";
 
@@ -81,7 +82,7 @@ export function TaskDetail({ task, reload }: Props) {
     try {
       await api.taskAction(t.id, "resolve");
       toast({ kind: "ok", text: `Resolved: ${t.name || t.id}`, ttl: 3000 });
-      window.dispatchEvent(new CustomEvent("nav:invalidate-counts"));
+      window.dispatchEvent(new CustomEvent(NAV_INVALIDATE_COUNTS));
     } catch (err) {
       toast({
         kind: "err",

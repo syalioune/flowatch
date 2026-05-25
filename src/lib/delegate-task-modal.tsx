@@ -25,6 +25,7 @@ import React from "react";
 import { api, type FlowableTask } from "../api";
 import { Icon, toast } from "../components";
 import { ErrorBox } from "./error-box";
+import { NAV_INVALIDATE_COUNTS } from "./nav-events";
 
 export interface DelegateTaskModalProps {
   /** When null, the modal is closed. Pass a FlowableTask to open. */
@@ -96,7 +97,7 @@ export const DelegateTaskModal: React.FC<DelegateTaskModalProps> = ({
         text: `Delegated: ${task.name || task.id} → ${trimmed}`,
         ttl: 3000,
       });
-      window.dispatchEvent(new CustomEvent("nav:invalidate-counts"));
+      window.dispatchEvent(new CustomEvent(NAV_INVALIDATE_COUNTS));
       onSubmitted();
       setBusy(false);
       closeWithFocus();

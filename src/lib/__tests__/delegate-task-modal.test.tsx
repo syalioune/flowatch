@@ -19,6 +19,7 @@ import { userEvent } from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, type FlowableTask } from "../../api";
 import { DelegateTaskModal } from "../delegate-task-modal";
+import { NAV_INVALIDATE_COUNTS } from "../nav-events";
 
 const sampleTask: FlowableTask = {
   id: "task-1",
@@ -110,7 +111,7 @@ describe("<DelegateTaskModal>", () => {
     const triggerRef = { current: trigger };
     const navEvents: string[] = [];
     const navHandler = (e: Event) => navEvents.push(e.type);
-    window.addEventListener("nav:invalidate-counts", navHandler);
+    window.addEventListener(NAV_INVALIDATE_COUNTS, navHandler);
     try {
       render(
         <DelegateTaskModal
@@ -125,7 +126,7 @@ describe("<DelegateTaskModal>", () => {
       await waitFor(() =>
         expect(taskActionSpy).toHaveBeenCalledWith("task-1", "delegate", { assignee: "kermit" }),
       );
-      expect(navEvents).toContain("nav:invalidate-counts");
+      expect(navEvents).toContain(NAV_INVALIDATE_COUNTS);
       expect(onSubmitted).toHaveBeenCalledTimes(1);
       expect(onClose).toHaveBeenCalledTimes(1);
       // Success toast (ok).
@@ -133,7 +134,7 @@ describe("<DelegateTaskModal>", () => {
         true,
       );
     } finally {
-      window.removeEventListener("nav:invalidate-counts", navHandler);
+      window.removeEventListener(NAV_INVALIDATE_COUNTS, navHandler);
       document.body.removeChild(trigger);
     }
   });

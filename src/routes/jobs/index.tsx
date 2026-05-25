@@ -12,11 +12,13 @@
  */
 
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import React from "react";
 import { z } from "zod";
 import { api, type FlowableJob } from "../../api";
 import { fmtDue, Icon, PageHead, toast } from "../../components";
 import { EmptyState, emptyStates } from "../../lib/empty-states";
 import { ErrorBox } from "../../lib/error-box";
+import { NAV_INVALIDATE_COUNTS } from "../../lib/nav-events";
 import { type RowActionItem, RowActionMenu } from "../../lib/row-action-menu";
 import { TableSkeleton } from "../../lib/table-skeleton";
 
@@ -147,8 +149,50 @@ function JobsRoute() {
   const data = Route.useLoaderData();
   const { type, onTypeChange } = useTypeNav();
   const router = useRouter();
+  // Story 12.2: optimistic busy-Set archetype (second consumer after 11.2's
+  // optimisticComplete). RC-3-safe: every mutation replaces the Set identity
+  // so React re-renders. Lifecycle: add on dispatch, delete on settle
+  // (success AND failure). The list reconciliation comes from
+  // router.invalidate on both paths — engine is source of truth.
+  const [optimisticExecuting, setOptimisticExecuting] = React.useState<Set<string>>(new Set());
 
   const refresh = () => router.invalidate({ filter: (r) => r.routeId === "/jobs/" });
+
+  // Story 12.2 AC-1: Execute on demand with optimistic busy-flag.
+  // Live-engine review patch: timer-job IDs do NOT resolve at
+  // /management/jobs/{id} — Flowable 7.x keeps a separate namespace. Branch
+  // on the active tab so the executable tab hits api.executeJob and the
+  // timer tab hits api.executeTimerJob.
+  const handleExecute = async (j: FlowableJob) => {
+    setOptimisticExecuting((s) => new Set(s).add(j.id));
+    try {
+      if (type === "timer") await api.executeTimerJob(j.id);
+      else await api.executeJob(j.id);
+      toast({ kind: "ok", text: `Executed: ${j.id}`, ttl: 3000 });
+      await router.invalidate({ filter: (r) => r.routeId === "/jobs/" });
+      window.dispatchEvent(new CustomEvent(NAV_INVALIDATE_COUNTS));
+      setOptimisticExecuting((s) => {
+        const copy = new Set(s);
+        copy.delete(j.id);
+        return copy;
+      });
+    } catch (err) {
+      setOptimisticExecuting((s) => {
+        const copy = new Set(s);
+        copy.delete(j.id);
+        return copy;
+      });
+      toast({
+        kind: "err",
+        text: "Execute failed",
+        sub: (err as Error)?.message ?? String(err),
+        ttl: 8000,
+      });
+      // Engine may have executed the job in a parallel session — reload to
+      // converge with engine truth (mirror 11.2 handleComplete).
+      void router.invalidate({ filter: (r) => r.routeId === "/jobs/" });
+    }
+  };
 
   if (data.data.length === 0) {
     return (
@@ -179,14 +223,14 @@ function JobsRoute() {
         <tbody>
           {data.data.map((raw) => {
             const j = raw as JobWide;
+            const isExecuting = optimisticExecuting.has(j.id);
             // Jobs has no detail page — row click would have no destination.
             // Stacktrace inspection lands inside the row in Story 12.4.
             const items: RowActionItem[] = [
               type !== "deadletter" && {
                 label: "Execute now",
-                onSelect: () =>
-                  toast({ kind: "info", text: "Execute now arrives in Story 12.2", ttl: 4000 }),
-                testId: "execute-job-placeholder",
+                disabled: isExecuting,
+                onSelect: () => handleExecute(j),
               },
               type === "deadletter" && {
                 label: "Move to executable",
@@ -207,7 +251,12 @@ function JobsRoute() {
             ].filter(Boolean) as RowActionItem[];
 
             return (
-              <tr key={j.id} data-job-id={j.id}>
+              <tr
+                key={j.id}
+                data-job-id={j.id}
+                data-busy={isExecuting ? "1" : undefined}
+                style={isExecuting ? { opacity: 0.6 } : undefined}
+              >
                 <td className="mono">{j.id}</td>
                 <td className="mono mute">{j.elementId || j.elementName || "—"}</td>
                 <td className="mono">
