@@ -3,16 +3,15 @@
 /**
  * History list route — seventh application of the Story 9.1 canonical list
  * archetype with multi-endpoint loader dispatch (mirrors src/routes/jobs/
- * index.tsx 12.1's tab-aware dispatch shape, now applied to a READ-only
+ * index.tsx 12.1's tab-aware dispatch shape, applied to a READ-only
  * surface).
  *
- * 13.1 introduced the route file with a single `instances` branch + a
- * transitional <LegacyHistoryShim> for `activities|variables|tasks`. 13.3
- * adds canonical-archetype dispatch for `variables` and `tasks` (in this
- * commit) and leaves `activities` routed through the shim. The follow-up
- * `chore(refactor):` commit drops the activities tab, the shim, and the
- * legacy <History> block from src/screens.tsx in a single
- * pure-deletion commit per Epic 12 retro §3.4.
+ * Tabs: Instances / Variables / Tasks — each tab dispatches via the
+ * URL search-param to a different historic endpoint with its own
+ * canonical-archetype table render. The legacy `?type=activities` flat
+ * list was dropped in the Story 13.3 follow-up refactor commit; the
+ * per-instance audit trail in <InstanceHistoricActivitiesPanel> on
+ * /instances/$id is the operator-relevant view (Story 13.2).
  */
 
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
@@ -29,7 +28,6 @@ import { fmtMs, fmtTime, Icon, PageHead } from "../../components";
 import { typeTone } from "../../components/InstanceVariablesPanel";
 import { EmptyState, type EmptyStateEntry, emptyStates } from "../../lib/empty-states";
 import { ErrorBox } from "../../lib/error-box";
-import { LegacyHistoryShim } from "../../lib/legacy-history-shim";
 import { TableSkeleton } from "../../lib/table-skeleton";
 
 type HistoricInstanceWide = FlowableHistoricProcessInstance & {
@@ -41,15 +39,13 @@ type HistoricTaskWide = FlowableHistoricTask & {
 };
 
 const historySearch = z.object({
-  type: z.enum(["instances", "activities", "variables", "tasks"]).optional().default("instances"),
+  type: z.enum(["instances", "variables", "tasks"]).optional().default("instances"),
 });
 
-export type HistoryType = "instances" | "activities" | "variables" | "tasks";
+export type HistoryType = "instances" | "variables" | "tasks";
 
-// Loader dispatches between three historic endpoints + the legacy
-// `activities` tab (which still routes through <LegacyHistoryShim> until
-// the follow-up chore(refactor) commit). Exported for unit testing of the
-// branch behaviour.
+// Loader dispatches between the three canonical-archetype historic
+// endpoints. Exported for unit testing of the branch behaviour.
 export const loadHistoryByType = (type: HistoryType) => {
   if (type === "instances") {
     return api.listHistoricInstances({
@@ -60,9 +56,7 @@ export const loadHistoryByType = (type: HistoryType) => {
     });
   }
   if (type === "variables") return api.listHistoricVariables({ size: 50 });
-  if (type === "tasks") return api.listHistoricTasks({ size: 50, finished: true });
-  // `activities` tab is handled by the legacy shim — no route-level fetch.
-  return null;
+  return api.listHistoricTasks({ size: 50, finished: true });
 };
 
 export const Route = createFileRoute("/history/")({
@@ -128,14 +122,6 @@ function PageChrome({ children, onRefresh, type, onTypeChange }: PageChromeProps
           onClick={() => onTypeChange("instances")}
         >
           Instances
-        </button>
-        <button
-          type="button"
-          className="seg-btn"
-          data-on={type === "activities" ? "1" : "0"}
-          onClick={() => onTypeChange("activities")}
-        >
-          Activities
         </button>
         <button
           type="button"
@@ -207,17 +193,6 @@ function HistoryRoute() {
 
   const refresh = () => router.invalidate({ filter: (r) => r.routeId === "/history/" });
   const openDetail = (id: string) => navigate({ to: "/instances/$id", params: { id } });
-
-  // `activities` tab keeps routing through the legacy shim until the
-  // follow-up chore(refactor) commit drops the legacy block + the
-  // tab from the seg-row + the Zod schema atomically.
-  if (type === "activities") {
-    return (
-      <PageChrome type={type} onTypeChange={onTypeChange}>
-        <LegacyHistoryShim type={type} />
-      </PageChrome>
-    );
-  }
 
   if (!data || data.data.length === 0) {
     const entry = emptyStateByType(type);
