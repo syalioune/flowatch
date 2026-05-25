@@ -25,6 +25,13 @@ export interface UploadDeploymentModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: (deployment: FlowableDeployment) => void;
+  /**
+   * Focus-restore target (Epic 9 retro A-4, Story 10.2 AC-7). When set, the
+   * trigger element is re-focused on modal close. When omitted, no
+   * restoration happens (the previous focus-snapshot pattern is gone — it
+   * was fragile when the trigger unmounted during the modal's lifecycle).
+   */
+  triggerRef?: React.RefObject<HTMLElement | null>;
 }
 
 // Exported for direct unit testing — the regex is the source of truth for
@@ -36,28 +43,23 @@ export const UploadDeploymentModal: React.FC<UploadDeploymentModalProps> = ({
   open,
   onClose,
   onSuccess,
+  triggerRef,
 }) => {
   const [file, setFile] = React.useState<File | null>(null);
   const [error, setError] = React.useState<Error | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [validationMsg, setValidationMsg] = React.useState<string | null>(null);
   const inputRef = React.useRef<HTMLInputElement | null>(null);
-  const previouslyFocused = React.useRef<HTMLElement | null>(null);
 
   // Reset internal state every time the modal opens — picking a file in one
   // session must not bleed into the next.
   React.useEffect(() => {
     if (!open) return;
-    previouslyFocused.current = (document.activeElement as HTMLElement) ?? null;
     setFile(null);
     setError(null);
     setBusy(false);
     setValidationMsg(null);
     setTimeout(() => inputRef.current?.focus(), 0);
-    return () => {
-      // Restore focus to whatever opened the modal.
-      previouslyFocused.current?.focus?.();
-    };
   }, [open]);
 
   // Escape closes — but not while busy: orphaning an in-flight upload would
@@ -67,14 +69,20 @@ export const UploadDeploymentModal: React.FC<UploadDeploymentModalProps> = ({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
+        triggerRef?.current?.focus();
         onClose();
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, busy, onClose]);
+  }, [open, busy, onClose, triggerRef]);
 
   if (!open) return null;
+
+  const closeWithFocus = () => {
+    triggerRef?.current?.focus();
+    onClose();
+  };
 
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = e.target.files?.[0] ?? null;
@@ -101,7 +109,7 @@ export const UploadDeploymentModal: React.FC<UploadDeploymentModalProps> = ({
       const deployment = await api.deployBpmn(file.name, content);
       setBusy(false);
       onSuccess(deployment);
-      onClose();
+      closeWithFocus();
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
       setBusy(false);
@@ -115,7 +123,7 @@ export const UploadDeploymentModal: React.FC<UploadDeploymentModalProps> = ({
       className="modal-back"
       data-testid="upload-deployment-modal"
       onClick={() => {
-        if (!busy) onClose();
+        if (!busy) closeWithFocus();
       }}
     >
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation only — no interactive role on the panel itself */}
@@ -126,7 +134,7 @@ export const UploadDeploymentModal: React.FC<UploadDeploymentModalProps> = ({
           <button
             type="button"
             className="icon-btn"
-            onClick={onClose}
+            onClick={closeWithFocus}
             disabled={busy}
             aria-label="Close upload modal"
             style={{ marginLeft: "auto" }}
@@ -155,7 +163,7 @@ export const UploadDeploymentModal: React.FC<UploadDeploymentModalProps> = ({
           )}
         </div>
         <div className="modal-ft">
-          <button type="button" className="btn" onClick={onClose} disabled={busy}>
+          <button type="button" className="btn" onClick={closeWithFocus} disabled={busy}>
             Cancel
           </button>
           <button

@@ -29,29 +29,32 @@ export interface DeleteDeploymentModalProps {
    * delete before returning an error.
    */
   onSettled: () => void;
+  /**
+   * Focus-restore target (Epic 9 retro A-4, Story 10.2 AC-7). When set, the
+   * trigger element is re-focused on modal close. When omitted, no
+   * restoration happens (the previous focus-snapshot pattern is gone — it
+   * was fragile when the trigger unmounted during the modal's lifecycle).
+   */
+  triggerRef?: React.RefObject<HTMLElement | null>;
 }
 
 export const DeleteDeploymentModal: React.FC<DeleteDeploymentModalProps> = ({
   deployment,
   onClose,
   onSettled,
+  triggerRef,
 }) => {
   const [cascade, setCascade] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const checkboxRef = React.useRef<HTMLInputElement | null>(null);
-  const previouslyFocused = React.useRef<HTMLElement | null>(null);
 
   // Reset state every time a NEW deployment is targeted (the route resets
   // deployment → null on close, then sets a fresh object on the next open).
   React.useEffect(() => {
     if (!deployment) return;
-    previouslyFocused.current = (document.activeElement as HTMLElement) ?? null;
     setCascade(false);
     setBusy(false);
     setTimeout(() => checkboxRef.current?.focus(), 0);
-    return () => {
-      previouslyFocused.current?.focus?.();
-    };
   }, [deployment]);
 
   // Escape closes — suppressed while busy (AC-7: once the user clicks
@@ -61,14 +64,20 @@ export const DeleteDeploymentModal: React.FC<DeleteDeploymentModalProps> = ({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
+        triggerRef?.current?.focus();
         onClose();
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [deployment, busy, onClose]);
+  }, [deployment, busy, onClose, triggerRef]);
 
   if (!deployment) return null;
+
+  const closeWithFocus = () => {
+    triggerRef?.current?.focus();
+    onClose();
+  };
 
   const submit = async () => {
     setBusy(true);
@@ -89,7 +98,7 @@ export const DeleteDeploymentModal: React.FC<DeleteDeploymentModalProps> = ({
     } finally {
       setBusy(false);
       onSettled();
-      onClose();
+      closeWithFocus();
     }
   };
 
@@ -100,7 +109,7 @@ export const DeleteDeploymentModal: React.FC<DeleteDeploymentModalProps> = ({
       className="modal-back"
       data-testid="delete-deployment-modal"
       onClick={() => {
-        if (!busy) onClose();
+        if (!busy) closeWithFocus();
       }}
     >
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation only — no interactive role on the panel itself */}
@@ -111,7 +120,7 @@ export const DeleteDeploymentModal: React.FC<DeleteDeploymentModalProps> = ({
           <button
             type="button"
             className="icon-btn"
-            onClick={onClose}
+            onClick={closeWithFocus}
             disabled={busy}
             aria-label="Close delete confirmation modal"
             style={{ marginLeft: "auto" }}
@@ -147,7 +156,7 @@ export const DeleteDeploymentModal: React.FC<DeleteDeploymentModalProps> = ({
             type="button"
             className="btn"
             data-testid="delete-cancel"
-            onClick={onClose}
+            onClick={closeWithFocus}
             disabled={busy}
           >
             Cancel

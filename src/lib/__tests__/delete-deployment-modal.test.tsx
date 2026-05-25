@@ -213,4 +213,35 @@ describe("<DeleteDeploymentModal>", () => {
     );
     expect(screen.getByTestId("cascade-checkbox")).not.toBeChecked();
   });
+
+  // Story 10.2 AC-7 / AC-12 — focus-restore via triggerRef.
+  it("restores focus to triggerRef.current after Cancel", async () => {
+    const user = userEvent.setup();
+    const trigger = document.createElement("button");
+    trigger.textContent = "Open Delete";
+    document.body.appendChild(trigger);
+    const triggerRef = { current: trigger };
+    const focusSpy = vi.spyOn(trigger, "focus");
+    render(
+      <DeleteDeploymentModal
+        deployment={sampleDeployment}
+        onClose={vi.fn()}
+        onSettled={vi.fn()}
+        triggerRef={triggerRef}
+      />,
+    );
+    await user.click(screen.getByTestId("delete-cancel"));
+    expect(focusSpy).toHaveBeenCalled();
+    document.body.removeChild(trigger);
+  });
+
+  it("does not throw when no triggerRef is provided and the modal closes", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(
+      <DeleteDeploymentModal deployment={sampleDeployment} onClose={onClose} onSettled={vi.fn()} />,
+    );
+    await user.click(screen.getByTestId("delete-cancel"));
+    expect(onClose).toHaveBeenCalled();
+  });
 });

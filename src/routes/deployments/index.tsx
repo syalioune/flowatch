@@ -62,13 +62,14 @@ interface PageChromeProps {
   children: React.ReactNode;
   onRefresh?: () => void;
   onUpload?: () => void;
+  uploadButtonRef?: React.RefObject<HTMLButtonElement>;
 }
 
 /**
  * Shared page chrome so the four states (pending / error / empty / data)
  * share an identical header — pages don't "blank" between transitions.
  */
-function PageChrome({ children, onRefresh, onUpload }: PageChromeProps) {
+function PageChrome({ children, onRefresh, onUpload, uploadButtonRef }: PageChromeProps) {
   return (
     <div className="page">
       <PageHead
@@ -77,6 +78,7 @@ function PageChrome({ children, onRefresh, onUpload }: PageChromeProps) {
         actions={
           <>
             <button
+              ref={uploadButtonRef}
               type="button"
               className="btn"
               data-testid="upload-deployment"
@@ -104,6 +106,11 @@ function DeploymentsRoute() {
   const navigate = useNavigate();
   const [uploadOpen, setUploadOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<FlowableDeployment | null>(null);
+  // Story 10.2 AC-7: focus-restore. Upload trigger is the page-level Upload
+  // button (single instance). Delete trigger is the last-clicked row's
+  // RowActionMenu trigger (per the pragmatic shared-ref alternative).
+  const uploadButtonRef = React.useRef<HTMLButtonElement>(null);
+  const deleteTriggerRef = React.useRef<HTMLElement | null>(null);
   const refresh = () => router.invalidate();
   const onUpload = () => setUploadOpen(true);
   const openDetail = (id: string) => navigate({ to: "/deployments/$id", params: { id } });
@@ -126,11 +133,13 @@ function DeploymentsRoute() {
         open={uploadOpen}
         onClose={() => setUploadOpen(false)}
         onSuccess={handleUploadSuccess}
+        triggerRef={uploadButtonRef}
       />
       <DeleteDeploymentModal
         deployment={deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onSettled={handleDeleteSettled}
+        triggerRef={deleteTriggerRef}
       />
     </>
   );
@@ -138,7 +147,7 @@ function DeploymentsRoute() {
   if (data.data.length === 0) {
     return (
       <>
-        <PageChrome onRefresh={refresh} onUpload={onUpload}>
+        <PageChrome onRefresh={refresh} onUpload={onUpload} uploadButtonRef={uploadButtonRef}>
           {(() => {
             const entry = emptyStates.deployments;
             if (!entry) return null;
@@ -152,7 +161,7 @@ function DeploymentsRoute() {
 
   return (
     <>
-      <PageChrome onRefresh={refresh} onUpload={onUpload}>
+      <PageChrome onRefresh={refresh} onUpload={onUpload} uploadButtonRef={uploadButtonRef}>
         <table className="tbl">
           <thead>
             <tr>
@@ -182,7 +191,16 @@ function DeploymentsRoute() {
                 <td className="mono mute">{d.id}</td>
                 <td className="mono">{d.tenantId || <span className="mute">—</span>}</td>
                 <td className="mute mono">{fmtTime(d.deploymentTime)}</td>
-                <td>
+                <td
+                  // Capture the row's RowActionMenu trigger for focus-restore.
+                  onClickCapture={(e) => {
+                    const target = e.target as HTMLElement | null;
+                    const trigger = target?.closest(
+                      '[data-testid="row-action-trigger"]',
+                    ) as HTMLElement | null;
+                    if (trigger) deleteTriggerRef.current = trigger;
+                  }}
+                >
                   <RowActionMenu
                     ariaLabel={`Actions for deployment ${d.name || d.id}`}
                     items={[

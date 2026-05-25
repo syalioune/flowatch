@@ -199,4 +199,28 @@ describe("<UploadDeploymentModal>", () => {
     // Resolve so the deferred promise doesn't dangle for vitest cleanup.
     resolveDeploy({ id: "dep-x", name: "orders.bpmn", deploymentTime: "", tenantId: "" });
   });
+
+  // Story 10.2 AC-7 / AC-12 — focus-restore via triggerRef.
+  it("restores focus to triggerRef.current after Cancel", async () => {
+    const user = userEvent.setup();
+    const trigger = document.createElement("button");
+    trigger.textContent = "Open Upload";
+    document.body.appendChild(trigger);
+    const triggerRef = { current: trigger };
+    const focusSpy = vi.spyOn(trigger, "focus");
+    render(
+      <UploadDeploymentModal open onClose={vi.fn()} onSuccess={vi.fn()} triggerRef={triggerRef} />,
+    );
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(focusSpy).toHaveBeenCalled();
+    document.body.removeChild(trigger);
+  });
+
+  it("does not throw when no triggerRef is provided and the modal closes", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(<UploadDeploymentModal open onClose={onClose} onSuccess={vi.fn()} />);
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onClose).toHaveBeenCalled();
+  });
 });

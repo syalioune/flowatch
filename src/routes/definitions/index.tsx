@@ -15,6 +15,7 @@ import { Icon, PageHead, toast } from "../../components";
 import { EmptyState, emptyStates } from "../../lib/empty-states";
 import { ErrorBox } from "../../lib/error-box";
 import { RowActionMenu } from "../../lib/row-action-menu";
+import { StartInstanceModal } from "../../lib/start-instance-modal";
 import { TableSkeleton } from "../../lib/table-skeleton";
 
 // Exported for unit testing of AC-1 / AC-12-style tenantId-omission.
@@ -39,6 +40,7 @@ export const Route = createFileRoute("/definitions/")({
         path: "/repository/process-definitions/{id}/resourcedata",
         desc: "Fetch BPMN XML",
       },
+      { method: "POST", path: "/runtime/process-instances", desc: "Start instance" },
     ],
   },
   component: DefinitionsRoute,
@@ -86,6 +88,12 @@ function DefinitionsRoute() {
   const [optimisticSuspended, setOptimisticSuspended] = React.useState<Map<string, boolean>>(
     new Map(),
   );
+  // Story 10.2: the Start instance modal target — null is closed.
+  const [startTarget, setStartTarget] = React.useState<FlowableProcessDefinition | null>(null);
+  // Story 10.2 AC-7: focus-restore target. Per the spec's pragmatic
+  // alternative, we point at the LAST-CLICKED row's RowActionMenu trigger
+  // (only one modal can be open at a time).
+  const startTriggerRef = React.useRef<HTMLElement | null>(null);
 
   const refresh = () => router.invalidate({ filter: (r) => r.routeId === "/definitions/" });
   const openDetail = (id: string) => navigate({ to: "/definitions/$id", params: { id } });
@@ -178,7 +186,19 @@ function DefinitionsRoute() {
                   </span>
                 </td>
                 <td className="mono">{d.tenantId || <span className="mute">—</span>}</td>
-                <td>
+                <td
+                  // Capture the actually-clicked row's RowActionMenu trigger
+                  // for focus-restore. The menu trigger is rendered inside
+                  // this <td>; relatedTarget on the synthetic click captures
+                  // the actual <button>.
+                  onClickCapture={(e) => {
+                    const target = e.target as HTMLElement | null;
+                    const trigger = target?.closest(
+                      '[data-testid="row-action-trigger"]',
+                    ) as HTMLElement | null;
+                    if (trigger) startTriggerRef.current = trigger;
+                  }}
+                >
                   <RowActionMenu
                     ariaLabel={`Actions for definition ${d.name || d.key}`}
                     items={[
@@ -192,12 +212,7 @@ function DefinitionsRoute() {
                       },
                       {
                         label: "Start instance",
-                        onSelect: () =>
-                          toast({
-                            kind: "info",
-                            text: "Start instance arrives in Story 10.2",
-                            ttl: 4000,
-                          }),
+                        onSelect: () => setStartTarget(d),
                       },
                     ]}
                   />
@@ -207,6 +222,11 @@ function DefinitionsRoute() {
           })}
         </tbody>
       </table>
+      <StartInstanceModal
+        definition={startTarget}
+        onClose={() => setStartTarget(null)}
+        triggerRef={startTriggerRef}
+      />
     </PageChrome>
   );
 }
