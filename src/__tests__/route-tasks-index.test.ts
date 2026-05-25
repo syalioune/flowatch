@@ -58,6 +58,52 @@ describe("/tasks route loader", () => {
     expect(Object.keys(lastParams as object)).not.toContain("unassigned");
   });
 
+  it("AC-6 me-without-username: dispatches the warning toast at loader time", async () => {
+    (apiModule.api as unknown as { config: () => apiModule.FlowableConfig }).config = () => ({
+      baseUrl: "http://x/y",
+      username: "",
+      password: "p",
+      tenantId: "",
+    });
+    const captured: Array<{ kind?: string; text: string }> = [];
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ kind?: string; text: string }>).detail;
+      captured.push(detail);
+    };
+    window.addEventListener("app:toast", handler as EventListener);
+    try {
+      await loadTasks("me");
+      // Toast is dispatched via setTimeout(0) so Toaster's listener catches
+      // it after mount; flush the timer before asserting.
+      await new Promise((r) => setTimeout(r, 5));
+      expect(captured.some((t) => t.kind === "warn" && /No username configured/.test(t.text))).toBe(
+        true,
+      );
+    } finally {
+      window.removeEventListener("app:toast", handler as EventListener);
+    }
+  });
+
+  it("AC-6 me-with-username: does NOT dispatch the warning toast", async () => {
+    (apiModule.api as unknown as { config: () => apiModule.FlowableConfig }).config = () => ({
+      baseUrl: "http://x/y",
+      username: "rest-admin",
+      password: "p",
+      tenantId: "",
+    });
+    const captured: Array<{ kind?: string; text: string }> = [];
+    const handler = (e: Event) => {
+      captured.push((e as CustomEvent<{ kind?: string; text: string }>).detail);
+    };
+    window.addEventListener("app:toast", handler as EventListener);
+    try {
+      await loadTasks("me");
+      expect(captured.some((t) => /No username configured/.test(t.text))).toBe(false);
+    } finally {
+      window.removeEventListener("app:toast", handler as EventListener);
+    }
+  });
+
   it("AC-1 unassigned: passes unassigned=true, size=50", async () => {
     (apiModule.api as unknown as { config: () => apiModule.FlowableConfig }).config = () => ({
       baseUrl: "http://x/y",

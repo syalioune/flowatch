@@ -116,9 +116,11 @@ test("operator golden path: definitions → start → instance → claim → com
   const allFilter = page.locator(".seg-btn").filter({ hasText: "All" });
   await allFilter.click();
 
-  const taskCard = page.locator(".panel > div > div").filter({ hasText: "Approve loan" }).first();
-  await expect(taskCard).toBeVisible({ timeout: 15_000 });
-  await taskCard.click();
+  // Story 11.1 replaced the legacy task-card panel with the canonical-archetype
+  // table layout. Locate the row by its task-name cell.
+  const taskRow = page.locator("table.tbl tbody tr").filter({ hasText: "Approve loan" }).first();
+  await expect(taskRow).toBeVisible({ timeout: 15_000 });
+  await taskRow.locator("td").first().click();
 
   // The right-side panel reveals Claim + Complete. Claim first (it's unassigned).
   const claimBtn = page.getByRole("button", { name: /^Claim$/ });
