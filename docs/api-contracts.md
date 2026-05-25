@@ -64,7 +64,7 @@ Every call — success or failure — pushes an entry into `API_LOG` and fires a
 | `listHistoricInstances(params)`      | GET    | `/history/historic-process-instances`             |                                                                  |
 | `getHistoricProcessInstance(id)`     | GET    | `/history/historic-process-instances/{id}`        | Per-id GET for the historic detail panel (Story 13.1).            |
 | `listHistoricActivities(params)`     | GET    | `/history/historic-activity-instances`            | Common filter: `processInstanceId={id}` for an instance's audit trail |
-| `listHistoricVariables(params)`      | GET    | `/history/historic-variable-instances`            |                                                                  |
+| `listHistoricVariables(params)`      | GET    | `/history/historic-variable-instances`            | Variable payload is nested under `entry.variable.{name,type,value,scope}` — NOT flattened like the runtime variables endpoint. See RC-12. |
 | `listHistoricTasks(params)`          | GET    | `/history/historic-task-instances`                |                                                                  |
 
 ## Identity

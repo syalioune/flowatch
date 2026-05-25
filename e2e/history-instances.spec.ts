@@ -134,6 +134,7 @@ test.describe("/history?type=instances + dual-fetch on /instances/$id (Story 13.
       timeout: 15_000,
     });
     await expect(page.getByRole("columnheader", { name: "Type" })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Value" })).toBeVisible();
     await expect(page.getByRole("columnheader", { name: "Instance" })).toBeVisible();
     await expect(page.getByRole("columnheader", { name: "Task" })).toBeVisible();
     // Tasks tab

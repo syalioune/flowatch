@@ -25,7 +25,7 @@ import {
   type FlowablePage,
 } from "../../api";
 import { fmtMs, fmtTime, Icon, PageHead } from "../../components";
-import { typeTone } from "../../components/InstanceVariablesPanel";
+import { prettyJson, typeTone } from "../../components/InstanceVariablesPanel";
 import { EmptyState, type EmptyStateEntry, emptyStates } from "../../lib/empty-states";
 import { ErrorBox } from "../../lib/error-box";
 import { TableSkeleton } from "../../lib/table-skeleton";
@@ -36,6 +36,30 @@ type HistoricInstanceWide = FlowableHistoricProcessInstance & {
 
 type HistoricTaskWide = FlowableHistoricTask & {
   startTime?: string;
+};
+
+// Render historic variable values for the row preview. Mirrors the
+// `InstanceVariablesPanel` strategy: primitive types render via String(),
+// JSON-typed values pretty-print via the shared `prettyJson` helper (so
+// the 4 KB render-side budget applies), and null / undefined collapse to
+// a muted dash. This is a row-cell render — no <pre>; truncate to a short
+// width so the table stays readable.
+const HISTORIC_VALUE_ROW_BUDGET = 120;
+
+const renderHistoricValue = (value: unknown): React.ReactNode => {
+  if (value === null || value === undefined) return <span className="mute">—</span>;
+  if (typeof value === "object") {
+    const pretty = prettyJson(value);
+    if (pretty.length > HISTORIC_VALUE_ROW_BUDGET) {
+      return `${pretty.slice(0, HISTORIC_VALUE_ROW_BUDGET)}…`;
+    }
+    return pretty;
+  }
+  const raw = String(value);
+  const quoted = typeof value === "string" ? `"${raw}"` : raw;
+  if (quoted.length > HISTORIC_VALUE_ROW_BUDGET)
+    return `${quoted.slice(0, HISTORIC_VALUE_ROW_BUDGET)}…`;
+  return quoted;
 };
 
 const historySearch = z.object({
@@ -155,11 +179,10 @@ function useTypeNav() {
 
 function HistoryPending() {
   const { type, onTypeChange } = useTypeNav();
-  // Column count differs by tab; default to 5 (matches instances + tasks).
-  const cols = type === "variables" ? 4 : 5;
+  // All three tabs ship a 5-column table (Instances, Variables, Tasks).
   return (
     <PageChrome type={type} onTypeChange={onTypeChange}>
-      <TableSkeleton columns={cols} rows={6} />
+      <TableSkeleton columns={5} rows={6} />
     </PageChrome>
   );
 }
@@ -254,38 +277,45 @@ function HistoryRoute() {
             <tr>
               <th>Variable</th>
               <th>Type</th>
+              <th>Value</th>
               <th>Instance</th>
               <th>Task</th>
             </tr>
           </thead>
           <tbody>
-            {page.data.map((v) => (
-              <tr key={v.id} data-historic-variable-id={v.id}>
-                <td>
-                  <span className="mono">{v.variableName}</span>
-                </td>
-                <td>
-                  <span className="badge" data-tone={typeTone(v.variableType)}>
-                    {v.variableType ?? "—"}
-                  </span>
-                </td>
-                <td>
-                  {v.processInstanceId ? (
-                    <Link
-                      to="/instances/$id"
-                      params={{ id: v.processInstanceId }}
-                      className="mono"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {v.processInstanceId}
-                    </Link>
-                  ) : (
-                    <span className="mute">—</span>
-                  )}
-                </td>
-                <td className="mono mute">{v.taskId || <span className="mute">—</span>}</td>
-              </tr>
-            ))}
+            {page.data.map((v) => {
+              const inner = v.variable;
+              return (
+                <tr key={v.id} data-historic-variable-id={v.id}>
+                  <td>
+                    <span className="mono">{inner?.name ?? <span className="mute">—</span>}</span>
+                  </td>
+                  <td>
+                    <span className="badge" data-tone={typeTone(inner?.type)}>
+                      {inner?.type ?? "—"}
+                    </span>
+                  </td>
+                  <td className="mono" style={{ fontSize: 11.5 }}>
+                    {renderHistoricValue(inner?.value)}
+                  </td>
+                  <td>
+                    {v.processInstanceId ? (
+                      <Link
+                        to="/instances/$id"
+                        params={{ id: v.processInstanceId }}
+                        className="mono"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {v.processInstanceId}
+                      </Link>
+                    ) : (
+                      <span className="mute">—</span>
+                    )}
+                  </td>
+                  <td className="mono mute">{v.taskId || <span className="mute">—</span>}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </PageChrome>
