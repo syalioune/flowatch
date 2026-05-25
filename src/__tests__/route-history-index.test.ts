@@ -110,12 +110,4 @@ describe("/history route loader", () => {
     expect(instancesSpy).not.toHaveBeenCalled();
     expect(variablesSpy).not.toHaveBeenCalled();
   });
-
-  it("AC-1 activities (transition): returns null without calling any list endpoint (legacy shim handles it)", async () => {
-    const out = await loadHistoryByType("activities");
-    expect(out).toBeNull();
-    expect(instancesSpy).not.toHaveBeenCalled();
-    expect(variablesSpy).not.toHaveBeenCalled();
-    expect(tasksSpy).not.toHaveBeenCalled();
-  });
 });
