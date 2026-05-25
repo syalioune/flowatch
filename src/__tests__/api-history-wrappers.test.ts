@@ -39,6 +39,44 @@ function mockResponse(opts: { status: number; body?: string; contentType?: strin
   return new Response(opts.body ?? "", { status: opts.status, headers });
 }
 
+describe("api.listHistoricVariables (RC-12 — nested variable shape)", () => {
+  it("preserves the engine's nested `variable.{name,type,value,scope}` payload on the wire", async () => {
+    const enginePayload = JSON.stringify({
+      data: [
+        {
+          id: "846acaed-5882-11f1-9961-be503a495712",
+          processInstanceId: "846acaec-5882-11f1-9961-be503a495712",
+          taskId: null,
+          executionId: "846acaec-5882-11f1-9961-be503a495712",
+          variable: {
+            name: "initiator",
+            type: "string",
+            value: "rest-admin",
+            scope: "global",
+          },
+        },
+      ],
+      total: 1,
+      start: 0,
+      size: 50,
+      sort: "variableName",
+      order: "asc",
+    });
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ status: 200, body: enginePayload, contentType: "application/json" }),
+    );
+    const out = await api.listHistoricVariables({ size: 50 });
+    expect(out.data).toHaveLength(1);
+    const entry = out.data[0];
+    expect(entry?.id).toBe("846acaed-5882-11f1-9961-be503a495712");
+    expect(entry?.variable.name).toBe("initiator");
+    expect(entry?.variable.type).toBe("string");
+    expect(entry?.variable.value).toBe("rest-admin");
+    expect(entry?.variable.scope).toBe("global");
+    expect(entry?.executionId).toBe("846acaec-5882-11f1-9961-be503a495712");
+  });
+});
+
 describe("api.getHistoricProcessInstance", () => {
   it("GETs /history/historic-process-instances/{id} with no body or params (Story 13.1 AC-2)", async () => {
     const id = "pi-42";

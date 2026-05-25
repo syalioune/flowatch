@@ -225,13 +225,26 @@ export interface FlowableHistoricActivity {
   durationInMillis?: number;
 }
 
+// Flowable 7.x returns historic variables with the variable payload nested
+// under a `variable` object — `{id, processInstanceId, taskId, executionId,
+// variable: {name, type, value, scope}}` — NOT flattened with top-level
+// `variableName` / `variableType` like the runtime variable endpoint
+// (`/runtime/process-instances/{id}/variables`). Operator-side render code
+// must read `entry.variable.name` / `entry.variable.type` / `entry.variable.value`.
+// See RC-12 in docs/runtime-caveats.md.
+export interface FlowableHistoricVariableValue {
+  name: string;
+  type?: string;
+  value: unknown;
+  scope?: string;
+}
+
 export interface FlowableHistoricVariable {
   id: string;
-  variableName: string;
-  variableType?: string;
-  value: unknown;
+  variable: FlowableHistoricVariableValue;
   processInstanceId?: string;
   taskId?: string;
+  executionId?: string;
 }
 
 export interface FlowableHistoricTask extends FlowableTask {

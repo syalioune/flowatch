@@ -262,6 +262,37 @@ else await api.executeJob(j.id);
 
 ---
 
+## RC-12 — `/history/historic-variable-instances` nests the variable payload under `variable.{name,type,value,scope}`
+
+**Naive intuition:** historic variables follow the same flat shape as the runtime variable endpoint (`/runtime/process-instances/{id}/variables`) — top-level `name`, `type`, `value`, `scope` fields next to `processInstanceId` / `taskId`. The historic envelope just adds timestamps; the variable bits stay flat.
+
+**Actual behaviour:** Flowable 7.x wraps the variable payload in a nested `variable` object. The row carries only the row-level metadata (`id`, `processInstanceId`, `taskId`, `executionId`, `processInstanceUrl`) at the top level; the variable bits live one level deeper:
+
+```json
+{
+  "id": "846acaed-5882-11f1-9961-be503a495712",
+  "processInstanceId": "846acaec-5882-11f1-9961-be503a495712",
+  "taskId": null,
+  "executionId": "846acaec-5882-11f1-9961-be503a495712",
+  "variable": {
+    "name": "initiator",
+    "type": "string",
+    "value": "rest-admin",
+    "scope": "global"
+  }
+}
+```
+
+Reading `entry.variableName` (the runtime-endpoint shape) yields `undefined` and the cell renders blank — a silent failure that's invisible until the operator notices an empty column.
+
+**Workaround:** the typed DTO is `FlowableHistoricVariable = { id, processInstanceId?, taskId?, executionId?, variable: FlowableHistoricVariableValue }` where `FlowableHistoricVariableValue = { name, type?, value, scope? }`. Render code reads `entry.variable.name` / `entry.variable.type` / `entry.variable.value`. See [src/api.ts](../src/api.ts) `FlowableHistoricVariable` and [src/routes/history/index.tsx](../src/routes/history/index.tsx) variables-tab render.
+
+The runtime-variable endpoint at `/runtime/process-instances/{id}/variables` keeps the flat shape (`FlowableVariable = { name, type, value, scope }` returned as a top-level array). Only the historic surface nests.
+
+**Surfaced by:** Story 13.3 follow-up (post-merge operator catch) — the variables tab rendered blank Variable / Type cells against a real Flowable 7.x engine; fixed in the same PR (commits `b533823` + `8085658` shipped the buggy assumption, the follow-up commit fixes the DTO + render).
+
+---
+
 ## How to extend this file
 
 When a review surfaces a runtime quirk that meets all three of:
