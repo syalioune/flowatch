@@ -237,6 +237,29 @@ tests all need it.
 
 **Surfaced by:** Story 9.6 F-2 review patch ([Epic 9 retro §3.1](../_bmad-output/implementation-artifacts/epic-9-retro-2026-05-25.md)).
 
+## RC-11 — Flowable job IDs are scoped to per-type namespaces, not the `/management/jobs` root
+
+**Naive intuition:** every Flowable job — executable, timer, dead-letter — can be acted on via `POST /management/jobs/{id}`. The `{action: "..."}` body verb varies by intent; the URL is uniform.
+
+**Actual behaviour:** Flowable 7.x keeps three separate URL namespaces, and job IDs do NOT cross-resolve. A `POST /management/jobs/{timerId}` returns 404 — Flowable refuses to look up a timer ID under the executable-jobs path. Each namespace also accepts only a subset of action verbs:
+
+| Namespace | List | Action verbs | Stacktrace endpoint |
+|---|---|---|---|
+| Executable | `GET /management/jobs` | `{action: "execute"}` | `GET /management/jobs/{id}/exception-stacktrace` |
+| Timer | `GET /management/timer-jobs` | `{action: "move"}`, `{action: "reschedule", dueDate: <iso>}` | `GET /management/timer-jobs/{id}/exception-stacktrace` |
+| Dead-letter | `GET /management/deadletter-jobs` | `{action: "move"}` | `GET /management/deadletter-jobs/{id}/exception-stacktrace` |
+
+The "fire timer now" recipe is `{action: "move"}` on the timer-jobs endpoint — moves the timer to the executable queue for immediate async-executor pickup. The timer-jobs endpoint REJECTS `{action: "execute"}` with 400. The operator-feel label ("Execute now") and the wire-level verb (`move`) deliberately diverge (see CLAUDE.md "Operator-feel UI labels can diverge from wire-level action verbs").
+
+**Workaround:** use the namespace-specific wrappers in [src/api.ts](../src/api.ts) (`executeJob` / `executeTimerJob` / `rescheduleTimerJob` / `moveDeadLetterJob` plus `jobStacktrace` / `timerJobStacktrace` / `deadLetterJobStacktrace`), never the bare `/management/jobs/{id}` path. The handler-side pattern is **tab-aware action-verb dispatch** (CLAUDE.md): branch on the active tab's URL search-param before picking the wrapper. Example from `handleExecute` in [src/routes/jobs/index.tsx](../src/routes/jobs/index.tsx):
+
+```ts
+if (type === "timer") await api.executeTimerJob(j.id);
+else await api.executeJob(j.id);
+```
+
+**Surfaced by:** Story 12.2 review patch — timer-job namespace surprise caught during live-engine probe before declaring "real Execute handler" done ([Epic 12 retro §4.1](../_bmad-output/implementation-artifacts/epic-12-retro-2026-05-25.md)).
+
 ---
 
 ## How to extend this file

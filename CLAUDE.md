@@ -45,8 +45,11 @@ Two important details:
 
 - **DMN lives at a different URL prefix.** Flowable's BPMN/runtime/identity endpoints are under `/flowable-rest/service`, but DMN sits at `/flowable-rest/dmn-api`. The `dmnBase()` helper rewrites the configured base URL by replacing `/service` with `/dmn-api`. Pass `{ base: dmnBase() }` for any DMN call.
 - **`/identity/tenants` does not exist in flowable-rest 7.2.** `api.listTenants()` derives distinct tenant IDs from `/repository/deployments` instead.
+- **Flowable job IDs are scoped to per-type namespaces** (Story 12.2). Executable jobs, timer jobs, and dead-letter jobs live in three SEPARATE URL namespaces with different valid action verbs and different stacktrace endpoints. `POST /management/jobs/{timerId}` returns 404; the `/management/timer-jobs/{id}` endpoint accepts `{action: "move"}` (fire-now) and `{action: "reschedule", dueDate: <iso>}`; `/management/deadletter-jobs/{id}` accepts `{action: "move"}`. Use the namespace-specific wrappers in [src/api.ts](src/api.ts) (`executeJob` / `executeTimerJob` / `rescheduleTimerJob` / `moveDeadLetterJob` plus three stacktrace variants). Full quirk listed as RC-11 in [docs/runtime-caveats.md](docs/runtime-caveats.md). The handler-side pattern is **tab-aware action-verb dispatch** (see below).
 
 When adding a new endpoint, just add a wrapper in [api.js](src/api.js) and export it from the `api` object at the bottom of the file.
+
+**Operator-feel UI labels can diverge from wire-level action verbs (Story 12.2).** When the operator's mental model doesn't match the engine's storage model, surface the operator-feel name in the UI (handler label, button text) and the wire-level verb in the `src/api.ts` wrapper — with a docstring naming the gap. Example: "Execute now" on timer-job rows dispatches `{action: "move"}` to `/management/timer-jobs/{id}` — Flowable's terminology — because the engine "fires a timer" by moving it from the timer-jobs queue to the executable-jobs queue. Future label/verb divergences (Epic 21 task-properties, Epic 28 OIDC sign-in flows) follow the same shape: operator-feel label up top, wire-level verb in the wrapper, comment block naming the divergence. See [src/api.ts](src/api.ts) `executeTimerJob` and its preceding comment block.
 
 ### Event-driven API log (the Inspector drawer)
 
@@ -86,6 +89,8 @@ The Upload modal at [src/lib/upload-deployment-modal.tsx](src/lib/upload-deploym
 
 Apply by operator-intent: "stop this" vs "I'm building this". Future task / job stories will encounter this fork — match the recipe.
 
+**`<input type="datetime-local">` local→UTC ISO-8601 round-trip (Story 12.2).** The datetime-local input emits `YYYY-MM-DDTHH:MM` in the browser's **LOCAL** timezone. Wire-level Flowable timestamps are ISO-8601 UTC. The convention: hydrate the input via a `toLocalInputValue(iso)` helper that pads month/day/hour/minute as a 2-digit local-time string; on submit parse via `new Date(value)` (browser reinterprets as local) then `.toISOString()` for the wire. The operator's timezone is implicit; the engine receives UTC. Validate `parsed.getTime() > Date.now()` for "must be in the future" inputs. See [src/lib/reschedule-timer-modal.tsx](src/lib/reschedule-timer-modal.tsx). Future stories that edit timer `dueDate`, task due-date (Epic 21), or any ISO-time field should reuse this round-trip — don't reinvent the parsing.
+
 ### Panel-as-sibling-component (Story 10.4)
 
 Detail pages with multiple panels use sibling components rather than inline panel logic. Each panel owns its own `useApi`, its own four-state rendering, its own refresh affordance, and its own row-count badge. The parent component mounts the panel with a single stable identifier prop (e.g. `<InstanceVariablesPanel instanceId={id} />`) — no callbacks, no state-threading. See [src/components/InstanceVariablesPanel.tsx](src/components/InstanceVariablesPanel.tsx) and [src/components/TaskFormPanel.tsx](src/components/TaskFormPanel.tsx). Future multi-panel detail pages (Historic Activity Instances, task detail with form + variables + history) follow this shape.
@@ -98,11 +103,38 @@ Detail pages with multiple panels use sibling components rather than inline pane
 
 **UX-polish cadence is opt-in by next story.** Canonical archetype stories ship working `window.confirm()` / native form elements / default styles. The polish story swaps to design-system equivalents. See 9.1 (`confirm()` for delete) → 9.3 (`DeleteDeploymentModal`); `prompt()` on instance detail → 10.3 (`CancelInstanceModal`). Don't preempt polish in the archetype; don't skip polish in the polish story.
 
+**Review-patch-fold vs post-closure-fixup decision matrix (Epic 12 retro §4.3).** Two defensible shapes for live-engine discoveries that arrive mid-epic: **(a) post-closure fixup commits** — appropriate for *genuine surprises* (engine contract mismatch, missing endpoint, undocumented behaviour); produces bisectable "what was the gap between spec'd and shipped" history; Epic 11's three fixup commits (`89de10f` / `f60756f` / `8c8bd51`) are the precedent. **(b) review-patch fold into originating commit** — appropriate for *scope expansion within original story intent* (the engine exposes additional related actions that the story's intent reasonably covers); produces "story shipped with full real action surface" history; Epic 12's `213bef0` (timer-job namespace absorption) and `eb7e377` (`RescheduleTimerModal` source absorption) are the precedent. Pick deliberately. **Review-patches that ADD files must land all-or-nothing in one commit** — splitting test and source across two commits breaks `git bisect` because the test-only commit fails to compile (Epic 12 retro §3.3).
+
+**Bundled refactor + feature avoidance for canonical-archetype migrations (Epic 12 retro §3.4).** When a canonical-archetype rewrite removes more than 50 LOC from [src/screens.tsx](src/screens.tsx) (or any other legacy file), **split the legacy-removal into its own `chore(refactor):` commit** before the feature commit. Story 12.1 bundled a 155-LOC `<JobsScreen>` deletion into the rewrite commit (`886c76e`); the cost was one less bisectable boundary. Future canonical-archetype migrations (Epic 13 historic-instances, Epic 14 identity, Epic 15 DMN) will face the same temptation — one extra commit per migration is the price for durable bisectability.
+
+### Cross-component state patterns
+
+**Map-symmetry for reverse-action pairs (Epic 11 retro §4.2).** When a story adds the inverse of an existing optimistic-UI action (e.g., unclaim alongside claim, reopen alongside resolve, unassign alongside assign), reuse the existing `Map<string, V>` with a distinct sentinel value (`""` for "intentionally empty"; `null` for "engine-state restored"). Do NOT introduce twin Maps. See [src/routes/tasks/index.tsx](src/routes/tasks/index.tsx) where `optimisticClaimed: Map<string, string>` is consumed by both `handleClaim` (sentinel = username) and `handleUnclaim` (sentinel = `""`); the reconciliation `effectiveAssignee = optimisticClaimed.get(t.id) ?? t.assignee ?? ""` handles both "just claimed" and "just unclaimed" cleanly.
+
+**Sequence-counter race guard (Epic 11 retro §4.5).** When concurrent listener firings can each launch an async fetch and only the latest result should commit, use a `useRef(0)` sequence counter — increment on entry, snapshot the value, only `setState` if the snapshot matches the current sequence:
+
+```ts
+const seq = useRef(0);
+const refresh = useCallback(async () => {
+  const mySeq = ++seq.current;
+  const counts = await fetchCounts();
+  if (mySeq === seq.current) setCounts(counts);  // only latest wins
+}, [tenant.id]);
+```
+
+Strictly stronger than an in-flight ref guard (which drops mutations) and trivially simpler than `AbortController` for read-only data. See [src/app.tsx](src/app.tsx)'s `refreshNavCounts`. Reusable for search-as-you-type filtering, dashboard tile refresh on tenant switch, or any future autosave-with-conflict-resolution scenario.
+
+**Tab-aware action-verb dispatch (Epic 12 retro §4.2).** When a URL search-param drives both the list endpoint AND the action verbs that apply to rows, dispatch in the handler — not in a separate handler-per-tab. The discriminant stays in scope at the row action; the handler reads as plain `if (type === "X") await api.tabXAction(j.id); else await api.defaultAction(j.id);`. See `handleExecute` in [src/routes/jobs/index.tsx](src/routes/jobs/index.tsx) branching between `api.executeJob` and `api.executeTimerJob` based on the `type` search-param. Future surfaces likely to need this: Epic 13.3's history-tab dispatch (variables vs tasks), Epic 14's identity-tab dispatch (users vs groups), Epic 15's DMN-tab dispatch (decisions vs deployments). Extraction trigger at N≥3 consumers; current count is 2 (Execute, Move).
+
+**Cross-component invalidation events live in `src/lib/nav-events.ts` (Epic 11 retro A-2).** The `NAV_INVALIDATE_COUNTS` constant is dispatched after mutations that change Sidebar badge counts (Claim / Complete / Delegate / Unclaim / Execute / Move / Start / Cancel / Resolve / form submit). The app-level listener in [src/app.tsx](src/app.tsx) refetches counts; the sequence-counter race guard above keeps it safe under concurrent dispatch. Add new `nav:*` events as named exports in the same module; never use bare string literals in dispatch sites (a `grep '"nav:invalidate-counts"' src/` regression-guard exists).
+
 ### State / data fetching pattern
 
 Screens use a small `useApi(fn, deps)` hook in [src/screens.jsx](src/screens.jsx) that returns `{ loading, data, error, reload }`. Every screen renders three states: loading, error (with the actual error message — no silent fallbacks), and empty (`No records.`). When you add a screen, follow this pattern rather than introducing a state library.
 
 **v1 canonical for list screens (Story 9.1 onwards):** URL-identity list data uses TanStack Router's `loader` + `pendingComponent` + `errorComponent` slots (precedent: [src/routes/deployments/index.tsx](src/routes/deployments/index.tsx)). `useApi` remains the pattern for secondary fetches inside components. The migration of the other list screens (Process Definitions, Instances, Tasks, Jobs, History, Identity) lands in subsequent Epic 9-15 stories — until each one ships, those screens keep their `useApi` implementation.
+
+**Canonical-archetype list screens defer browser-tier route-mount tests (Epic 11 retro A-4 Option b).** In favour of loader-unit + Playwright E2E. Precedents: 9.1 (deployments), 9.4 (definitions), 10.1 (instances), 11.1 (tasks), 12.1 (jobs). Spec authors should NOT ask for browser-tier `describe(..., ...)` route-mount tests on canonical-archetype list screens — the per-spec deferral note is unnecessary now that the pattern has 5 applications. The harness to render a TanStack Router route with loader + search-param context + `RouterProvider` is intentionally not built; when a non-archetype list screen needs it (likely Epic 18's keyboard navigation), build the harness then. Per-component browser-tier tests on individual sub-components (modals, panels, ErrorBox) remain expected.
 
 ### Vite → nginx → Flowable proxy chain
 
