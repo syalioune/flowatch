@@ -1,19 +1,17 @@
 /**
- * E2E — /tasks list with assignee filter + row actions (Story 11.1 + 11.2).
+ * E2E — /tasks list with assignee filter + row actions (Story 11.1 + 11.2 + 11.4).
  *
  * Uploads the loan-approval fixture (it has a userTask first node, so the
  * started instance produces a task), starts an instance via REST, navigates
  * to /tasks?assignee=all, asserts the task row appears, clicks the
  * Unassigned filter, asserts URL transitions, opens the row's ⋮ menu,
- * asserts the Delegate (still placeholder) row action surfaces, then clicks
- * the row body and asserts the URL transitions to /tasks/{id}.
+ * then clicks the row body and asserts the URL transitions to /tasks/{id}.
  * Cleanup cancels the started instance and removes the fixture deployment.
  *
- * Story 11.2 swapped the Claim + Complete placeholders into real handlers;
- * the corresponding placeholder-toast assertions were removed from this
- * file. The Claim + Complete flow is now exercised by tasks-claim-complete.spec.ts.
- * Delegate + Unclaim remain placeholders (still asserted here) until
- * Stories 11.4 / 11.5 land.
+ * Story 11.2 swapped Claim + Complete placeholders into real handlers;
+ * Story 11.4 swapped Delegate into a modal flow (exercised in
+ * tasks-delegate-resolve.spec.ts). Only Unclaim remains a placeholder
+ * (still asserted in the modal-surface case) until Story 11.5 lands.
  *
  * Per Pattern P-009: real engine; no mocks.
  */
@@ -108,21 +106,20 @@ test.describe("/tasks list (Story 11.1)", () => {
     await expect(page.locator("tr[data-task-id]").first()).toBeVisible({ timeout: 15_000 });
   });
 
-  test("⋮ menu surfaces the Delegate placeholder + Claim/Complete real items", async ({ page }) => {
+  test("⋮ menu surfaces the Delegate modal trigger + Unclaim remains placeholder", async ({
+    page,
+  }) => {
     await page.goto("/tasks?assignee=all");
     const row = page.locator("tr[data-task-id]").first();
     await expect(row).toBeVisible({ timeout: 15_000 });
     // Open the menu via the row's ⋮ trigger.
     await row.locator('[data-testid="row-action-trigger"]').click();
-    // Delegate is still a placeholder (Story 11.4); Unclaim is conditional and
-    // not visible on this unassigned row.
-    await expect(page.locator('[data-testid="delegate-task-placeholder"]')).toBeVisible();
+    // Delegate is now a real modal trigger (Story 11.4); Unclaim is the
+    // remaining placeholder (Story 11.5). Both menu items use `menuitem`
+    // role; assert by name.
+    await expect(page.getByRole("menuitem", { name: "Delegate…" })).toBeVisible();
+    // Unclaim is conditional and not visible on this unassigned row.
     await expect(page.locator('[data-testid="unclaim-task-placeholder"]')).toHaveCount(0);
-    // Clicking Delegate fires the info toast (forward-ref to Story 11.4).
-    await page.locator('[data-testid="delegate-task-placeholder"]').click();
-    await expect(
-      page.locator(".toast").filter({ hasText: "Delegate arrives in Story 11.4" }),
-    ).toBeVisible();
   });
 
   test("clicking the row body navigates to /tasks/{id}", async ({ page }) => {
