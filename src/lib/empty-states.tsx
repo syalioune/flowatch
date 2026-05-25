@@ -46,6 +46,10 @@ export const emptyStates: Record<string, EmptyStateEntry> = {
     title: "No resources.",
     body: "This deployment has no files. That's unusual — deployments typically bundle at least one BPMN / DMN file.",
   },
+  historicActivities: {
+    title: "No recorded activities for this instance yet.",
+    body: "Activities appear here as the engine records them. If the instance has just started, give it a moment and refresh.",
+  },
   historicInstances: {
     title: "No completed instances yet.",
     body: "Once a process instance ends — by completion, cancellation, or admin delete — it appears here as a historic record.",

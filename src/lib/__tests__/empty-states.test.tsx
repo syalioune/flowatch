@@ -77,6 +77,15 @@ describe("empty-states registry", () => {
     expect(emptyStates.stacktrace?.cta).toBeUndefined();
   });
 
+  it("exposes a historicActivities entry (added in Story 13.2)", () => {
+    expect(emptyStates.historicActivities).toBeDefined();
+    expect(emptyStates.historicActivities?.title).toBe(
+      "No recorded activities for this instance yet.",
+    );
+    expect(emptyStates.historicActivities?.body).toMatch(/Activities appear here/);
+    expect(emptyStates.historicActivities?.cta).toBeUndefined();
+  });
+
   it("exposes a historicInstances entry (added in Story 13.1)", () => {
     expect(emptyStates.historicInstances).toBeDefined();
     expect(emptyStates.historicInstances?.title).toBe("No completed instances yet.");

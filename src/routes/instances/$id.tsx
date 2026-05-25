@@ -20,6 +20,7 @@
 
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHead } from "../../components";
+import { InstanceHistoricActivitiesPanel } from "../../components/InstanceHistoricActivitiesPanel";
 import { InstanceHistoricPanel } from "../../components/InstanceHistoricPanel";
 import { InstanceRuntimePanel } from "../../components/InstanceRuntimePanel";
 import { ErrorBox } from "../../lib/error-box";
@@ -33,6 +34,11 @@ export const Route = createFileRoute("/instances/$id")({
         method: "GET",
         path: "/history/historic-process-instances/{id}",
         desc: "Get historic record",
+      },
+      {
+        method: "GET",
+        path: "/history/historic-activity-instances",
+        desc: "Audit trail (per instance)",
       },
       { method: "DELETE", path: "/runtime/process-instances/{id}", desc: "Cancel" },
     ],
@@ -57,6 +63,7 @@ function ProcessInstanceDetailRoute() {
       <PageHead title={id} subtitle="Process instance" />
       <InstanceRuntimePanel instanceId={id} />
       <InstanceHistoricPanel instanceId={id} />
+      <InstanceHistoricActivitiesPanel instanceId={id} />
     </div>
   );
 }

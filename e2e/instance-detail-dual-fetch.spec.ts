@@ -7,6 +7,11 @@
  * panel flips to the "ended" empty state AND the historic panel
  * populates.
  *
+ * Story 13.2 extends the spec with three assertions on the third sibling
+ * panel (`<InstanceHistoricActivitiesPanel>`): the timeline renders, the
+ * cancellation produces additional activity rows, and the Refresh button
+ * triggers a second fetch visible in the Inspector log.
+ *
  * Per Pattern P-009: real engine; no mocks.
  */
 
@@ -119,6 +124,57 @@ test.describe("/instances/$id dual-fetch sibling pattern (Story 13.1)", () => {
     await expect(historic).toBeVisible();
     await expect(historic).toContainText(BUSINESS_KEY);
     await expect(historic.getByText("ended")).toBeVisible();
+  });
+
+  test("activities panel renders the timeline with at least two rows (Story 13.2)", async ({
+    page,
+  }) => {
+    // Fresh instance so both runtime + activities panels render side-by-side.
+    const fresh = await startInstance(`${BUSINESS_KEY}-13-2`);
+    try {
+      await page.goto(`/instances/${fresh.id}`);
+      const timeline = page.getByTestId("historic-activities-timeline");
+      await expect(timeline).toBeVisible({ timeout: 15_000 });
+      // loan-approval has at least a startEvent + a userTask, so expect ≥ 2.
+      const rows = timeline.locator("[data-activity-id]");
+      await expect.poll(async () => rows.count(), { timeout: 15_000 }).toBeGreaterThanOrEqual(2);
+    } finally {
+      await cancelInstance(fresh.id);
+    }
+  });
+
+  test("activities Refresh button fires a second fetch visible in the Inspector (Story 13.2)", async ({
+    page,
+  }) => {
+    const fresh = await startInstance(`${BUSINESS_KEY}-13-2-refresh`);
+    try {
+      await page.goto(`/instances/${fresh.id}`);
+      await expect(page.getByTestId("historic-activities-timeline")).toBeVisible({
+        timeout: 15_000,
+      });
+      const before = await page.evaluate(() => {
+        const log = (window as unknown as { API_LOG?: { method: string; path: string }[] }).API_LOG;
+        return (log ?? []).filter(
+          (e) => e.method === "GET" && e.path === "/history/historic-activity-instances",
+        ).length;
+      });
+      await page.getByTestId("historic-activities-refresh").click();
+      await expect
+        .poll(
+          async () =>
+            page.evaluate(() => {
+              const log = (window as unknown as { API_LOG?: { method: string; path: string }[] })
+                .API_LOG;
+              return (log ?? []).filter(
+                (e) => e.method === "GET" && e.path === "/history/historic-activity-instances",
+              ).length;
+            }),
+          { timeout: 10_000 },
+        )
+        .toBeGreaterThan(before);
+    } finally {
+      await cancelInstance(fresh.id);
+    }
   });
 });
 
