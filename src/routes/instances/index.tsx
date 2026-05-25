@@ -10,9 +10,10 @@
  */
 
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
-import type React from "react";
+import React from "react";
 import { api, type FlowableProcessInstance } from "../../api";
-import { fmtTime, Icon, PageHead, toast } from "../../components";
+import { fmtTime, Icon, PageHead } from "../../components";
+import { CancelInstanceModal } from "../../lib/cancel-instance-modal";
 import { EmptyState, emptyStates } from "../../lib/empty-states";
 import { ErrorBox } from "../../lib/error-box";
 import { type RowActionItem, RowActionMenu } from "../../lib/row-action-menu";
@@ -54,6 +55,11 @@ export const Route = createFileRoute("/instances/")({
         method: "GET",
         path: "/runtime/process-instances",
         desc: "List running instances",
+      },
+      {
+        method: "DELETE",
+        path: "/runtime/process-instances/{id}",
+        desc: "Cancel instance",
       },
     ],
   },
@@ -97,9 +103,17 @@ function ProcessInstancesRoute() {
   const data = Route.useLoaderData();
   const router = useRouter();
   const navigate = useNavigate();
+  // Story 10.3: Cancel target (null is closed). Per the 10.2 T-2.4 shared-ref
+  // alternative, the focus-restore target is the last-clicked row's
+  // RowActionMenu trigger.
+  const [cancelTarget, setCancelTarget] = React.useState<FlowableProcessInstance | null>(null);
+  const cancelTriggerRef = React.useRef<HTMLElement | null>(null);
 
   const refresh = () => router.invalidate({ filter: (r) => r.routeId === "/instances/" });
   const openDetail = (id: string) => navigate({ to: "/instances/$id", params: { id } });
+  const handleCancelSettled = () => {
+    router.invalidate({ filter: (r) => r.routeId === "/instances/" });
+  };
 
   if (data.data.length === 0) {
     return (
@@ -136,18 +150,7 @@ function ProcessInstancesRoute() {
               items.push({
                 label: "Cancel",
                 danger: true,
-                onSelect: () =>
-                  toast({
-                    kind: "info",
-                    text: "Cancel arrives in Story 10.3",
-                    ttl: 4000,
-                  }),
-                // RowActionItem doesn't declare data-testid in its public
-                // interface; the menu renderer doesn't forward arbitrary
-                // attrs, but Story 10.3 grep-swaps this menu item by label.
-                // The testid wiring lives on the rendered <li> via the
-                // shared menu component — added by 10.3's review patch if
-                // testid-based selection becomes load-bearing.
+                onSelect: () => setCancelTarget(p),
               });
             }
             return (
@@ -172,7 +175,18 @@ function ProcessInstancesRoute() {
                     {state}
                   </span>
                 </td>
-                <td>
+                <td
+                  // Capture the actually-clicked row's RowActionMenu trigger
+                  // for focus-restore (mirrors the 10.2 definitions-route
+                  // pattern).
+                  onClickCapture={(e) => {
+                    const target = e.target as HTMLElement | null;
+                    const trigger = target?.closest(
+                      '[data-testid="row-action-trigger"]',
+                    ) as HTMLElement | null;
+                    if (trigger) cancelTriggerRef.current = trigger;
+                  }}
+                >
                   {items.length > 0 && (
                     <RowActionMenu
                       ariaLabel={`Actions for instance ${p.businessKey || p.id}`}
@@ -185,6 +199,12 @@ function ProcessInstancesRoute() {
           })}
         </tbody>
       </table>
+      <CancelInstanceModal
+        instance={cancelTarget}
+        onClose={() => setCancelTarget(null)}
+        onSettled={handleCancelSettled}
+        triggerRef={cancelTriggerRef}
+      />
     </PageChrome>
   );
 }

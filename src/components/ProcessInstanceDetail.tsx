@@ -14,8 +14,10 @@
  */
 
 import { Link, useNavigate } from "@tanstack/react-router";
+import React from "react";
 import { api, type FlowableProcessInstance } from "../api";
 import { fmtTime, Icon, PageHead } from "../components";
+import { CancelInstanceModal } from "../lib/cancel-instance-modal";
 import { ErrorBox } from "../lib/error-box";
 import { useApi } from "../lib/useApi";
 
@@ -33,13 +35,14 @@ export function ProcessInstanceDetail({ instance }: Props) {
   const navigate = useNavigate();
   const variables = useApi(() => api.getProcessInstanceVariables(instance.id), [instance.id]);
   const p = instance as InstanceWide;
-
-  const cancel = async () => {
-    const reason = prompt("Cancel reason?");
-    if (reason == null) return;
-    await api.deleteProcessInstance(p.id, reason || "user-cancelled");
-    navigate({ to: "/instances" });
-  };
+  // Story 10.3: Cancel modal target + focus-restore ref for the
+  // "Cancel instance" button.
+  const [cancelOpen, setCancelOpen] = React.useState(false);
+  const cancelTriggerRef = React.useRef<HTMLButtonElement>(null);
+  // Navigate-on-both per the 10.3 T-3.5 pragmatic decision: success and
+  // failure both navigate back to /instances; the failure toast tells the
+  // operator what happened. The engine is the source of truth.
+  const handleCancelSettled = () => navigate({ to: "/instances" });
 
   return (
     <div className="page">
@@ -52,9 +55,18 @@ export function ProcessInstanceDetail({ instance }: Props) {
               <Icon name="chevron" size={12} />
               Back
             </Link>
-            <button type="button" className="btn" data-tone="bad" onClick={cancel}>
-              Cancel instance
-            </button>
+            {!p.ended && (
+              <button
+                ref={cancelTriggerRef}
+                type="button"
+                className="btn"
+                data-tone="bad"
+                data-testid="cancel-instance"
+                onClick={() => setCancelOpen(true)}
+              >
+                Cancel instance
+              </button>
+            )}
           </>
         }
       />
@@ -162,6 +174,12 @@ export function ProcessInstanceDetail({ instance }: Props) {
           )}
         </div>
       </div>
+      <CancelInstanceModal
+        instance={cancelOpen ? instance : null}
+        onClose={() => setCancelOpen(false)}
+        onSettled={handleCancelSettled}
+        triggerRef={cancelTriggerRef}
+      />
     </div>
   );
 }
