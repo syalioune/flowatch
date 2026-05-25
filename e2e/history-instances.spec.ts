@@ -112,9 +112,13 @@ test.describe("/history?type=instances + dual-fetch on /instances/$id (Story 13.
     await expect(page).toHaveURL(new RegExp(`/instances/${endedInstance?.id}$`));
     // Runtime panel renders the "instance has ended" empty state (404 → null).
     await expect(page.getByText("This instance has ended.")).toBeVisible({ timeout: 15_000 });
-    // Historic panel mounts with its data-testid + an ended badge.
-    await expect(page.getByTestId("historic-instance-panel")).toBeVisible();
-    await expect(page.getByTestId("historic-instance-panel").getByText("ended")).toBeVisible();
+    // Historic panel mounts with its data-testid + an ended badge. Scope the
+    // assertion to the badge element (not the bare text) — `<td>Ended</td>`
+    // also matches `getByText("ended")` under Playwright's default
+    // case-insensitive substring match, which produces a strict-mode error.
+    const historic = page.getByTestId("historic-instance-panel");
+    await expect(historic).toBeVisible();
+    await expect(historic.locator('.badge[data-tone="mute"]', { hasText: "ended" })).toBeVisible();
   });
 
   test("switching tabs updates the URL and active segment (Story 13.3)", async ({ page }) => {

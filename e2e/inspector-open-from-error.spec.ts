@@ -3,10 +3,18 @@
 /**
  * E2E: ErrorBox → API Inspector handoff (Story 8.2 retro A-4 critical path).
  *
- * Navigates to a detail route guaranteed to 404 against the live engine,
- * then exercises the upgraded ErrorBox button: assert the box renders,
- * the data-testid hooks are present, clicking the button opens the drawer,
- * the "Recent calls" tab activates, and at least one log entry is visible.
+ * Navigates to a detail route whose loader is guaranteed to 404 against
+ * the live engine, then exercises the upgraded ErrorBox button: assert
+ * the box renders, the data-testid hooks are present, clicking the button
+ * opens the drawer, the "Recent calls" tab activates, and at least one
+ * log entry is visible.
+ *
+ * Target route: `/definitions/$id`. The Story 13.1 R-1 restructure
+ * removed the loader from `/instances/$id` (panels now own their own
+ * 404 → empty state probes), so it can no longer surface a top-of-page
+ * ErrorBox. `/definitions/$id`, `/deployments/$id`, `/tasks/$id`,
+ * `/identity/users/$id`, and `/identity/groups/$id` still use the
+ * loader + errorComponent shape this test exercises.
  *
  * The focused-row attribute (data-focused="1") may have already faded by
  * the time Playwright queries — the test accepts either "still present" OR
@@ -21,8 +29,8 @@ test.describe("ErrorBox → Inspector handoff (Story 8.2)", () => {
   test("clicking Open Inspector inside an ErrorBox opens the drawer on the Recent calls tab", async ({
     page,
   }) => {
-    const nonExistentId = `nonexistent-pi-${Math.random().toString(36).slice(2, 10)}`;
-    await page.goto(`/instances/${nonExistentId}`);
+    const nonExistentId = `nonexistent-def-${Math.random().toString(36).slice(2, 10)}`;
+    await page.goto(`/definitions/${nonExistentId}`);
 
     // The detail route's loader will throw a FlowableError, which the
     // errorComponent renders via <ErrorBox/>. data-testid="error-box" is the
