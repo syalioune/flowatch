@@ -273,6 +273,37 @@ function redactAuthHeader(headers: Record<string, string>): Record<string, strin
   return out;
 }
 
+// Epic 9 retro A-3 (Story 10.2): body byte-budget guard. The Inspector's
+// previewBody synchronously JSON.stringifies entry.body on click; a 100 KB
+// variables blob from startProcessInstance would lock the main thread. We
+// truncate at capture time so the ring buffer's memory footprint is bounded
+// and the drawer's preview stays interactive. Bodies whose stringified form
+// throws (circular refs, BigInt, throwing toJSON) pass through unchanged —
+// the render-time fallback in previewBody handles those.
+export const BODY_BYTE_BUDGET = 16 * 1024;
+
+export interface TruncatedBody {
+  __truncated: true;
+  __originalBytes: number;
+  __preview: string;
+}
+
+export const captureBody = (body: unknown): unknown => {
+  try {
+    const json = JSON.stringify(body);
+    if (json === undefined) return body;
+    if (json.length <= BODY_BYTE_BUDGET) return body;
+    const envelope: TruncatedBody = {
+      __truncated: true,
+      __originalBytes: json.length,
+      __preview: json.slice(0, BODY_BYTE_BUDGET),
+    };
+    return envelope;
+  } catch {
+    return body;
+  }
+};
+
 // Dev-only seed hook: lets Playwright visual tests inject deterministic API_LOG
 // entries without going through the real request() funnel. Guarded by Vite's
 // DEV flag so production bundles never expose it. (Story 2.4 / Path B.)
@@ -353,10 +384,15 @@ async function request<T = unknown>(
     entry.headers = redactAuthHeader(headers);
     if (body) {
       init.body = JSON.stringify(body);
-      // Per AC-3: capture the original JS value (not the stringified form) so
-      // the Inspector can pretty-print structured bodies. Placed before fetch
-      // so network-error paths (status: 0) still see the body in API_LOG.
-      entry.body = body;
+      // Per Story 8.1 AC-3 + Story 10.2 A-3: capture the original JS value
+      // (not the stringified form) so the Inspector can pretty-print, but
+      // truncate at capture time when the stringified form exceeds the
+      // byte budget. Note: entry.body and init.body diverge above the
+      // budget — init.body always carries the real bytes sent on the
+      // wire; entry.body may carry the truncated envelope. The Inspector's
+      // "Copy as curl" surfaces entry.body and therefore the envelope on
+      // oversized requests — accepted (a 100 KB clipboard isn't useful).
+      entry.body = captureBody(body);
     }
     const res = await fetch(url, init);
     entry.status = res.status;
