@@ -227,6 +227,39 @@ function TasksRoute() {
     }
   };
 
+  // Story 11.5: Unclaim handler — reuses the 11.2 optimisticClaimed Map with
+  // `""` as the empty-string sentinel. The effectiveAssignee resolution
+  // (optimisticClaimed.get(t.id) ?? t.assignee ?? "") correctly overrides the
+  // engine's assignee with `""` during the optimistic window. No new state
+  // structure; the Claim/Unclaim toggle is closed by symmetric reuse of the
+  // existing Map (intentional — do not refactor into two Maps).
+  const handleUnclaim = async (t: TaskWide) => {
+    setOptimisticClaimed((m) => new Map(m).set(t.id, ""));
+    try {
+      await api.taskAction(t.id, "unclaim");
+      toast({ kind: "ok", text: `Unclaimed: ${t.name || t.id}`, ttl: 3000 });
+      await router.invalidate({ filter: (r) => r.routeId === "/tasks/" });
+      window.dispatchEvent(new CustomEvent("nav:invalidate-counts"));
+      setOptimisticClaimed((m) => {
+        const copy = new Map(m);
+        copy.delete(t.id);
+        return copy;
+      });
+    } catch (err) {
+      setOptimisticClaimed((m) => {
+        const copy = new Map(m);
+        copy.delete(t.id);
+        return copy;
+      });
+      toast({
+        kind: "err",
+        text: "Unclaim failed",
+        sub: (err as Error)?.message ?? String(err),
+        ttl: 8000,
+      });
+    }
+  };
+
   // Story 11.2 AC-2: busy-flag-then-reload. Engine is source of truth; reload
   // on both success and failure to converge the list.
   const handleComplete = async (t: TaskWide) => {
@@ -311,7 +344,7 @@ function TasksRoute() {
             //   Claim — only when unassigned (Story 11.2 real handler)
             //   Complete — always (Story 11.2 real handler; disabled while busy)
             //   Delegate… — always (forward-ref 11.4, still placeholder)
-            //   Unclaim — only when effectiveAssignee === cfg.username (forward-ref 11.5, still placeholder)
+            //   Unclaim — only when effectiveAssignee === cfg.username (Story 11.5 real handler; reuses the 11.2 Map with "" sentinel)
             const items: RowActionItem[] = [
               !effectiveAssignee && {
                 label: "Claim",
@@ -328,9 +361,7 @@ function TasksRoute() {
               },
               isMine && {
                 label: "Unclaim",
-                testId: "unclaim-task-placeholder",
-                onSelect: () =>
-                  toast({ kind: "info", text: "Unclaim arrives in Story 11.5", ttl: 4000 }),
+                onSelect: () => handleUnclaim(t),
               },
             ].filter(Boolean) as RowActionItem[];
 

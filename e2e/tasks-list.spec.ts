@@ -1,5 +1,5 @@
 /**
- * E2E — /tasks list with assignee filter + row actions (Story 11.1 + 11.2 + 11.4).
+ * E2E — /tasks list with assignee filter + row actions (Story 11.1 → 11.5).
  *
  * Uploads the loan-approval fixture (it has a userTask first node, so the
  * started instance produces a task), starts an instance via REST, navigates
@@ -8,10 +8,10 @@
  * then clicks the row body and asserts the URL transitions to /tasks/{id}.
  * Cleanup cancels the started instance and removes the fixture deployment.
  *
- * Story 11.2 swapped Claim + Complete placeholders into real handlers;
- * Story 11.4 swapped Delegate into a modal flow (exercised in
- * tasks-delegate-resolve.spec.ts). Only Unclaim remains a placeholder
- * (still asserted in the modal-surface case) until Story 11.5 lands.
+ * All four 11.1 placeholders are now real handlers:
+ *   - Claim + Complete swapped in Story 11.2 (tasks-claim-complete.spec.ts).
+ *   - Delegate swapped in Story 11.4 (tasks-delegate-resolve.spec.ts).
+ *   - Unclaim swapped in Story 11.5 (task-unclaim.spec.ts).
  *
  * Per Pattern P-009: real engine; no mocks.
  */
@@ -106,7 +106,7 @@ test.describe("/tasks list (Story 11.1)", () => {
     await expect(page.locator("tr[data-task-id]").first()).toBeVisible({ timeout: 15_000 });
   });
 
-  test("⋮ menu surfaces the Delegate modal trigger + Unclaim remains placeholder", async ({
+  test("⋮ menu surfaces the Delegate modal trigger; Unclaim hidden on unassigned row", async ({
     page,
   }) => {
     await page.goto("/tasks?assignee=all");
@@ -114,12 +114,11 @@ test.describe("/tasks list (Story 11.1)", () => {
     await expect(row).toBeVisible({ timeout: 15_000 });
     // Open the menu via the row's ⋮ trigger.
     await row.locator('[data-testid="row-action-trigger"]').click();
-    // Delegate is now a real modal trigger (Story 11.4); Unclaim is the
-    // remaining placeholder (Story 11.5). Both menu items use `menuitem`
-    // role; assert by name.
+    // Delegate is a real modal trigger (Story 11.4); Unclaim is a real handler
+    // (Story 11.5) but only visible when the row's assignee is the current
+    // user. This row is unassigned, so Unclaim is hidden by predicate.
     await expect(page.getByRole("menuitem", { name: "Delegate…" })).toBeVisible();
-    // Unclaim is conditional and not visible on this unassigned row.
-    await expect(page.locator('[data-testid="unclaim-task-placeholder"]')).toHaveCount(0);
+    await expect(page.getByRole("menuitem", { name: "Unclaim" })).toHaveCount(0);
   });
 
   test("clicking the row body navigates to /tasks/{id}", async ({ page }) => {
