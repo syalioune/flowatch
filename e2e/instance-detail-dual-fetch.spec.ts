@@ -95,7 +95,7 @@ test.describe("/instances/$id dual-fetch sibling pattern (Story 13.1)", () => {
     await deleteFixtureDeployments();
   });
 
-  test("runtime panel renders properties; historic panel renders the empty state when the instance is still running", async ({
+  test("runtime panel renders properties; historic panel shows the in-progress historic snapshot (eager record, endTime missing)", async ({
     page,
   }) => {
     await page.goto(`/instances/${runningInstance?.id}`);
@@ -103,13 +103,19 @@ test.describe("/instances/$id dual-fetch sibling pattern (Story 13.1)", () => {
     const runtime = page.getByTestId("instance-runtime-panel");
     await expect(runtime).toBeVisible({ timeout: 15_000 });
     await expect(runtime).toContainText(BUSINESS_KEY);
-    // Historic panel: 404 → "No historic record yet"
+    // Historic panel: Flowable 7.x eagerly archives the instance the moment
+    // it starts (the historic-process-instances/{id} endpoint returns 200
+    // with `endTime: null`, NOT 404). The panel renders the populated
+    // properties table with a `historic` badge (warn tone) — see RC-13.
     const historic = page.getByTestId("historic-instance-panel");
     await expect(historic).toBeVisible();
-    await expect(historic.getByText("No historic record yet.")).toBeVisible();
+    await expect(historic.locator('.badge[data-tone="warn"]', { hasText: "historic" })).toBeVisible(
+      { timeout: 15_000 },
+    );
+    await expect(historic).toContainText(BUSINESS_KEY);
   });
 
-  test("after cancellation, runtime panel flips to ended empty + historic panel populates", async ({
+  test("after cancellation, runtime panel flips to ended empty + historic panel badge flips to ended", async ({
     page,
   }) => {
     await cancelInstance(runningInstance!.id);
@@ -119,11 +125,13 @@ test.describe("/instances/$id dual-fetch sibling pattern (Story 13.1)", () => {
     const runtime = page.getByTestId("instance-runtime-panel");
     await expect(runtime).toBeVisible({ timeout: 15_000 });
     await expect(runtime.getByText("This instance has ended.")).toBeVisible({ timeout: 15_000 });
-    // Historic panel: data populated with the captured business key
+    // Historic panel: data populated with the captured business key; badge
+    // flips to `ended` (mute tone). Scope to the badge to avoid the
+    // strict-mode collision with `<td>Ended</td>`.
     const historic = page.getByTestId("historic-instance-panel");
     await expect(historic).toBeVisible();
     await expect(historic).toContainText(BUSINESS_KEY);
-    await expect(historic.getByText("ended")).toBeVisible();
+    await expect(historic.locator('.badge[data-tone="mute"]', { hasText: "ended" })).toBeVisible();
   });
 
   test("activities panel renders the timeline with at least two rows (Story 13.2)", async ({
@@ -143,35 +151,35 @@ test.describe("/instances/$id dual-fetch sibling pattern (Story 13.1)", () => {
     }
   });
 
-  test("activities Refresh button fires a second fetch visible in the Inspector (Story 13.2)", async ({
-    page,
-  }) => {
+  test("activities Refresh button fires a second fetch (Story 13.2)", async ({ page }) => {
     const fresh = await startInstance(`${BUSINESS_KEY}-13-2-refresh`);
     try {
       await page.goto(`/instances/${fresh.id}`);
       await expect(page.getByTestId("historic-activities-timeline")).toBeVisible({
         timeout: 15_000,
       });
-      const before = await page.evaluate(() => {
-        const log = (window as unknown as { API_LOG?: { method: string; path: string }[] }).API_LOG;
-        return (log ?? []).filter(
-          (e) => e.method === "GET" && e.path === "/history/historic-activity-instances",
-        ).length;
-      });
-      await page.getByTestId("historic-activities-refresh").click();
-      await expect
-        .poll(
-          async () =>
-            page.evaluate(() => {
-              const log = (window as unknown as { API_LOG?: { method: string; path: string }[] })
-                .API_LOG;
-              return (log ?? []).filter(
-                (e) => e.method === "GET" && e.path === "/history/historic-activity-instances",
-              ).length;
-            }),
-          { timeout: 10_000 },
-        )
-        .toBeGreaterThan(before);
+      // Use Playwright's network layer rather than reading window.API_LOG —
+      // the API_LOG export is module-scoped, not exposed on window. Wait
+      // for the next `/historic-activity-instances` GET (no `finished`
+      // filter — that param belongs to the active-activities panel's
+      // request) triggered specifically by clicking Refresh on the audit-
+      // trail panel.
+      const refreshClick = page.getByTestId("historic-activities-refresh").click();
+      const responsePromise = page.waitForResponse(
+        (resp) => {
+          const url = resp.url();
+          return (
+            resp.request().method() === "GET" &&
+            url.includes("/history/historic-activity-instances") &&
+            !url.includes("finished=false") &&
+            url.includes(`processInstanceId=${fresh.id}`)
+          );
+        },
+        { timeout: 10_000 },
+      );
+      await refreshClick;
+      const response = await responsePromise;
+      expect(response.status()).toBe(200);
     } finally {
       await cancelInstance(fresh.id);
     }
