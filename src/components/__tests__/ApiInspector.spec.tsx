@@ -257,6 +257,55 @@ describe("<ApiInspector> (Story 8.2)", () => {
     expect(screen.getByText("Multipart upload — reproduce via the modeler")).toBeInTheDocument();
   });
 
+  it("(13.4) renders an operator-readable truncation note when body is the captureBody envelope", async () => {
+    const preview = '{"foo":"bar","largePayload":"xxxxxxxxxxxxxxxxxxxxxxxxxxxx"}';
+    seed([
+      {
+        id: "trunc-row",
+        method: "POST",
+        path: "/runtime/process-instances",
+        url: "http://localhost:8080/flowable-rest/service/runtime/process-instances",
+        status: 201,
+        body: {
+          __truncated: true,
+          __originalBytes: 51_234,
+          __preview: preview,
+        },
+      },
+    ]);
+    const user = userEvent.setup();
+    render(<ApiInspector open={true} onClose={() => {}} screenEndpoints={[]} screenTitle="Test" />);
+    await user.click(screen.getByText("Recent calls"));
+    await user.click(document.querySelector('[data-entry-id="trunc-row"]') as HTMLElement);
+    const detail = document.querySelector(".log-row-detail") as HTMLElement;
+    expect(detail).not.toBeNull();
+    expect(detail).toHaveTextContent("[body truncated: 51234 bytes total, showing first 16 KB]");
+    // Preview content rendered alongside the note.
+    expect(detail).toHaveTextContent('"foo":"bar"');
+    expect(detail).toHaveTextContent('"largePayload"');
+  });
+
+  it("(13.4) preserves the existing JSON-stringified render for non-envelope bodies", async () => {
+    seed([
+      {
+        id: "json-row",
+        method: "POST",
+        path: "/runtime/process-instances",
+        url: "http://localhost:8080/flowable-rest/service/runtime/process-instances",
+        status: 201,
+        body: { processDefinitionId: "def-1" },
+      },
+    ]);
+    const user = userEvent.setup();
+    render(<ApiInspector open={true} onClose={() => {}} screenEndpoints={[]} screenTitle="Test" />);
+    await user.click(screen.getByText("Recent calls"));
+    await user.click(document.querySelector('[data-entry-id="json-row"]') as HTMLElement);
+    const detail = document.querySelector(".log-row-detail") as HTMLElement;
+    expect(detail).toHaveTextContent('"processDefinitionId": "def-1"');
+    // Regression guard against false-positive envelope detection.
+    expect(detail.textContent ?? "").not.toContain("[body truncated:");
+  });
+
   it("registers exactly one api:log + one api:log-cleared listener per mount (AC-10)", () => {
     const addSpy = vi.spyOn(window, "addEventListener");
     const removeSpy = vi.spyOn(window, "removeEventListener");

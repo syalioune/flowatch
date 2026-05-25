@@ -864,7 +864,21 @@ export const ApiInspector = ({
     }
   };
 
+  const isTruncationEnvelope = (
+    d: unknown,
+  ): d is { __truncated: true; __originalBytes: number; __preview: string } => {
+    return (
+      typeof d === "object" &&
+      d !== null &&
+      (d as { __truncated?: unknown }).__truncated === true &&
+      typeof (d as { __originalBytes?: unknown }).__originalBytes === "number" &&
+      typeof (d as { __preview?: unknown }).__preview === "string"
+    );
+  };
   const previewBody = (d: unknown): string => {
+    if (isTruncationEnvelope(d)) {
+      return `[body truncated: ${d.__originalBytes} bytes total, showing first 16 KB]\n\n${d.__preview}`;
+    }
     if (d == null) return "";
     if (typeof d === "string") return d.slice(0, 4000);
     try {
