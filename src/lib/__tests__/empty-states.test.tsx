@@ -70,6 +70,13 @@ describe("empty-states registry", () => {
     expect(emptyStates.jobs?.cta).toBeUndefined();
   });
 
+  it("exposes a stacktrace entry (added in Story 12.4)", () => {
+    expect(emptyStates.stacktrace).toBeDefined();
+    expect(emptyStates.stacktrace?.title).toBe("No stacktrace available.");
+    expect(emptyStates.stacktrace?.body).toMatch(/no recorded exception/);
+    expect(emptyStates.stacktrace?.cta).toBeUndefined();
+  });
+
   it("exposes a tasks entry (added in Story 11.1)", () => {
     expect(emptyStates.tasks).toBeDefined();
     expect(emptyStates.tasks?.title).toBe("No tasks for this filter.");

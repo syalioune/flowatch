@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             targetNamespace="http://flowatch.test/e2e"
+             typeLanguage="http://www.w3.org/2001/XMLSchema"
+             expressionLanguage="http://www.w3.org/1999/XPath">
+
+  <!--
+    Fixture for live-engine testing of /jobs?type=executable (Story 12.4
+    stacktrace panel on the "Jobs" tab, not Timers or Dead-letter).
+
+    Key difference vs loan-with-slow-failing-job.bpmn20.xml: there is NO
+    <flowable:failedJobRetryTimeCycle> extension. With the cycle present,
+    Flowable 7.x moves the failed job to act_ru_timer_job (Timers tab) and
+    waits for the dueDate before retrying. Without it, the engine takes
+    its default path: decrement retries, clear the lock, and keep the job
+    in act_ru_job (Jobs tab) with `exceptionMessage` set; the async
+    executor picks it up again on the next poll (~10s).
+
+    Lifecycle:
+      t=0:    instance starts; async job created in /management/jobs
+              (retries=3, no exceptionMessage)
+      t<1s:   async executor picks up, fails (class missing)
+              → retries=2, exceptionMessage set, STAYS in /jobs
+      t≈10s:  next async-executor poll retries → retries=1, stays in /jobs
+      t≈20s:  next poll retries → retries=0 → MOVES to /deadletter-jobs
+
+    Net window in /jobs with `j.exceptionMessage` truthy: roughly 20-30s.
+    Within that window the operator can click ⋮ → View stacktrace and see
+    the verbatim engine stacktrace in the sibling-row panel.
+
+    To extend the window for longer interactive sessions, bump retries
+    back up via REST while the row is alive:
+      curl -u rest-admin:test -X PUT \
+        -H 'Content-Type: application/json' \
+        -d '{"retries": 99}' \
+        http://localhost:8080/flowable-rest/service/management/jobs/{jobId}
+  -->
+
+  <process id="loanWithJobsTabFailure" name="Loan with /jobs-tab failing service task" isExecutable="true">
+    <startEvent id="start" name="Application received"/>
+
+    <sequenceFlow id="flow1" sourceRef="start" targetRef="failingService"/>
+
+    <serviceTask id="failingService"
+                 name="Always fails (class missing)"
+                 flowable:async="true"
+                 flowable:exclusive="true"
+                 flowable:class="com.example.IntentionallyMissingService"/>
+
+    <sequenceFlow id="flow2" sourceRef="failingService" targetRef="end"/>
+
+    <endEvent id="end" name="Application decided"/>
+  </process>
+
+  <bpmndi:BPMNDiagram id="diagram_loanWithJobsTabFailure">
+    <bpmndi:BPMNPlane id="plane_loanWithJobsTabFailure" bpmnElement="loanWithJobsTabFailure">
+
+      <bpmndi:BPMNShape id="shape_start" bpmnElement="start">
+        <omgdc:Bounds x="100" y="160" width="30" height="30"/>
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="80" y="195" width="80" height="20"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="shape_failingService" bpmnElement="failingService">
+        <omgdc:Bounds x="200" y="135" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="shape_end" bpmnElement="end">
+        <omgdc:Bounds x="390" y="160" width="30" height="30"/>
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="370" y="195" width="80" height="20"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="edge_flow1" bpmnElement="flow1">
+        <omgdi:waypoint x="130" y="175"/>
+        <omgdi:waypoint x="200" y="175"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="edge_flow2" bpmnElement="flow2">
+        <omgdi:waypoint x="320" y="175"/>
+        <omgdi:waypoint x="390" y="175"/>
+      </bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+
+</definitions>

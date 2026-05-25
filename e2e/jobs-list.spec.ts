@@ -6,10 +6,10 @@
  * empty against a freshly-seeded engine — that's OK; this spec exercises
  * the route-level navigation surface and the placeholder forward-references).
  *
- * Placeholder cluster status (post-12.2): two placeholders remain.
+ * Placeholder cluster status (post-12.4): ALL Epic 12 placeholders closed.
  *   - Execute now → real handler in Story 12.2 (closed).
- *   - Move to executable → real handler in Story 12.3.
- *   - View stacktrace → real handler in Story 12.4.
+ *   - Move to executable → real handler in Story 12.3 (closed).
+ *   - View stacktrace → real handler in Story 12.4 (closed).
  *
  * Per CLAUDE.md placeholder-then-real: each swap PR drops its corresponding
  * placeholder-toast assertion in this file.
