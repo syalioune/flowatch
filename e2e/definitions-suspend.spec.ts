@@ -74,14 +74,4 @@ test.describe("/definitions suspend/activate (Story 9.4)", () => {
     // and is verified manually.
     await expect(page.getByText(/Suspended:/)).toBeVisible({ timeout: 10_000 });
   });
-
-  test("Start instance menu item shows the Story 10.2 placeholder toast", async ({ page }) => {
-    await page.goto("/definitions");
-    const row = page.locator('tr[data-definition-id^="story-9-2-test-upload"]').first();
-    await expect(row).toBeVisible({ timeout: 15_000 });
-
-    await row.locator('[data-testid="row-action-trigger"]').click();
-    await page.getByRole("menuitem", { name: "Start instance" }).click();
-    await expect(page.getByText(/Start instance arrives in Story 10\.2/)).toBeVisible();
-  });
 });

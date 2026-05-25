@@ -1,12 +1,12 @@
 /**
- * E2E — /instances list with row navigation + Cancel placeholder (Story 10.1).
+ * E2E — /instances list with row navigation (Story 10.1).
  *
  * Uploads the loan-approval fixture (a userTask-bearing process so the
  * started instance stays running), starts an instance via REST, navigates
- * to /instances, asserts the row appears, opens the action menu, clicks
- * Cancel and asserts the Story 10.3 placeholder toast, then clicks the
- * row body and asserts the URL transitions to /instances/{id}. Cleanup
- * cancels the started instance and removes the fixture deployment.
+ * to /instances, asserts the row appears, then clicks the row body and
+ * asserts the URL transitions to /instances/{id}. Cleanup cancels the
+ * started instance and removes the fixture deployment. The Cancel menu
+ * flow is covered end-to-end by cancel-instance.spec.ts.
  *
  * Per Pattern P-009: real engine; no mocks.
  */
@@ -97,15 +97,6 @@ test.describe("/instances list (Story 10.1)", () => {
     await expect(row).toBeVisible({ timeout: 15_000 });
     await expect(row.locator(".badge")).toHaveText(/active/);
     await expect(row.locator("td").first()).toContainText(BUSINESS_KEY);
-  });
-
-  test("Cancel menu item shows the Story 10.3 placeholder toast", async ({ page }) => {
-    await page.goto("/instances");
-    const row = page.locator(`tr[data-instance-id="${startedInstance?.id}"]`).first();
-    await expect(row).toBeVisible({ timeout: 15_000 });
-    await row.locator('[data-testid="row-action-trigger"]').click();
-    await page.getByRole("menuitem", { name: "Cancel" }).click();
-    await expect(page.getByText(/Cancel arrives in Story 10\.3/)).toBeVisible();
   });
 
   test("clicking the row body navigates to /instances/{id}", async ({ page }) => {
