@@ -61,6 +61,15 @@ describe("empty-states registry", () => {
     expect(emptyStates.instanceVariables?.cta).toBeUndefined();
   });
 
+  it("exposes a tasks entry (added in Story 11.1)", () => {
+    expect(emptyStates.tasks).toBeDefined();
+    expect(emptyStates.tasks?.title).toBe("No tasks for this filter.");
+    expect(emptyStates.tasks?.body).toBe(
+      "Try switching the filter, or wait for a workflow to assign one.",
+    );
+    expect(emptyStates.tasks?.cta).toBeUndefined();
+  });
+
   it("renders title + body for the deployments entry", () => {
     const entry = emptyStates.deployments;
     if (!entry) throw new Error("deployments entry missing");

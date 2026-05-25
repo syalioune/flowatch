@@ -25,6 +25,11 @@ export interface RowActionItem {
   onSelect: () => void | Promise<void>;
   danger?: boolean;
   disabled?: boolean;
+  // Optional test-only attribute on the menu item <li>. Added in Story 11.1 so
+  // placeholder forward-references (claim/complete/delegate/unclaim) can carry
+  // stable testids that downstream swap stories (11.2 / 11.4 / 11.5) can use
+  // as the swap point. Has no UX or rendering effect when omitted.
+  testId?: string;
 }
 
 export interface RowActionMenuProps {
@@ -194,6 +199,7 @@ export const RowActionMenu: React.FC<RowActionMenuProps> = ({
               tabIndex={activeIndex === i ? 0 : -1}
               aria-disabled={item.disabled || undefined}
               data-danger={item.danger ? "1" : undefined}
+              data-testid={item.testId}
               className="row-action-menu-item"
               // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard activation lives on the parent <ul> via handleMenuKey (Enter/Space dispatches to invoke())
               onClick={(e) => {
