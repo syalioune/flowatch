@@ -52,6 +52,15 @@ describe("empty-states registry", () => {
     expect(emptyStates.instances?.cta).toBeUndefined();
   });
 
+  it("exposes an instanceVariables entry (added in Story 10.4)", () => {
+    expect(emptyStates.instanceVariables).toBeDefined();
+    expect(emptyStates.instanceVariables?.title).toBe("No variables.");
+    expect(emptyStates.instanceVariables?.body).toBe(
+      "This instance is not carrying any global or local variables yet.",
+    );
+    expect(emptyStates.instanceVariables?.cta).toBeUndefined();
+  });
+
   it("renders title + body for the deployments entry", () => {
     const entry = emptyStates.deployments;
     if (!entry) throw new Error("deployments entry missing");

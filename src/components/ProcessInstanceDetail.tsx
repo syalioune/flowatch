@@ -15,11 +15,10 @@
 
 import { Link, useNavigate } from "@tanstack/react-router";
 import React from "react";
-import { api, type FlowableProcessInstance } from "../api";
+import type { FlowableProcessInstance } from "../api";
 import { fmtTime, Icon, PageHead } from "../components";
 import { CancelInstanceModal } from "../lib/cancel-instance-modal";
-import { ErrorBox } from "../lib/error-box";
-import { useApi } from "../lib/useApi";
+import { InstanceVariablesPanel } from "./InstanceVariablesPanel";
 
 interface Props {
   instance: FlowableProcessInstance;
@@ -33,7 +32,6 @@ type InstanceWide = FlowableProcessInstance & {
 
 export function ProcessInstanceDetail({ instance }: Props) {
   const navigate = useNavigate();
-  const variables = useApi(() => api.getProcessInstanceVariables(instance.id), [instance.id]);
   const p = instance as InstanceWide;
   // Story 10.3: Cancel modal target + focus-restore ref for the
   // "Cancel instance" button.
@@ -128,52 +126,7 @@ export function ProcessInstanceDetail({ instance }: Props) {
         </div>
       </div>
 
-      <div className="panel" style={{ marginTop: 18 }}>
-        <div className="panel-hd">
-          <span className="panel-title">Variables</span>
-          <span
-            className="mono mute"
-            style={{ marginLeft: "auto", fontSize: 10, color: "var(--fg-mute)" }}
-          >
-            GET /runtime/process-instances/{p.id}/variables
-          </span>
-        </div>
-        <div className="panel-body">
-          {variables.loading && (
-            <div className="empty" style={{ padding: 20 }}>
-              Loading…
-            </div>
-          )}
-          {variables.error && <ErrorBox error={variables.error} onRetry={variables.reload} />}
-          {variables.data && variables.data.length === 0 && (
-            <div className="empty">No variables.</div>
-          )}
-          {variables.data && variables.data.length > 0 && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              {variables.data.map((v) => (
-                <div
-                  key={v.name}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    padding: "8px 12px",
-                    background: "var(--bg-sunken)",
-                    border: "1px solid var(--line)",
-                    borderRadius: 6,
-                  }}
-                >
-                  <span className="mono" style={{ fontSize: 11.5, color: "var(--fg-soft)" }}>
-                    {v.name}
-                  </span>
-                  <span className="mono" style={{ fontSize: 11.5 }}>
-                    {typeof v.value === "string" ? `"${v.value}"` : String(v.value)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      <InstanceVariablesPanel instance={instance} />
       <CancelInstanceModal
         instance={cancelOpen ? instance : null}
         onClose={() => setCancelOpen(false)}

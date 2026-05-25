@@ -50,6 +50,10 @@ export const emptyStates: Record<string, EmptyStateEntry> = {
     title: "No running process instances.",
     body: "Start an instance from a process definition to see it listed here.",
   },
+  instanceVariables: {
+    title: "No variables.",
+    body: "This instance is not carrying any global or local variables yet.",
+  },
 };
 
 export interface EmptyStateProps {
