@@ -172,8 +172,86 @@ function TasksRoute() {
   // Unclaim-visibility predicate behaves consistently with the loader.
   const cfgUsername = api.config().username?.trim() ?? "";
 
+  // Story 11.2: optimistic-UI Map archetype (second application; 9.4 was the
+  // first). RC-3-safe: every mutation replaces the Map/Set identity so React
+  // re-renders. Per Story 11.2 Dev Notes "Why the asymmetric optimistic shape":
+  //   - Claim flips Assignee immediately (toggle-with-flip-immediately)
+  //   - Complete uses busy-flag-then-reload (remove-with-confirmation-from-engine)
+  const [optimisticClaimed, setOptimisticClaimed] = React.useState<Map<string, string>>(new Map());
+  const [optimisticComplete, setOptimisticComplete] = React.useState<Set<string>>(new Set());
+
   const refresh = () => router.invalidate({ filter: (r) => r.routeId === "/tasks/" });
   const openDetail = (id: string) => navigate({ to: "/tasks/$id", params: { id } });
+
+  // Story 11.2 AC-1: optimistic claim with revert-on-failure.
+  const handleClaim = async (t: TaskWide) => {
+    if (!cfgUsername) {
+      toast({
+        kind: "warn",
+        text: "No username configured",
+        sub: "Set a username in Settings to claim tasks.",
+        ttl: 6000,
+      });
+      return;
+    }
+    setOptimisticClaimed((m) => new Map(m).set(t.id, cfgUsername));
+    try {
+      await api.taskAction(t.id, "claim", { assignee: cfgUsername });
+      toast({ kind: "ok", text: `Claimed: ${t.name || t.id}`, ttl: 3000 });
+      await router.invalidate({ filter: (r) => r.routeId === "/tasks/" });
+      window.dispatchEvent(new CustomEvent("nav:invalidate-counts"));
+      setOptimisticClaimed((m) => {
+        const copy = new Map(m);
+        copy.delete(t.id);
+        return copy;
+      });
+    } catch (err) {
+      // Revert the optimistic flip — engine state unchanged.
+      setOptimisticClaimed((m) => {
+        const copy = new Map(m);
+        copy.delete(t.id);
+        return copy;
+      });
+      toast({
+        kind: "err",
+        text: "Claim failed",
+        sub: (err as Error)?.message ?? String(err),
+        ttl: 8000,
+      });
+    }
+  };
+
+  // Story 11.2 AC-2: busy-flag-then-reload. Engine is source of truth; reload
+  // on both success and failure to converge the list.
+  const handleComplete = async (t: TaskWide) => {
+    setOptimisticComplete((s) => new Set(s).add(t.id));
+    try {
+      await api.taskAction(t.id, "complete");
+      toast({ kind: "ok", text: `Completed: ${t.name || t.id}`, ttl: 3000 });
+      await router.invalidate({ filter: (r) => r.routeId === "/tasks/" });
+      window.dispatchEvent(new CustomEvent("nav:invalidate-counts"));
+      setOptimisticComplete((s) => {
+        const copy = new Set(s);
+        copy.delete(t.id);
+        return copy;
+      });
+    } catch (err) {
+      setOptimisticComplete((s) => {
+        const copy = new Set(s);
+        copy.delete(t.id);
+        return copy;
+      });
+      toast({
+        kind: "err",
+        text: "Complete failed",
+        sub: (err as Error)?.message ?? String(err),
+        ttl: 8000,
+      });
+      // Engine may have completed the task in a parallel session — reload to
+      // converge.
+      void router.invalidate({ filter: (r) => r.routeId === "/tasks/" });
+    }
+  };
 
   // AC-6: one-shot warning toast when the operator selected "Mine" but has no
   // username configured. Keyed on [assignee, cfgUsername] so it fires exactly
@@ -217,24 +295,26 @@ function TasksRoute() {
         <tbody>
           {data.data.map((raw) => {
             const t = raw as TaskWide;
-            const isMine = !!t.assignee && t.assignee === cfgUsername;
-            // AC-7: per-row action menu items.
-            //   Claim — only when unassigned (forward-ref 11.2)
-            //   Complete — always (forward-ref 11.2)
-            //   Delegate… — always (forward-ref 11.4)
-            //   Unclaim — only when assignee === cfg.username (forward-ref 11.5)
+            // Story 11.2 AC-3: effectiveAssignee folds the optimistic Map over
+            // the engine value, so the column + visibility predicates flip
+            // immediately on a claim while the API call settles.
+            const effectiveAssignee = optimisticClaimed.get(t.id) ?? t.assignee ?? "";
+            const isMine = !!effectiveAssignee && effectiveAssignee === cfgUsername;
+            const isCompleting = optimisticComplete.has(t.id);
+            // Per-row action menu items.
+            //   Claim — only when unassigned (Story 11.2 real handler)
+            //   Complete — always (Story 11.2 real handler; disabled while busy)
+            //   Delegate… — always (forward-ref 11.4, still placeholder)
+            //   Unclaim — only when effectiveAssignee === cfg.username (forward-ref 11.5, still placeholder)
             const items: RowActionItem[] = [
-              !t.assignee && {
+              !effectiveAssignee && {
                 label: "Claim",
-                testId: "claim-task-placeholder",
-                onSelect: () =>
-                  toast({ kind: "info", text: "Claim arrives in Story 11.2", ttl: 4000 }),
+                onSelect: () => handleClaim(t),
               },
               {
                 label: "Complete",
-                testId: "complete-task-placeholder",
-                onSelect: () =>
-                  toast({ kind: "info", text: "Complete arrives in Story 11.2", ttl: 4000 }),
+                disabled: isCompleting,
+                onSelect: () => handleComplete(t),
               },
               {
                 label: "Delegate…",
@@ -265,8 +345,8 @@ function TasksRoute() {
                   <b style={{ fontWeight: 500 }}>{t.name || t.id}</b>
                 </td>
                 <td className="mono">
-                  {t.assignee ? (
-                    t.assignee
+                  {effectiveAssignee ? (
+                    effectiveAssignee
                   ) : t.candidateGroup ? (
                     `group:${t.candidateGroup}`
                   ) : (

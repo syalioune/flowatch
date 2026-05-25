@@ -146,23 +146,43 @@ function App() {
     return () => window.removeEventListener("conn:config-changed", handler);
   }, [probe]);
 
-  React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
+  // Story 11.2 AC-5: the count-fetch is now wrapped in a stable callback so
+  // both the tenant-change effect AND the `nav:invalidate-counts` window
+  // listener can call it. The in-flight ref prevents duplicate concurrent
+  // fetches if a route mutation handler fires multiple events in quick
+  // succession (rare, but cheap to guard).
+  const refreshNavCountsInFlight = React.useRef(false);
+  const refreshNavCounts = React.useCallback(async () => {
+    if (refreshNavCountsInFlight.current) return;
+    refreshNavCountsInFlight.current = true;
+    try {
       const [tasks, jobs] = await Promise.all([
         api.listTasks({ size: 0 }).catch(() => null),
         api.listJobs({ size: 0 }).catch(() => null),
       ]);
-      if (cancelled) return;
       setNavCounts({
         tasks: tasks?.total ?? null,
         jobs: jobs?.total ?? null,
       });
-    })();
-    return () => {
-      cancelled = true;
-    };
+    } finally {
+      refreshNavCountsInFlight.current = false;
+    }
+    // tenant.id is read indirectly via api.config() inside api.listTasks /
+    // api.listJobs; include it in the dep list so the callback identity
+    // changes on tenant switch and the effect below re-runs.
   }, [tenant.id]);
+
+  React.useEffect(() => {
+    void refreshNavCounts();
+  }, [refreshNavCounts]);
+
+  React.useEffect(() => {
+    const handler = (): void => {
+      void refreshNavCounts();
+    };
+    window.addEventListener("nav:invalidate-counts", handler);
+    return () => window.removeEventListener("nav:invalidate-counts", handler);
+  }, [refreshNavCounts]);
 
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {
