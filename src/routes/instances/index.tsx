@@ -11,8 +11,14 @@
 
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import React from "react";
-import { api, type FlowableProcessInstance } from "../../api";
+import {
+  api,
+  type FlowableHistoricActivity,
+  type FlowablePage,
+  type FlowableProcessInstance,
+} from "../../api";
 import { fmtTime, Icon, PageHead } from "../../components";
+import { summarizeActiveActivities } from "../../components/InstanceRuntimePanel";
 import { CancelInstanceModal } from "../../lib/cancel-instance-modal";
 import { EmptyState, emptyStates } from "../../lib/empty-states";
 import { ErrorBox } from "../../lib/error-box";
@@ -31,11 +37,25 @@ type InstanceWide = FlowableProcessInstance & {
 const stateOf = (pi: { suspended?: boolean; ended?: boolean }): string =>
   pi.suspended ? "suspended" : pi.ended ? "ended" : "active";
 
-// Exported for unit testing of the AC-1 tenantId-omission behaviour. Not
-// re-used elsewhere — the route's `loader` slot is the only production caller.
-export const loadProcessInstances = () => {
+// One-shot ceiling for the parallel active-activities fetch. Bounded large
+// enough to cover most operator-scale engines without paginating; the
+// activities-per-instance map is built client-side from this single page.
+const ACTIVE_ACTIVITIES_BATCH_SIZE = 500;
+
+export interface InstancesLoaderData {
+  instances: FlowablePage<FlowableProcessInstance>;
+  activeActivities: FlowablePage<FlowableHistoricActivity>;
+}
+
+// Exported for unit testing of the AC-1 tenantId-omission behaviour + the
+// parallel active-activities fetch. The active-activities call is a single
+// batch (no per-row N+1) — grouped client-side to populate the Activity
+// column. Sort/order omitted because the column shows a derived summary
+// (first name + count); preserving start-time order keeps the per-instance
+// summary stable across reloads.
+export const loadProcessInstances = async (): Promise<InstancesLoaderData> => {
   const tenantId = api.config().tenantId;
-  return api.listProcessInstances({
+  const instancesParams = {
     size: 50,
     sort: "startTime",
     order: "desc",
@@ -43,7 +63,32 @@ export const loadProcessInstances = () => {
     // empty string would tell the engine "filter to tenant ''" — the loader
     // must instead OMIT the param so single-tenant deployments return rows.
     ...(tenantId ? { tenantId } : {}),
-  });
+  };
+  const [instances, activeActivities] = await Promise.all([
+    api.listProcessInstances(instancesParams),
+    api.listHistoricActivities({
+      finished: false,
+      size: ACTIVE_ACTIVITIES_BATCH_SIZE,
+      sort: "startTime",
+    }),
+  ]);
+  return { instances, activeActivities };
+};
+
+// Build a Map<processInstanceId, activities[]> from a flat active-activities
+// page. Exported for unit testing.
+export const groupActivitiesByInstance = (
+  activities: FlowableHistoricActivity[],
+): Map<string, FlowableHistoricActivity[]> => {
+  const map = new Map<string, FlowableHistoricActivity[]>();
+  for (const a of activities) {
+    const pid = a.processInstanceId;
+    if (!pid) continue;
+    const bucket = map.get(pid);
+    if (bucket) bucket.push(a);
+    else map.set(pid, [a]);
+  }
+  return map;
 };
 
 export const Route = createFileRoute("/instances/")({
@@ -76,6 +121,12 @@ export const Route = createFileRoute("/instances/")({
   ),
 });
 
+// Note: the loader's staticData widens to include the historic-activity
+// endpoint via the route's combined fetch. We keep the documented
+// endpoints concise on the chip row above; the Inspector log surfaces the
+// historic-activity-instances?finished=false call as the parallel fetch
+// that fills the Activity column.
+
 interface PageChromeProps {
   children: React.ReactNode;
   onRefresh?: () => void;
@@ -101,6 +152,11 @@ function PageChrome({ children, onRefresh }: PageChromeProps) {
 
 function ProcessInstancesRoute() {
   const data = Route.useLoaderData();
+  const instancesPage = data.instances;
+  const activitiesByInstance = React.useMemo(
+    () => groupActivitiesByInstance(data.activeActivities.data),
+    [data.activeActivities.data],
+  );
   const router = useRouter();
   const navigate = useNavigate();
   // Story 10.3: Cancel target (null is closed). Per the 10.2 T-2.4 shared-ref
@@ -115,7 +171,7 @@ function ProcessInstancesRoute() {
     router.invalidate({ filter: (r) => r.routeId === "/instances/" });
   };
 
-  if (data.data.length === 0) {
+  if (instancesPage.data.length === 0) {
     return (
       <PageChrome onRefresh={refresh}>
         {(() => {
@@ -142,7 +198,7 @@ function ProcessInstancesRoute() {
           </tr>
         </thead>
         <tbody>
-          {data.data.map((raw) => {
+          {instancesPage.data.map((raw) => {
             const p = raw as InstanceWide;
             const state = stateOf(p);
             const items: RowActionItem[] = [];
@@ -153,6 +209,12 @@ function ProcessInstancesRoute() {
                 onSelect: () => setCancelTarget(p),
               });
             }
+            const activeForRow = activitiesByInstance.get(p.id) ?? [];
+            const activitySummary = summarizeActiveActivities(activeForRow);
+            const activityTitle =
+              activeForRow.length > 0
+                ? activeForRow.map((a) => a.activityName || a.activityId).join(", ")
+                : undefined;
             return (
               <tr
                 key={p.id}
@@ -166,7 +228,9 @@ function ProcessInstancesRoute() {
               >
                 <td className="mono">{p.businessKey || p.id}</td>
                 <td>{p.processDefinitionName || p.processDefinitionKey}</td>
-                <td className="soft">{p.activityId || "—"}</td>
+                <td className="soft" data-testid="instance-activity-summary" title={activityTitle}>
+                  {activitySummary}
+                </td>
                 <td className="mono mute">{p.startUserId || <span className="mute">—</span>}</td>
                 <td className="mute mono">{fmtTime(p.startTime)}</td>
                 <td>

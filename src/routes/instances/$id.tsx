@@ -47,6 +47,11 @@ export const Route = createFileRoute("/instances/$id")({
       },
       {
         method: "GET",
+        path: "/history/historic-activity-instances?finished=false",
+        desc: "Active activities",
+      },
+      {
+        method: "GET",
         path: "/history/historic-activity-instances",
         desc: "Audit trail (per instance)",
       },

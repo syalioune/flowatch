@@ -16,14 +16,40 @@
 
 import { Link, useNavigate } from "@tanstack/react-router";
 import React from "react";
-import { api, FlowableError, type FlowableProcessInstance } from "../api";
+import {
+  api,
+  FlowableError,
+  type FlowableHistoricActivity,
+  type FlowableProcessInstance,
+} from "../api";
 import { fmtTime, Icon } from "../components";
 import { CancelInstanceModal } from "../lib/cancel-instance-modal";
 import { EmptyState, emptyStates } from "../lib/empty-states";
 import { ErrorBox } from "../lib/error-box";
 import { TableSkeleton } from "../lib/table-skeleton";
 import { useApi } from "../lib/useApi";
+import {
+  fetchActiveActivitiesOrNull,
+  InstanceActiveActivitiesPanel,
+} from "./InstanceActiveActivitiesPanel";
 import { InstanceVariablesPanel } from "./InstanceVariablesPanel";
+
+// Derive a one-line Activity-row summary from the active-activities list.
+// The runtime DTO only carries a lead `activityId` (often null for
+// parallel-branch instances); this summary fills the gap so the
+// properties row stays meaningful. Format:
+//   - 0 active            → "—" (instance is idle or has completed)
+//   - 1 active            → activity name (fallback to activityId)
+//   - N active            → "<first name> (+N-1 more)"
+export const summarizeActiveActivities = (
+  activities: FlowableHistoricActivity[] | null | undefined,
+): string => {
+  if (!activities || activities.length === 0) return "—";
+  const first = activities[0];
+  const label = first?.activityName || first?.activityId || "(unnamed)";
+  if (activities.length === 1) return label;
+  return `${label} (+${activities.length - 1} more)`;
+};
 
 // Engine-returned fields not on the typed FlowableProcessInstance DTO —
 // same rationale as the legacy screens.tsx `Loose<T>` pattern.
@@ -52,6 +78,17 @@ export function InstanceRuntimePanel({ instanceId }: Props) {
   const navigate = useNavigate();
   const runtime = useApi<FlowableProcessInstance | null>(
     () => fetchRuntimeOrNull(instanceId),
+    [instanceId],
+  );
+  // Parent-level state-gating duplicate of the active-activities call (the
+  // same one the nested <InstanceActiveActivitiesPanel> makes) — see
+  // CLAUDE.md "Parent-level state-gating fetches are an acceptable
+  // duplication, not a refactor target". Used here so the Activity
+  // properties row can show a real summary instead of the engine's often-
+  // null lead `activityId`. Both calls route through the api funnel and
+  // appear in the Inspector by design.
+  const activeActivities = useApi<FlowableHistoricActivity[] | null>(
+    () => fetchActiveActivitiesOrNull(instanceId),
     [instanceId],
   );
   const [cancelOpen, setCancelOpen] = React.useState(false);
@@ -145,7 +182,23 @@ export function InstanceRuntimePanel({ instanceId }: Props) {
                 </tr>
                 <tr>
                   <td className="mute">Activity</td>
-                  <td className="mono">{p.activityId || <span className="mute">—</span>}</td>
+                  <td
+                    className="mono"
+                    data-testid="runtime-activity-summary"
+                    title={
+                      activeActivities.data && activeActivities.data.length > 0
+                        ? activeActivities.data
+                            .map((a) => a.activityName || a.activityId)
+                            .join(", ")
+                        : undefined
+                    }
+                  >
+                    {activeActivities.loading
+                      ? "…"
+                      : activeActivities.error
+                        ? p.activityId || <span className="mute">—</span>
+                        : summarizeActiveActivities(activeActivities.data)}
+                  </td>
                 </tr>
                 <tr>
                   <td className="mute">Started</td>
@@ -166,6 +219,7 @@ export function InstanceRuntimePanel({ instanceId }: Props) {
       </div>
       {p && (
         <>
+          <InstanceActiveActivitiesPanel instanceId={p.id} />
           <InstanceVariablesPanel instance={p} />
           <CancelInstanceModal
             instance={cancelOpen ? p : null}
