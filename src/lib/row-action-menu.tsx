@@ -84,14 +84,20 @@ export const RowActionMenu: React.FC<RowActionMenuProps> = ({
     if (restoreFocus) {
       // setTimeout zero: allow React to flush the state update before re-focusing,
       // so the focus doesn't race with the menu unmount.
-      setTimeout(() => triggerRef.current?.focus(), 0);
+      // preventScroll: don't auto-scroll the trigger into view — it's already
+      // visible (it's where the user just clicked).
+      setTimeout(() => triggerRef.current?.focus({ preventScroll: true }), 0);
     }
   }, []);
 
   React.useEffect(() => {
     if (!open) return;
     const el = itemRefs.current[activeIndex];
-    el?.focus();
+    // preventScroll: focusing a menu item normally scrolls it into view, which
+    // jerks the table when the menu opens below the viewport fold. The menu
+    // is absolutely positioned right next to the trigger; the operator
+    // doesn't need an auto-scroll.
+    el?.focus({ preventScroll: true });
   }, [open, activeIndex]);
 
   React.useEffect(() => {

@@ -152,6 +152,10 @@ export const StartInstanceModal: React.FC<StartInstanceModalProps> = ({
         sub: `id ${instance.id}`,
         ttl: 4000,
       });
+      // Starting an instance increments the Sidebar's `instances` badge AND
+      // may also create a `tasks` row immediately (first userTask of the
+      // process). The refreshNavCounts listener picks up both in one sweep.
+      window.dispatchEvent(new CustomEvent("nav:invalidate-counts"));
       // Close before navigating so the modal unmounts and triggerRef.focus()
       // doesn't fight TanStack Router's focus management on the next page.
       onClose();

@@ -72,7 +72,7 @@ function App() {
     host: "connecting…",
   });
   const [navCounts, setNavCounts] = React.useState<
-    Partial<Record<"tasks" | "jobs", number | null>>
+    Partial<Record<"tasks" | "jobs" | "instances", number | null>>
   >({});
 
   React.useEffect(() => {
@@ -146,30 +146,32 @@ function App() {
     return () => window.removeEventListener("conn:config-changed", handler);
   }, [probe]);
 
-  // Story 11.2 AC-5: the count-fetch is now wrapped in a stable callback so
-  // both the tenant-change effect AND the `nav:invalidate-counts` window
-  // listener can call it. The in-flight ref prevents duplicate concurrent
-  // fetches if a route mutation handler fires multiple events in quick
-  // succession (rare, but cheap to guard).
-  const refreshNavCountsInFlight = React.useRef(false);
+  // Sidebar count fetch — wrapped in a stable callback so the tenant-change
+  // effect AND the `nav:invalidate-counts` window listener both call it.
+  //
+  // Sequence-counter race guard (replaces the earlier in-flight ref): every
+  // call bumps the counter; only the latest call's result commits to state.
+  // The in-flight ref was over-conservative — when a rapid sequence of
+  // mutations (e.g. claim → complete) dispatched `nav:invalidate-counts`
+  // multiple times in quick succession, the second listener call no-op'd
+  // because the first fetch was still in flight, leaving the badge stale
+  // until the next manual refresh.
+  const refreshNavCountsSeq = React.useRef(0);
   const refreshNavCounts = React.useCallback(async () => {
-    if (refreshNavCountsInFlight.current) return;
-    refreshNavCountsInFlight.current = true;
-    try {
-      const [tasks, jobs] = await Promise.all([
-        api.listTasks({ size: 0 }).catch(() => null),
-        api.listJobs({ size: 0 }).catch(() => null),
-      ]);
-      setNavCounts({
-        tasks: tasks?.total ?? null,
-        jobs: jobs?.total ?? null,
-      });
-    } finally {
-      refreshNavCountsInFlight.current = false;
-    }
-    // tenant.id is read indirectly via api.config() inside api.listTasks /
-    // api.listJobs; include it in the dep list so the callback identity
-    // changes on tenant switch and the effect below re-runs.
+    const seq = ++refreshNavCountsSeq.current;
+    const [tasks, jobs, instances] = await Promise.all([
+      api.listTasks({ size: 0 }).catch(() => null),
+      api.listJobs({ size: 0 }).catch(() => null),
+      api.listProcessInstances({ size: 0 }).catch(() => null),
+    ]);
+    if (seq !== refreshNavCountsSeq.current) return; // stale fetch — newer call in flight
+    setNavCounts({
+      tasks: tasks?.total ?? null,
+      jobs: jobs?.total ?? null,
+      instances: instances?.total ?? null,
+    });
+    // tenant.id is read indirectly via api.config() inside the API calls;
+    // include it so the callback identity changes on tenant switch.
   }, [tenant.id]);
 
   React.useEffect(() => {
