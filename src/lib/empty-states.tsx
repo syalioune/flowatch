@@ -54,6 +54,10 @@ export const emptyStates: Record<string, EmptyStateEntry> = {
     title: "No variables.",
     body: "This instance is not carrying any global or local variables yet.",
   },
+  jobs: {
+    title: "No jobs on this tab.",
+    body: "Try switching to Timers or Dead-letter, or trigger a workflow that schedules background work.",
+  },
   tasks: {
     title: "No tasks for this filter.",
     body: "Try switching the filter, or wait for a workflow to assign one.",

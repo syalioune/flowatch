@@ -3,8 +3,8 @@
 
 import { useNavigate } from "@tanstack/react-router";
 import React from "react";
-import { api, type FlowableJob } from "./api";
-import { fmtDue, fmtTime, Icon, PageHead } from "./components";
+import { api } from "./api";
+import { fmtTime, Icon, PageHead } from "./components";
 import { ErrorBox } from "./lib/error-box";
 import { useApi } from "./lib/useApi";
 
@@ -19,8 +19,6 @@ export { ErrorBox };
 // avoid widening api.ts (which is Story 1.1's domain), we cast inline to
 // `Loose<T>` at the use site. Cross-epic flag: see Dev Agent Record.
 type Loose<T> = T & Record<string, unknown>;
-
-type RuntimeJob = Loose<FlowableJob>;
 
 interface TenantsScreenProps {
   tenants?: { id: string; name: string }[];
@@ -64,150 +62,11 @@ const fmtMs = (ms: number | null | undefined): string => {
 // Canonical list archetype (loader + four-state). The Cancel menu item is a
 // placeholder forward-referencing Story 10.3.
 
-// ── Jobs ──────────────────────────────────────────────────────────
-
-export type JobsType = "executable" | "timer" | "deadletter";
-
-interface JobsScreenProps {
-  initialType?: JobsType | undefined;
-  onTypeChange?: ((t: JobsType) => void) | undefined;
-}
-
-export const Jobs = ({ initialType, onTypeChange }: JobsScreenProps) => {
-  const [tab, setTab] = React.useState<JobsType>(initialType ?? "executable");
-  // Keep local state in sync if the URL changes externally (back button).
-  React.useEffect(() => {
-    if (initialType && initialType !== tab) setTab(initialType);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialType]);
-  const setType = (t: JobsType) => {
-    setTab(t);
-    onTypeChange?.(t);
-  };
-  const fetcher = () => {
-    if (tab === "timer") return api.listTimerJobs({ size: 200 });
-    if (tab === "deadletter") return api.listDeadLetterJobs({ size: 200 });
-    return api.listJobs({ size: 200 });
-  };
-  const jobs = useApi(fetcher, [tab]);
-  const list = (jobs.data?.data || []) as RuntimeJob[];
-
-  const retry = async (j: RuntimeJob) => {
-    if (tab === "deadletter") await api.moveDeadLetterJob(j.id);
-    else await api.executeJob(j.id);
-    jobs.reload();
-  };
-
-  return (
-    <div className="page">
-      <PageHead
-        title="Jobs"
-        subtitle="Background work: timers, async continuations, and retry queues."
-        actions={
-          <button className="btn" onClick={jobs.reload}>
-            <Icon name="refresh" size={13} />
-            Refresh
-          </button>
-        }
-      />
-      <div className="tbl-wrap">
-        <div className="tbl-toolbar">
-          <div className="seg-row">
-            <button
-              type="button"
-              className="seg-btn"
-              data-on={tab === "executable" ? "1" : "0"}
-              onClick={() => setType("executable")}
-            >
-              Jobs
-            </button>
-            <button
-              type="button"
-              className="seg-btn"
-              data-on={tab === "timer" ? "1" : "0"}
-              onClick={() => setType("timer")}
-            >
-              Timers
-            </button>
-            <button
-              type="button"
-              className="seg-btn"
-              data-on={tab === "deadletter" ? "1" : "0"}
-              onClick={() => setType("deadletter")}
-            >
-              Dead-letter
-            </button>
-          </div>
-          <span className="mute mono text-xs" style={{ marginLeft: "auto" }}>
-            {list.length} of {jobs.data?.total ?? 0}
-          </span>
-        </div>
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>Job</th>
-              <th>Element</th>
-              <th>Process</th>
-              <th>Due</th>
-              <th>Retries</th>
-              <th>Exception</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {jobs.loading && <EmptyRow cols={7} msg="Loading…" />}
-            {jobs.error && <EmptyRow cols={7} msg={String(jobs.error.message || jobs.error)} />}
-            {!jobs.loading && !jobs.error && list.length === 0 && (
-              <EmptyRow
-                cols={7}
-                msg={tab === "deadletter" ? "Dead-letter queue is empty." : "No jobs."}
-              />
-            )}
-            {list.map((j) => (
-              <tr key={j.id}>
-                <td className="mono">{j.id}</td>
-                <td className="mono mute">
-                  {(j.elementId as string | undefined) ||
-                    (j.elementName as string | undefined) ||
-                    "—"}
-                </td>
-                <td className="mono">{j.processInstanceId || <span className="mute">—</span>}</td>
-                <td className="mute mono">{j.dueDate ? fmtDue(j.dueDate) : "—"}</td>
-                <td
-                  className="mono"
-                  style={{ color: j.retries === 0 ? "var(--bad)" : "var(--fg)" }}
-                >
-                  {j.retries}
-                </td>
-                <td
-                  className="mono"
-                  style={{
-                    maxWidth: 240,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    color: j.exceptionMessage ? "var(--bad)" : "var(--fg-mute)",
-                  }}
-                >
-                  {j.exceptionMessage || "—"}
-                </td>
-                <td>
-                  <button
-                    className="btn"
-                    data-size="sm"
-                    onClick={() => retry(j)}
-                    title={tab === "deadletter" ? "Move back" : "Execute now"}
-                  >
-                    <Icon name="refresh" size={11} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-};
+// ── Jobs — moved to src/routes/jobs/index.tsx (Story 12.1) ────────
+// Canonical list archetype (loader + four-state + RowActionMenu) with the
+// URL-driven `<seg-row>` selecting between three different management
+// endpoints. Three placeholder row actions forward-reference Stories 12.2
+// (Execute now), 12.3 (Move to executable), 12.4 (View stacktrace).
 
 // ── Tasks — moved to src/routes/tasks/index.tsx (Story 11.1) ──────
 // Canonical list archetype (loader + four-state + RowActionMenu) with the
