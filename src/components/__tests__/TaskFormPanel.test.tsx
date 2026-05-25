@@ -11,6 +11,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, FlowableError, type FlowableTask, type FlowableTaskForm } from "../../api";
+import { NAV_INVALIDATE_COUNTS } from "../../lib/nav-events";
 import {
   buildSubmitProperties,
   initialFormValues,
@@ -243,7 +244,7 @@ describe("<TaskFormPanel>", () => {
     submitSpy.mockResolvedValue({} as unknown as FlowableTaskForm);
     const events: string[] = [];
     const handler = (e: Event) => events.push(e.type);
-    window.addEventListener("nav:invalidate-counts", handler);
+    window.addEventListener(NAV_INVALIDATE_COUNTS, handler);
     try {
       render(<TaskFormPanel taskId="t-1" task={sampleTask} onSubmitted={onSubmitted} />);
       const nameInput = (await screen.findByLabelText(/Name/)) as HTMLInputElement;
@@ -256,10 +257,10 @@ describe("<TaskFormPanel>", () => {
           { id: "active", value: "false" },
         ],
       });
-      expect(events).toContain("nav:invalidate-counts");
+      expect(events).toContain(NAV_INVALIDATE_COUNTS);
       expect(onSubmitted).toHaveBeenCalledTimes(1);
     } finally {
-      window.removeEventListener("nav:invalidate-counts", handler);
+      window.removeEventListener(NAV_INVALIDATE_COUNTS, handler);
     }
   });
 

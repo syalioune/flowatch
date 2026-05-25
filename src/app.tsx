@@ -4,6 +4,7 @@ import { Outlet, useNavigate } from "@tanstack/react-router";
 import React from "react";
 import { api } from "./api";
 import { ApiInspector, SettingsModal, Sidebar, Toaster, Topbar } from "./components";
+import { NAV_INVALIDATE_COUNTS } from "./lib/nav-events";
 import { useRouteMeta } from "./lib/route-meta";
 import "./lib/window-events";
 import {
@@ -159,15 +160,25 @@ function App() {
   const refreshNavCountsSeq = React.useRef(0);
   const refreshNavCounts = React.useCallback(async () => {
     const seq = ++refreshNavCountsSeq.current;
-    const [tasks, jobs, instances] = await Promise.all([
+    // Story 12.2 review patch: the Jobs sidebar pill now cumulates all three
+    // /jobs tabs (executable + timer + dead-letter) so the operator's
+    // mental model matches the /jobs screen surface. Pre-Epic-12 this was
+    // just listJobs.total (executable only).
+    const [tasks, jobs, timerJobs, deadJobs, instances] = await Promise.all([
       api.listTasks({ size: 0 }).catch(() => null),
       api.listJobs({ size: 0 }).catch(() => null),
+      api.listTimerJobs({ size: 0 }).catch(() => null),
+      api.listDeadLetterJobs({ size: 0 }).catch(() => null),
       api.listProcessInstances({ size: 0 }).catch(() => null),
     ]);
     if (seq !== refreshNavCountsSeq.current) return; // stale fetch — newer call in flight
+    const totalJobs =
+      jobs == null && timerJobs == null && deadJobs == null
+        ? null
+        : (jobs?.total ?? 0) + (timerJobs?.total ?? 0) + (deadJobs?.total ?? 0);
     setNavCounts({
       tasks: tasks?.total ?? null,
-      jobs: jobs?.total ?? null,
+      jobs: totalJobs,
       instances: instances?.total ?? null,
     });
     // tenant.id is read indirectly via api.config() inside the API calls;
@@ -182,8 +193,8 @@ function App() {
     const handler = (): void => {
       void refreshNavCounts();
     };
-    window.addEventListener("nav:invalidate-counts", handler);
-    return () => window.removeEventListener("nav:invalidate-counts", handler);
+    window.addEventListener(NAV_INVALIDATE_COUNTS, handler);
+    return () => window.removeEventListener(NAV_INVALIDATE_COUNTS, handler);
   }, [refreshNavCounts]);
 
   React.useEffect(() => {

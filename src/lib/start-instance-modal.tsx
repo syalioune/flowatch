@@ -25,6 +25,7 @@ import React from "react";
 import { api, type FlowableProcessDefinition, type FlowableProcessInstance } from "../api";
 import { Icon, toast } from "../components";
 import { ErrorBox } from "./error-box";
+import { NAV_INVALIDATE_COUNTS } from "./nav-events";
 
 export interface FlowableVariableEntry {
   name: string;
@@ -155,7 +156,7 @@ export const StartInstanceModal: React.FC<StartInstanceModalProps> = ({
       // Starting an instance increments the Sidebar's `instances` badge AND
       // may also create a `tasks` row immediately (first userTask of the
       // process). The refreshNavCounts listener picks up both in one sweep.
-      window.dispatchEvent(new CustomEvent("nav:invalidate-counts"));
+      window.dispatchEvent(new CustomEvent(NAV_INVALIDATE_COUNTS));
       // Close before navigating so the modal unmounts and triggerRef.focus()
       // doesn't fight TanStack Router's focus management on the next page.
       onClose();

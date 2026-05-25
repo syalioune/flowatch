@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://flowatch.test/e2e">
+  <!--
+    Fixture for Story 12.2 (Execute on demand) — a far-future timer creates a
+    timer-job that the operator can manually execute via the UI. The timer
+    is dated 2050-01-01 so the test never races the engine's natural fire.
+  -->
+  <process id="loanWithTimer" name="Loan with future timer" isExecutable="true">
+    <startEvent id="start"/>
+    <sequenceFlow id="flow1" sourceRef="start" targetRef="wait"/>
+    <intermediateCatchEvent id="wait" name="Wait until 2050">
+      <timerEventDefinition>
+        <timeDate>2050-01-01T00:00:00Z</timeDate>
+      </timerEventDefinition>
+    </intermediateCatchEvent>
+    <sequenceFlow id="flow2" sourceRef="wait" targetRef="end"/>
+    <endEvent id="end"/>
+  </process>
+</definitions>

@@ -530,6 +530,20 @@ const listDeadLetterJobs = (params?: QueryParams) =>
   request<FlowablePage<FlowableJob>>("GET", "/management/deadletter-jobs", { params });
 const executeJob = (id: string) =>
   request<void>("POST", `/management/jobs/${id}`, { body: { action: "execute" } });
+// Timer-job IDs live in a different namespace than executable-job IDs in
+// Flowable 7.x — a POST to /management/jobs/{timerId} returns 404, and the
+// timer-jobs endpoint only accepts `move` or `reschedule` (NOT `execute`).
+// The supported "fire timer now" recipe is `move` (queues to executable;
+// the async executor picks it up on its next poll). The handler-side label
+// "Execute now" reflects the operator-feel; the wire-level verb is `move`.
+const executeTimerJob = (id: string) =>
+  request<void>("POST", `/management/timer-jobs/${id}`, { body: { action: "move" } });
+// Reschedule a timer job to a new dueDate (Flowable 7.x action verb). The
+// payload key is `dueDate` per the engine contract; format is ISO-8601.
+const rescheduleTimerJob = (id: string, dueDate: string) =>
+  request<FlowableJob>("POST", `/management/timer-jobs/${id}`, {
+    body: { action: "reschedule", dueDate },
+  });
 const moveDeadLetterJob = (id: string) =>
   request<FlowableJob>("POST", `/management/deadletter-jobs/${id}`, { body: { action: "move" } });
 const jobStacktrace = (id: string): Promise<string> =>
@@ -728,6 +742,8 @@ export const api = {
   listTimerJobs,
   listDeadLetterJobs,
   executeJob,
+  executeTimerJob,
+  rescheduleTimerJob,
   moveDeadLetterJob,
   jobStacktrace,
   // History

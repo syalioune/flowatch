@@ -23,6 +23,7 @@
 import React from "react";
 import { api, type FlowableProcessInstance } from "../api";
 import { Icon, toast } from "../components";
+import { NAV_INVALIDATE_COUNTS } from "./nav-events";
 
 export interface CancelInstanceModalProps {
   /** When null, the modal is closed. Pass a FlowableProcessInstance to open. */
@@ -94,7 +95,7 @@ export const CancelInstanceModal: React.FC<CancelInstanceModalProps> = ({
       // Cancelling an instance decrements the Sidebar's `instances` badge AND
       // may also drop a `tasks` row (if a user-task was active). The
       // refreshNavCounts listener handles both in one fetch sweep.
-      window.dispatchEvent(new CustomEvent("nav:invalidate-counts"));
+      window.dispatchEvent(new CustomEvent(NAV_INVALIDATE_COUNTS));
     } catch (err) {
       toast({
         kind: "err",

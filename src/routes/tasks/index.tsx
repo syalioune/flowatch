@@ -18,6 +18,7 @@ import { fmtDue, Icon, PageHead, toast } from "../../components";
 import { DelegateTaskModal } from "../../lib/delegate-task-modal";
 import { EmptyState, emptyStates } from "../../lib/empty-states";
 import { ErrorBox } from "../../lib/error-box";
+import { NAV_INVALIDATE_COUNTS } from "../../lib/nav-events";
 import { type RowActionItem, RowActionMenu } from "../../lib/row-action-menu";
 import { TableSkeleton } from "../../lib/table-skeleton";
 
@@ -221,7 +222,7 @@ function TasksRoute() {
       await api.taskAction(t.id, "claim", { assignee: cfgUsername });
       toast({ kind: "ok", text: `Claimed: ${t.name || t.id}`, ttl: 3000 });
       await router.invalidate({ filter: (r) => r.routeId === "/tasks/" });
-      window.dispatchEvent(new CustomEvent("nav:invalidate-counts"));
+      window.dispatchEvent(new CustomEvent(NAV_INVALIDATE_COUNTS));
       setOptimisticClaimed((m) => {
         const copy = new Map(m);
         copy.delete(t.id);
@@ -261,7 +262,7 @@ function TasksRoute() {
       await api.taskAction(t.id, "claim", { assignee: null });
       toast({ kind: "ok", text: `Unclaimed: ${t.name || t.id}`, ttl: 3000 });
       await router.invalidate({ filter: (r) => r.routeId === "/tasks/" });
-      window.dispatchEvent(new CustomEvent("nav:invalidate-counts"));
+      window.dispatchEvent(new CustomEvent(NAV_INVALIDATE_COUNTS));
       setOptimisticClaimed((m) => {
         const copy = new Map(m);
         copy.delete(t.id);
@@ -290,7 +291,7 @@ function TasksRoute() {
       await api.taskAction(t.id, "complete");
       toast({ kind: "ok", text: `Completed: ${t.name || t.id}`, ttl: 3000 });
       await router.invalidate({ filter: (r) => r.routeId === "/tasks/" });
-      window.dispatchEvent(new CustomEvent("nav:invalidate-counts"));
+      window.dispatchEvent(new CustomEvent(NAV_INVALIDATE_COUNTS));
       setOptimisticComplete((s) => {
         const copy = new Set(s);
         copy.delete(t.id);
