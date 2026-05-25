@@ -46,6 +46,14 @@ export const emptyStates: Record<string, EmptyStateEntry> = {
     title: "No resources.",
     body: "This deployment has no files. That's unusual — deployments typically bundle at least one BPMN / DMN file.",
   },
+  historicInstances: {
+    title: "No completed instances yet.",
+    body: "Once a process instance ends — by completion, cancellation, or admin delete — it appears here as a historic record.",
+  },
+  historicNoRecord: {
+    title: "No historic record yet.",
+    body: "The instance is still running — see the runtime section above. A historic record appears when the engine archives the instance lifecycle.",
+  },
   instances: {
     title: "No running process instances.",
     body: "Start an instance from a process definition to see it listed here.",
@@ -57,6 +65,10 @@ export const emptyStates: Record<string, EmptyStateEntry> = {
   jobs: {
     title: "No jobs on this tab.",
     body: "Try switching to Timers or Dead-letter, or trigger a workflow that schedules background work.",
+  },
+  runtimeEnded: {
+    title: "This instance has ended.",
+    body: "See the historic record below for completion details.",
   },
   stacktrace: {
     title: "No stacktrace available.",

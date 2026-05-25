@@ -563,6 +563,11 @@ const listHistoricInstances = (params?: QueryParams) =>
     "/history/historic-process-instances",
     { params },
   );
+// Story 13.1: per-id GET for the historic detail panel — the runtime sibling
+// is api.getProcessInstance. Returns the same DTO as items in the list
+// response (Flowable's historic surface re-uses the shape).
+const getHistoricProcessInstance = (id: string) =>
+  request<FlowableHistoricProcessInstance>("GET", `/history/historic-process-instances/${id}`);
 const listHistoricActivities = (params?: QueryParams) =>
   request<FlowablePage<FlowableHistoricActivity>>("GET", "/history/historic-activity-instances", {
     params,
@@ -757,6 +762,7 @@ export const api = {
   deadLetterJobStacktrace,
   // History
   listHistoricInstances,
+  getHistoricProcessInstance,
   listHistoricActivities,
   listHistoricVariables,
   listHistoricTasks,

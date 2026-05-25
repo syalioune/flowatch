@@ -10,7 +10,6 @@
 
 import { Route as rootRouteImport } from "./routes/__root"
 import { Route as TenantsRouteImport } from "./routes/tenants"
-import { Route as HistoryRouteImport } from "./routes/history"
 import { Route as DmnRouteImport } from "./routes/dmn"
 import { Route as BpmnRouteImport } from "./routes/bpmn"
 import { Route as IndexRouteImport } from "./routes/index"
@@ -18,6 +17,7 @@ import { Route as TasksIndexRouteImport } from "./routes/tasks/index"
 import { Route as JobsIndexRouteImport } from "./routes/jobs/index"
 import { Route as InstancesIndexRouteImport } from "./routes/instances/index"
 import { Route as IdentityIndexRouteImport } from "./routes/identity/index"
+import { Route as HistoryIndexRouteImport } from "./routes/history/index"
 import { Route as DeploymentsIndexRouteImport } from "./routes/deployments/index"
 import { Route as DefinitionsIndexRouteImport } from "./routes/definitions/index"
 import { Route as TasksIdRouteImport } from "./routes/tasks/$id"
@@ -30,11 +30,6 @@ import { Route as IdentityGroupsIdRouteImport } from "./routes/identity/groups/$
 const TenantsRoute = TenantsRouteImport.update({
   id: "/tenants",
   path: "/tenants",
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HistoryRoute = HistoryRouteImport.update({
-  id: "/history",
-  path: "/history",
   getParentRoute: () => rootRouteImport,
 } as any)
 const DmnRoute = DmnRouteImport.update({
@@ -70,6 +65,11 @@ const InstancesIndexRoute = InstancesIndexRouteImport.update({
 const IdentityIndexRoute = IdentityIndexRouteImport.update({
   id: "/identity/",
   path: "/identity/",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HistoryIndexRoute = HistoryIndexRouteImport.update({
+  id: "/history/",
+  path: "/history/",
   getParentRoute: () => rootRouteImport,
 } as any)
 const DeploymentsIndexRoute = DeploymentsIndexRouteImport.update({
@@ -117,7 +117,6 @@ export interface FileRoutesByFullPath {
   "/": typeof IndexRoute
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
-  "/history": typeof HistoryRoute
   "/tenants": typeof TenantsRoute
   "/definitions/$id": typeof DefinitionsIdRoute
   "/deployments/$id": typeof DeploymentsIdRoute
@@ -125,6 +124,7 @@ export interface FileRoutesByFullPath {
   "/tasks/$id": typeof TasksIdRoute
   "/definitions/": typeof DefinitionsIndexRoute
   "/deployments/": typeof DeploymentsIndexRoute
+  "/history/": typeof HistoryIndexRoute
   "/identity/": typeof IdentityIndexRoute
   "/instances/": typeof InstancesIndexRoute
   "/jobs/": typeof JobsIndexRoute
@@ -136,7 +136,6 @@ export interface FileRoutesByTo {
   "/": typeof IndexRoute
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
-  "/history": typeof HistoryRoute
   "/tenants": typeof TenantsRoute
   "/definitions/$id": typeof DefinitionsIdRoute
   "/deployments/$id": typeof DeploymentsIdRoute
@@ -144,6 +143,7 @@ export interface FileRoutesByTo {
   "/tasks/$id": typeof TasksIdRoute
   "/definitions": typeof DefinitionsIndexRoute
   "/deployments": typeof DeploymentsIndexRoute
+  "/history": typeof HistoryIndexRoute
   "/identity": typeof IdentityIndexRoute
   "/instances": typeof InstancesIndexRoute
   "/jobs": typeof JobsIndexRoute
@@ -156,7 +156,6 @@ export interface FileRoutesById {
   "/": typeof IndexRoute
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
-  "/history": typeof HistoryRoute
   "/tenants": typeof TenantsRoute
   "/definitions/$id": typeof DefinitionsIdRoute
   "/deployments/$id": typeof DeploymentsIdRoute
@@ -164,6 +163,7 @@ export interface FileRoutesById {
   "/tasks/$id": typeof TasksIdRoute
   "/definitions/": typeof DefinitionsIndexRoute
   "/deployments/": typeof DeploymentsIndexRoute
+  "/history/": typeof HistoryIndexRoute
   "/identity/": typeof IdentityIndexRoute
   "/instances/": typeof InstancesIndexRoute
   "/jobs/": typeof JobsIndexRoute
@@ -177,7 +177,6 @@ export interface FileRouteTypes {
     | "/"
     | "/bpmn"
     | "/dmn"
-    | "/history"
     | "/tenants"
     | "/definitions/$id"
     | "/deployments/$id"
@@ -185,6 +184,7 @@ export interface FileRouteTypes {
     | "/tasks/$id"
     | "/definitions/"
     | "/deployments/"
+    | "/history/"
     | "/identity/"
     | "/instances/"
     | "/jobs/"
@@ -196,7 +196,6 @@ export interface FileRouteTypes {
     | "/"
     | "/bpmn"
     | "/dmn"
-    | "/history"
     | "/tenants"
     | "/definitions/$id"
     | "/deployments/$id"
@@ -204,6 +203,7 @@ export interface FileRouteTypes {
     | "/tasks/$id"
     | "/definitions"
     | "/deployments"
+    | "/history"
     | "/identity"
     | "/instances"
     | "/jobs"
@@ -215,7 +215,6 @@ export interface FileRouteTypes {
     | "/"
     | "/bpmn"
     | "/dmn"
-    | "/history"
     | "/tenants"
     | "/definitions/$id"
     | "/deployments/$id"
@@ -223,6 +222,7 @@ export interface FileRouteTypes {
     | "/tasks/$id"
     | "/definitions/"
     | "/deployments/"
+    | "/history/"
     | "/identity/"
     | "/instances/"
     | "/jobs/"
@@ -235,7 +235,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BpmnRoute: typeof BpmnRoute
   DmnRoute: typeof DmnRoute
-  HistoryRoute: typeof HistoryRoute
   TenantsRoute: typeof TenantsRoute
   DefinitionsIdRoute: typeof DefinitionsIdRoute
   DeploymentsIdRoute: typeof DeploymentsIdRoute
@@ -243,6 +242,7 @@ export interface RootRouteChildren {
   TasksIdRoute: typeof TasksIdRoute
   DefinitionsIndexRoute: typeof DefinitionsIndexRoute
   DeploymentsIndexRoute: typeof DeploymentsIndexRoute
+  HistoryIndexRoute: typeof HistoryIndexRoute
   IdentityIndexRoute: typeof IdentityIndexRoute
   InstancesIndexRoute: typeof InstancesIndexRoute
   JobsIndexRoute: typeof JobsIndexRoute
@@ -258,13 +258,6 @@ declare module "@tanstack/react-router" {
       path: "/tenants"
       fullPath: "/tenants"
       preLoaderRoute: typeof TenantsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    "/history": {
-      id: "/history"
-      path: "/history"
-      fullPath: "/history"
-      preLoaderRoute: typeof HistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/dmn": {
@@ -314,6 +307,13 @@ declare module "@tanstack/react-router" {
       path: "/identity"
       fullPath: "/identity/"
       preLoaderRoute: typeof IdentityIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/history/": {
+      id: "/history/"
+      path: "/history"
+      fullPath: "/history/"
+      preLoaderRoute: typeof HistoryIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/deployments/": {
@@ -379,7 +379,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BpmnRoute: BpmnRoute,
   DmnRoute: DmnRoute,
-  HistoryRoute: HistoryRoute,
   TenantsRoute: TenantsRoute,
   DefinitionsIdRoute: DefinitionsIdRoute,
   DeploymentsIdRoute: DeploymentsIdRoute,
@@ -387,6 +386,7 @@ const rootRouteChildren: RootRouteChildren = {
   TasksIdRoute: TasksIdRoute,
   DefinitionsIndexRoute: DefinitionsIndexRoute,
   DeploymentsIndexRoute: DeploymentsIndexRoute,
+  HistoryIndexRoute: HistoryIndexRoute,
   IdentityIndexRoute: IdentityIndexRoute,
   InstancesIndexRoute: InstancesIndexRoute,
   JobsIndexRoute: JobsIndexRoute,
