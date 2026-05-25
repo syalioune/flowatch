@@ -86,6 +86,15 @@ describe("empty-states registry", () => {
     expect(emptyStates.historicActivities?.cta).toBeUndefined();
   });
 
+  it("exposes a historicInstanceVariables entry (added with InstanceHistoricVariablesPanel)", () => {
+    expect(emptyStates.historicInstanceVariables).toBeDefined();
+    expect(emptyStates.historicInstanceVariables?.title).toBe(
+      "No historic variables for this instance.",
+    );
+    expect(emptyStates.historicInstanceVariables?.body).toMatch(/Variables appear here/);
+    expect(emptyStates.historicInstanceVariables?.cta).toBeUndefined();
+  });
+
   it("exposes a historicInstances entry (added in Story 13.1)", () => {
     expect(emptyStates.historicInstances).toBeDefined();
     expect(emptyStates.historicInstances?.title).toBe("No completed instances yet.");
