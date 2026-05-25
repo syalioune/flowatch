@@ -91,6 +91,10 @@ export const CancelInstanceModal: React.FC<CancelInstanceModalProps> = ({
         text: `Cancelled: ${instance.businessKey || instance.id}`,
         ttl: 3000,
       });
+      // Cancelling an instance decrements the Sidebar's `instances` badge AND
+      // may also drop a `tasks` row (if a user-task was active). The
+      // refreshNavCounts listener handles both in one fetch sweep.
+      window.dispatchEvent(new CustomEvent("nav:invalidate-counts"));
     } catch (err) {
       toast({
         kind: "err",
