@@ -966,10 +966,15 @@ a {
 }
 
 /* ── Modeler ────────────────────────────────────────────────── */
+/* Story 16.1 (UX Q-5): the modeler chrome (toolbar row + child controls)
+   reads --row-h / --pad / --gap from data-density so toggling density in
+   TweaksPanel rescales the chrome WITHOUT remounting the bpmn-js / dmn-js
+   canvas. Fallbacks match the comfy preset (44px / 14px) to preserve the
+   pre-16.1 visual when the variables aren't set. */
 .modeler {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr) 320px;
-  grid-template-rows: 44px minmax(0, 1fr);
+  grid-template-rows: var(--row-h, 44px) minmax(0, 1fr);
   height: calc(100vh - var(--topbar-h));
   background: var(--bg);
 }
@@ -1082,11 +1087,25 @@ a {
   grid-column: 1 / span 3;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 14px;
+  gap: var(--gap, 12px);
+  padding: 0 var(--pad, 14px);
+  height: var(--row-h, 44px);
   border-bottom: 1px solid var(--line);
   background: var(--bg-elev);
   font-size: 13px;
+}
+/* Story 16.1 (UX Q-5) + Story 16.2 AC-4: child controls scale with density.
+   The dropdown is a native <select>, so option rows rely on the OS — only
+   the closed-state height + padding can be styled reliably. */
+.mod-toolbar .btn,
+.mod-toolbar .select,
+.mod-toolbar .modeler-dropdown {
+  height: calc(var(--row-h, 44px) - 12px);
+  min-height: 24px;
+}
+.mod-toolbar .modeler-dropdown {
+  padding: 0 var(--pad, 14px);
+  line-height: calc(var(--row-h, 44px) - 16px);
 }
 .mod-toolbar .file-name {
   display: flex;

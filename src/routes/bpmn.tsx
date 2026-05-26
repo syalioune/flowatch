@@ -2,7 +2,7 @@
 
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { BpmnModeler } from "../modeler";
+import { BpmnModeler } from "../modeler/BpmnModeler";
 
 // Story 9.5 renamed the search param `defId` → `definitionId` to match the
 // API resource path (`/repository/process-definitions/{id}`) and the epic
