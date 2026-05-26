@@ -635,6 +635,15 @@ const getDmnResource = (deploymentId: string, resourceId: string): Promise<strin
     raw: true,
     base: dmnBase(),
   });
+// Story 16.4: list the resources for a DMN deployment so DmnModeler can
+// resolve `resourceId` (the filename, e.g. "loan-eligibility.dmn") from
+// a `FlowableDecision` (which only carries `deploymentId`, not the resource
+// name directly). Each resource's `id` is the filename per the DMN parallel
+// of the BPMN /repository/deployments/{id}/resources contract.
+const listDmnDeploymentResources = (deploymentId: string): Promise<FlowableResource[]> =>
+  request<FlowableResource[]>("GET", `/dmn-repository/deployments/${deploymentId}/resources`, {
+    base: dmnBase(),
+  });
 
 // ── Deployment helpers (multipart upload) ────────────────────────────────
 // Flowable expects multipart/form-data, not the JSON-with-base64 shape we used
@@ -792,6 +801,7 @@ export const api = {
   listDmnDeployments,
   executeDecision,
   getDmnResource,
+  listDmnDeploymentResources,
   deployBpmn,
   deployDmn,
   ping,
