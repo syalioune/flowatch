@@ -73,6 +73,11 @@ test.describe("BPMN authoring loop (Story 16.3)", () => {
     // valid BPMN structure — Flowable accepts the deploy and assigns a new
     // version (or v1 on a freshly-cleaned engine).
     await page.getByTestId("bpmn-deploy").click();
+    // PR #168 follow-up round 4: Deploy now opens a confirmation modal
+    // prompting for process definition name + key. Confirm with the
+    // pre-filled defaults to actually post the deployment.
+    await expect(page.getByTestId("deploy-bpmn-modal")).toBeVisible({ timeout: 5_000 });
+    await page.getByTestId("deploy-bpmn-submit").click();
     // Either a success toast (with the Open action) or an error toast
     // appears. We assert on the success path; if the engine returns an
     // error the test will fail loudly — that's the right signal.
