@@ -182,6 +182,12 @@ export const Icon = ({ name, size = 14 }: IconProps) => {
         <circle cx="12" cy="15.5" r="1.5" />
       </>
     ),
+    decision: (
+      <>
+        <rect x="4" y="4" width="16" height="16" rx="1.5" />
+        <path d="M4 9h16M9 4v16M14 14l2 2 4-4" />
+      </>
+    ),
   };
   return (
     <svg
@@ -300,6 +306,7 @@ const NAV: NavGroup[] = [
     items: [
       { path: "/deployments", label: "Deployments", icon: "deploy" },
       { path: "/definitions", label: "Process definitions", icon: "def" },
+      { path: "/decisions", label: "Decisions", icon: "decision" },
     ],
   },
   {
