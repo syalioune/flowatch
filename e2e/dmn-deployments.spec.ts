@@ -61,14 +61,12 @@ test.describe("DMN deploy + delete (Story 15.2)", () => {
   });
 
   test("delete DMN deployment via row action menu", async ({ page }) => {
-    // The previous test deployed sample.dmn; this test deletes it.
+    // The previous test deployed sample.dmn; this test deletes it. Wait
+    // for the deployment row to render — engine read-after-write lag can
+    // briefly hide the just-deployed row when this test navigates.
     await page.goto("/decisions?tab=deployments");
     const rows = page.locator('[data-testid^="dmn-deployment-row-"]');
-    const count = await rows.count();
-    if (count === 0) {
-      test.skip(true, "No DMN deployments to delete (the deploy test may have been skipped)");
-      return;
-    }
+    await expect(rows.first()).toBeVisible({ timeout: 15_000 });
     await rows.first().locator('[data-testid="row-action-trigger"]').click();
     await page.getByTestId("delete-dmn-deployment").click();
     const modal = page.getByTestId("delete-dmn-deployment-modal");

@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * Browser-tier suite for `<DmnExecutionsList>` (Story 15.4).
+ * Browser-tier suite for `<DmnExecutionsList>`.
+ *
+ * The list endpoint only returns coarse metadata (id, decisionName,
+ * decisionKey, startTime, endTime, failed, instanceId) — the rich audit
+ * data (hit policy, typed inputs, decision result, per-rule trace) lives
+ * on the `/dmn-history/.../auditdata` endpoint per execution. The expand
+ * row triggers a lazy fetch + renders <DmnExecutionAuditPanel>.
  *
  * The component lives at `src/routes/decisions/index.tsx`; it consumes
  * TanStack Router's `<Link>` for the process-instance cell, so the test
- * mounts inside a real router context per RC-10.
- *
- * Covers: initial render, row-expand toggle, single-expand invariant,
- * empty-state rendering, hit-policy badge tone mapping, and process-
- * instance link rendering.
+ * mounts inside a real router context.
  */
 
 import "@testing-library/jest-dom/vitest";
@@ -21,9 +23,17 @@ import {
 } from "@tanstack/react-router";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
-import type { FlowableHistoricDecisionExecution, FlowablePage } from "../../api";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  api,
+  type FlowableDmnExecutionAudit,
+  type FlowableHistoricDecisionExecution,
+  type FlowablePage,
+} from "../../api";
 import { DmnExecutionsList } from "../../routes/decisions/index";
+
+type GetAuditFn = typeof api.getDmnHistoryAuditdata;
+type Host = { getDmnHistoryAuditdata: GetAuditFn };
 
 const sampleExecution = (
   overrides: Partial<FlowableHistoricDecisionExecution> = {},
@@ -32,10 +42,41 @@ const sampleExecution = (
   decisionKey: "loanEligibility",
   decisionName: "Loan Eligibility",
   startTime: "2026-05-26T10:00:00.000Z",
-  durationInMillis: 42,
-  hitPolicy: "UNIQUE",
-  inputVariables: { creditScore: 750, income: 80000 },
-  outputVariables: { tier: "A", approved: true },
+  endTime: "2026-05-26T10:00:00.042Z",
+  failed: false,
+  ...overrides,
+});
+
+const sampleAudit = (
+  overrides: Partial<FlowableDmnExecutionAudit> = {},
+): FlowableDmnExecutionAudit => ({
+  decisionKey: "loanEligibility",
+  decisionName: "Loan Eligibility",
+  decisionVersion: 1,
+  hitPolicy: "FIRST",
+  startTime: "2026-05-26T10:00:00.000Z",
+  endTime: "2026-05-26T10:00:00.042Z",
+  inputVariables: { tier: "A", employmentStatus: "employed" },
+  inputVariableTypes: { tier: "string", employmentStatus: "string" },
+  decisionResult: [{ decision: "approve", rate: 0.0425 }],
+  decisionResultTypes: { decision: "string", rate: "number" },
+  multipleResults: false,
+  ruleExecutions: {
+    "1": {
+      ruleNumber: 1,
+      valid: true,
+      conditionResults: [
+        { id: "re1i1", result: true },
+        { id: "re1i2", result: true },
+      ],
+      conclusionResults: [
+        { id: "re1o1", result: "approve" },
+        { id: "re1o2", result: 0.0425 },
+      ],
+    },
+  },
+  failed: false,
+  strictMode: true,
   ...overrides,
 });
 
@@ -61,15 +102,25 @@ const renderList = (page: FlowablePage<FlowableHistoricDecisionExecution>) => {
   return render(<RouterProvider router={router} />);
 };
 
-describe("<DmnExecutionsList> (Story 15.4)", () => {
+describe("<DmnExecutionsList>", () => {
+  const realGetAudit = api.getDmnHistoryAuditdata;
+  let auditSpy: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    auditSpy = vi.fn().mockResolvedValue(sampleAudit());
+    (api as unknown as Host).getDmnHistoryAuditdata = auditSpy as unknown as GetAuditFn;
+  });
+
   afterEach(() => {
+    (api as unknown as Host).getDmnHistoryAuditdata = realGetAudit;
     cleanup();
   });
 
-  it("renders rows; no expansion before any click", async () => {
+  it("renders rows; no expansion before any click and no audit fetch", async () => {
     renderList(pageOf(sampleExecution()));
     await waitFor(() => expect(screen.getByTestId("execution-row-exec-1")).toBeInTheDocument());
     expect(screen.queryByTestId("execution-detail-exec-1")).toBeNull();
+    expect(auditSpy).not.toHaveBeenCalled();
   });
 
   it("renders the empty state when data is empty", async () => {
@@ -77,25 +128,36 @@ describe("<DmnExecutionsList> (Story 15.4)", () => {
     await waitFor(() => expect(screen.getByTestId("empty-state")).toBeInTheDocument());
   });
 
-  it("clicking a row expands the detail panel below", async () => {
+  it("clicking a row expands and lazily fetches the audit data", async () => {
     const user = userEvent.setup();
     renderList(pageOf(sampleExecution()));
     const row = await waitFor(() => screen.getByTestId("execution-row-exec-1"));
     await user.click(row);
     expect(screen.getByTestId("execution-detail-exec-1")).toBeInTheDocument();
-    // Variable testids render via the shared DecisionVariableTable helper.
-    expect(screen.getByTestId("execution-input-exec-1-creditScore")).toBeInTheDocument();
-    expect(screen.getByTestId("execution-output-exec-1-tier")).toBeInTheDocument();
+    await waitFor(() => expect(auditSpy).toHaveBeenCalledWith("exec-1"));
+    // Audit panel renders: meta strip, typed inputs/results, rule executions.
+    await waitFor(() =>
+      expect(screen.getByTestId("execution-audit-meta-exec-1")).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("execution-audit-inputs-exec-1")).toBeInTheDocument();
+    expect(screen.getByTestId("execution-audit-results-exec-1")).toBeInTheDocument();
+    // Per-rule trace: rule #1 fired with both conditions true.
+    expect(screen.getByTestId("execution-audit-rule-exec-1-1")).toBeInTheDocument();
   });
 
-  it("clicking the expanded row again collapses it", async () => {
+  it("collapses on second click; audit is NOT re-fetched on the next expand of the same row", async () => {
     const user = userEvent.setup();
     renderList(pageOf(sampleExecution()));
     const row = await waitFor(() => screen.getByTestId("execution-row-exec-1"));
     await user.click(row);
-    expect(screen.getByTestId("execution-detail-exec-1")).toBeInTheDocument();
+    await waitFor(() => expect(auditSpy).toHaveBeenCalledTimes(1));
     await user.click(row);
     expect(screen.queryByTestId("execution-detail-exec-1")).toBeNull();
+    // Re-opening unmounts/remounts the panel, so a refetch IS expected
+    // (useApi has no module-level cache). This is intentional — the
+    // operator clicking again is the freshness signal.
+    await user.click(row);
+    await waitFor(() => expect(auditSpy).toHaveBeenCalledTimes(2));
   });
 
   it("single-expand invariant: clicking a second row collapses the first", async () => {
@@ -109,26 +171,21 @@ describe("<DmnExecutionsList> (Story 15.4)", () => {
     expect(screen.getByTestId("execution-detail-exec-2")).toBeInTheDocument();
   });
 
-  it("hit-policy badge tone reflects the policy", async () => {
+  it("status badge surfaces the failed flag from the list response", async () => {
     renderList(
       pageOf(
-        sampleExecution({ id: "u", hitPolicy: "UNIQUE" }),
-        sampleExecution({ id: "c", hitPolicy: "COLLECT" }),
-        sampleExecution({ id: "p", hitPolicy: "PRIORITY" }),
+        sampleExecution({ id: "ok", failed: false }),
+        sampleExecution({ id: "ko", failed: true }),
       ),
     );
-    // The badge lives inside the row. We assert tone via the data-tone attribute.
-    const uRow = await waitFor(() => screen.getByTestId("execution-row-u"));
-    const cRow = screen.getByTestId("execution-row-c");
-    const pRow = screen.getByTestId("execution-row-p");
-    expect(uRow.querySelector('[data-tone="ok"]')?.textContent).toContain("UNIQUE");
-    expect(cRow.querySelector('[data-tone="warn"]')?.textContent).toContain("COLLECT");
-    expect(pRow.querySelector('[data-tone="neutral"]')?.textContent).toContain("PRIORITY");
+    const okRow = await waitFor(() => screen.getByTestId("execution-row-ok"));
+    const koRow = screen.getByTestId("execution-row-ko");
+    expect(okRow.querySelector('[data-tone="ok"]')?.textContent).toContain("ok");
+    expect(koRow.querySelector('[data-tone="bad"]')?.textContent).toContain("failed");
   });
 
-  it("process-instance cell renders a Link when processInstanceId is set", async () => {
-    renderList(pageOf(sampleExecution({ processInstanceId: "pi-123" })));
-    // The Link renders a real <a> tag inside the row.
+  it("process-instance cell renders a Link when instanceId is set", async () => {
+    renderList(pageOf(sampleExecution({ instanceId: "pi-123" })));
     const link = await waitFor(() => screen.getByRole("link", { name: "pi-123" }));
     expect(link).toBeInTheDocument();
   });

@@ -55,7 +55,11 @@ test.describe("DMN modeler authoring loop (Story 16.4)", () => {
   }) => {
     await page.goto("/dmn");
     await expect(page.locator(".dmn-host").first()).toBeVisible({ timeout: 15_000 });
+    // Deploy now opens a name+id confirmation modal (mirrors BPMN's deploy
+    // flow). Submit the modal to fire the actual multipart deploy.
     await page.getByTestId("dmn-deploy").click();
+    await expect(page.getByTestId("deploy-dmn-modal")).toBeVisible();
+    await page.getByTestId("deploy-dmn-submit").click();
     const openAction = page.getByTestId("open-deployed-decision");
     await expect(openAction).toBeVisible({ timeout: 15_000 });
     await openAction.click();

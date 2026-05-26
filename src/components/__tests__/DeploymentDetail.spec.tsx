@@ -19,7 +19,14 @@ import {
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, type FlowableDeployment, FlowableError, type FlowableResource } from "../../api";
+import {
+  api,
+  type FlowableDecision,
+  type FlowableDeployment,
+  FlowableError,
+  type FlowablePage,
+  type FlowableResource,
+} from "../../api";
 import { DeploymentDetail } from "../DeploymentDetail";
 
 const deployment: FlowableDeployment = {
@@ -36,11 +43,21 @@ const resources: FlowableResource[] = [
 
 type ListFn = (id: string) => Promise<FlowableResource[]>;
 type DownloadFn = (deploymentId: string, resourceName: string) => Promise<Response>;
-type Host = { listDeploymentResources: ListFn; getDeploymentResource: DownloadFn };
+type ListDecisionsFn = (params: {
+  deploymentId: string;
+  size?: number;
+}) => Promise<FlowablePage<FlowableDecision>>;
+type GetDmnDecisionResourceFn = (decisionId: string) => Promise<string>;
+type Host = {
+  listDeploymentResources: ListFn;
+  getDeploymentResource: DownloadFn;
+  listDecisions: ListDecisionsFn;
+  getDmnDecisionResource: GetDmnDecisionResourceFn;
+};
 
-const renderDetail = () => {
+const renderDetail = (kind: "bpmn" | "dmn" = "bpmn") => {
   const rootRoute = createRootRoute({
-    component: () => <DeploymentDetail deployment={deployment} />,
+    component: () => <DeploymentDetail deployment={deployment} kind={kind} />,
   });
   const router = createRouter({
     routeTree: rootRoute,
@@ -63,19 +80,30 @@ const collectToasts = () => {
 describe("<DeploymentDetail> Resources panel (Story 9.6)", () => {
   const realList = api.listDeploymentResources;
   const realDownload = api.getDeploymentResource;
+  const realListDecisions = api.listDecisions;
+  const realGetDmnDecisionResource = api.getDmnDecisionResource;
   let listSpy: ReturnType<typeof vi.fn>;
   let downloadSpy: ReturnType<typeof vi.fn>;
+  let listDecisionsSpy: ReturnType<typeof vi.fn>;
+  let getDmnDecisionResourceSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     listSpy = vi.fn();
     downloadSpy = vi.fn();
+    listDecisionsSpy = vi.fn();
+    getDmnDecisionResourceSpy = vi.fn();
     (api as unknown as Host).listDeploymentResources = listSpy as unknown as ListFn;
     (api as unknown as Host).getDeploymentResource = downloadSpy as unknown as DownloadFn;
+    (api as unknown as Host).listDecisions = listDecisionsSpy as unknown as ListDecisionsFn;
+    (api as unknown as Host).getDmnDecisionResource =
+      getDmnDecisionResourceSpy as unknown as GetDmnDecisionResourceFn;
   });
 
   afterEach(() => {
     (api as unknown as Host).listDeploymentResources = realList;
     (api as unknown as Host).getDeploymentResource = realDownload;
+    (api as unknown as Host).listDecisions = realListDecisions;
+    (api as unknown as Host).getDmnDecisionResource = realGetDmnDecisionResource;
     cleanup();
   });
 
@@ -162,6 +190,78 @@ describe("<DeploymentDetail> Resources panel (Story 9.6)", () => {
       URL.createObjectURL = origCreate;
       URL.revokeObjectURL = origRevoke;
       createElementSpy.mockRestore();
+    }
+  });
+
+  it("kind='dmn' lists decisions via /dmn-repository/decision-tables?deploymentId=, NOT /resources", async () => {
+    listDecisionsSpy.mockResolvedValue({
+      data: [
+        {
+          id: "dec-1",
+          key: "loanEligibility",
+          name: "Loan Eligibility",
+          version: 1,
+          deploymentId: "dep-1",
+        },
+      ],
+      total: 1,
+      start: 0,
+      size: 200,
+      sort: "name",
+      order: "asc",
+    });
+    renderDetail("dmn");
+    await waitFor(() =>
+      expect(screen.getByTestId("deployment-decisions-table")).toBeInTheDocument(),
+    );
+    expect(listDecisionsSpy).toHaveBeenCalledWith({ deploymentId: "dep-1", size: 200 });
+    // The BPMN /resources wrapper must NOT have fired — that endpoint 500s
+    // on the DMN sub-app.
+    expect(listSpy).not.toHaveBeenCalled();
+    // The endpoint hint in the panel header reflects the decision-tables URL.
+    expect(
+      screen.getByText(/\/dmn-repository\/decision-tables\?deploymentId=dep-1/),
+    ).toBeInTheDocument();
+    // Row carries decision-key for navigation + Decision detail link.
+    expect(screen.getByText("loanEligibility")).toBeInTheDocument();
+  });
+
+  it("kind='dmn' Download streams the XML via getDmnDecisionResource by decision id", async () => {
+    listDecisionsSpy.mockResolvedValue({
+      data: [
+        {
+          id: "dec-1",
+          key: "loanEligibility",
+          name: "Loan Eligibility",
+          version: 1,
+          deploymentId: "dep-1",
+        } as FlowableDecision & { resourceName?: string },
+      ],
+      total: 1,
+      start: 0,
+      size: 200,
+      sort: "name",
+      order: "asc",
+    });
+    getDmnDecisionResourceSpy.mockResolvedValue("<dmn/>");
+    const createObjectURL = vi.fn(() => "blob:fake");
+    const revokeObjectURL = vi.fn();
+    const origCreate = URL.createObjectURL;
+    const origRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = createObjectURL as unknown as typeof URL.createObjectURL;
+    URL.revokeObjectURL = revokeObjectURL as unknown as typeof URL.revokeObjectURL;
+    try {
+      const user = userEvent.setup();
+      renderDetail("dmn");
+      await waitFor(() =>
+        expect(screen.getByTestId("deployment-decisions-table")).toBeInTheDocument(),
+      );
+      await user.click(screen.getAllByTestId("download-decision")[0] as HTMLElement);
+      await waitFor(() => expect(getDmnDecisionResourceSpy).toHaveBeenCalled());
+      expect(getDmnDecisionResourceSpy).toHaveBeenCalledWith("dec-1");
+    } finally {
+      URL.createObjectURL = origCreate;
+      URL.revokeObjectURL = origRevoke;
     }
   });
 

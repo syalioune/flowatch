@@ -28,6 +28,11 @@ export const Route = createFileRoute("/decisions/$key")({
         path: "/dmn-repository/decisions?key={key}&latest=true",
         desc: "Find decision by key (latest version)",
       },
+      {
+        method: "GET",
+        path: "/dmn-repository/decision-tables/{decisionId}/resourcedata",
+        desc: "Fetch DMN XML (by decision-table id)",
+      },
     ],
   },
   component: DecisionDetailRoute,

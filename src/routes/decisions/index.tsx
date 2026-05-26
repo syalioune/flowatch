@@ -22,11 +22,11 @@ import {
   api,
   type FlowableDecision,
   type FlowableDeployment,
+  type FlowableDmnRuleExecution,
   type FlowableHistoricDecisionExecution,
   type FlowablePage,
 } from "../../api";
 import { fmtMs, fmtTime, Icon, PageHead, toast } from "../../components";
-import { DecisionVariableTable } from "../../components/DecisionVariableTable";
 import { DeleteDmnDeploymentModal } from "../../lib/delete-dmn-deployment-modal";
 import { EmptyState, emptyStates } from "../../lib/empty-states";
 import { ErrorBox } from "../../lib/error-box";
@@ -34,12 +34,16 @@ import { ExecuteDecisionModal } from "../../lib/execute-decision-modal";
 import { RowActionMenu } from "../../lib/row-action-menu";
 import { TableSkeleton } from "../../lib/table-skeleton";
 import { UploadDmnDeploymentModal } from "../../lib/upload-dmn-deployment-modal";
+import { useApi } from "../../lib/useApi";
 
 const decisionsSearch = z.object({
-  tab: z.enum(["decisions", "deployments", "executions"]).optional().default("decisions"),
+  // Deployments is the FIRST tab AND the default — operators think
+  // "deployment → decisions inside it" rather than "decision → which
+  // deployment is it from." Tab order mirrors that mental model.
+  tab: z.enum(["deployments", "decisions", "executions"]).optional().default("deployments"),
 });
 
-export type DecisionsTab = "decisions" | "deployments" | "executions";
+export type DecisionsTab = "deployments" | "decisions" | "executions";
 
 // Exported for unit testing of the tab-aware dispatch. Not re-used
 // elsewhere — the route's `loader` slot is the only production caller.
@@ -110,18 +114,18 @@ function PageChrome({ children, tab, onTabChange, actions }: PageChromeProps) {
         <button
           type="button"
           className="seg-btn"
-          data-on={tab === "decisions" ? "1" : "0"}
-          onClick={() => onTabChange("decisions")}
-        >
-          Decisions
-        </button>
-        <button
-          type="button"
-          className="seg-btn"
           data-on={tab === "deployments" ? "1" : "0"}
           onClick={() => onTabChange("deployments")}
         >
           Deployments
+        </button>
+        <button
+          type="button"
+          className="seg-btn"
+          data-on={tab === "decisions" ? "1" : "0"}
+          onClick={() => onTabChange("decisions")}
+        >
+          Decisions
         </button>
         <button
           type="button"
@@ -358,6 +362,12 @@ interface DmnDeploymentsListProps {
 }
 
 function DmnDeploymentsList({ page, onDeleteClick, deleteTriggerRef }: DmnDeploymentsListProps) {
+  const navigate = useNavigate();
+  // Mirrors the /deployments page: a DMN deployment row navigates to the
+  // detail route with ?kind=dmn so the loader hits the right sub-app.
+  const openDetail = (id: string) =>
+    navigate({ to: "/deployments/$id", params: { id }, search: { kind: "dmn" as const } });
+
   if (page.data.length === 0) {
     const entry = emptyStates.dmnDeployments;
     return entry ? <EmptyState entry={entry} /> : null;
@@ -376,7 +386,16 @@ function DmnDeploymentsList({ page, onDeleteClick, deleteTriggerRef }: DmnDeploy
       </thead>
       <tbody>
         {page.data.map((dep) => (
-          <tr key={dep.id} data-testid={`dmn-deployment-row-${dep.id}`}>
+          <tr
+            key={dep.id}
+            data-testid={`dmn-deployment-row-${dep.id}`}
+            tabIndex={0}
+            style={{ cursor: "pointer" }}
+            onClick={() => openDetail(dep.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") openDetail(dep.id);
+            }}
+          >
             <td>
               <b style={{ fontWeight: 500 }}>{dep.name || dep.id}</b>
             </td>
@@ -384,6 +403,8 @@ function DmnDeploymentsList({ page, onDeleteClick, deleteTriggerRef }: DmnDeploy
             <td className="mute mono">{fmtTime(dep.deploymentTime)}</td>
             <td className="mono mute">{dep.tenantId || <span className="mute">—</span>}</td>
             <td
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
               onClickCapture={(e) => {
                 const target = e.target as HTMLElement | null;
                 const trigger = target?.closest(
@@ -411,7 +432,7 @@ function DmnDeploymentsList({ page, onDeleteClick, deleteTriggerRef }: DmnDeploy
   );
 }
 
-// Story 15.4: hit-policy → tone mapping for the badge column.
+// Hit-policy → tone mapping for the badge in the audit panel.
 function hitPolicyTone(policy?: string): "ok" | "neutral" | "warn" | "mute" {
   if (!policy) return "mute";
   const upper = policy.toUpperCase();
@@ -423,13 +444,23 @@ function hitPolicyTone(policy?: string): "ok" | "neutral" | "warn" | "mute" {
   return "mute";
 }
 
+// Compute duration in ms from start/end ISO timestamps. Returns undefined
+// when either bound is missing or invalid — the renderer shows "—".
+function computeDurationMs(start?: string, end?: string): number | undefined {
+  if (!start || !end) return undefined;
+  const a = Date.parse(start);
+  const b = Date.parse(end);
+  if (Number.isNaN(a) || Number.isNaN(b)) return undefined;
+  return b - a;
+}
+
 interface DmnExecutionsListProps {
   page: FlowablePage<FlowableHistoricDecisionExecution>;
 }
 
 export function DmnExecutionsList({ page }: DmnExecutionsListProps) {
-  // Story 15.4: row-expand-for-detail pattern. Single string holds the
-  // currently-expanded id; clicking another row collapses the previous.
+  // Row-expand-for-detail pattern. Single string holds the currently-
+  // expanded id; clicking another row collapses the previous.
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
 
   if (page.data.length === 0) {
@@ -445,13 +476,15 @@ export function DmnExecutionsList({ page }: DmnExecutionsListProps) {
           <th>Process instance</th>
           <th>Started</th>
           <th>Duration</th>
-          <th>Hit policy</th>
+          <th>Status</th>
           <th />
         </tr>
       </thead>
       <tbody>
         {page.data.map((e) => {
           const isOpen = expandedId === e.id;
+          const durationMs = computeDurationMs(e.startTime, e.endTime);
+          const instanceId = e.instanceId;
           return (
             <React.Fragment key={e.id}>
               <tr
@@ -470,23 +503,23 @@ export function DmnExecutionsList({ page }: DmnExecutionsListProps) {
                   <b style={{ fontWeight: 500 }}>{e.decisionName || e.decisionKey || e.id}</b>
                 </td>
                 <td className="mono">
-                  {e.processInstanceId ? (
+                  {instanceId ? (
                     <Link
                       to="/instances/$id"
-                      params={{ id: e.processInstanceId }}
+                      params={{ id: instanceId }}
                       onClick={(ev) => ev.stopPropagation()}
                     >
-                      {e.processInstanceId}
+                      {instanceId}
                     </Link>
                   ) : (
                     <span className="mute">—</span>
                   )}
                 </td>
                 <td className="mute mono">{fmtTime(e.startTime)}</td>
-                <td className="mono">{fmtMs(e.durationInMillis)}</td>
+                <td className="mono">{fmtMs(durationMs)}</td>
                 <td>
-                  <span className="badge" data-tone={hitPolicyTone(e.hitPolicy)}>
-                    {e.hitPolicy || "—"}
+                  <span className="badge" data-tone={e.failed ? "bad" : "ok"}>
+                    {e.failed ? "failed" : "ok"}
                   </span>
                 </td>
                 <td style={{ width: 24, textAlign: "right" }}>
@@ -496,23 +529,7 @@ export function DmnExecutionsList({ page }: DmnExecutionsListProps) {
               {isOpen && (
                 <tr data-testid={`execution-detail-${e.id}`}>
                   <td colSpan={6} style={{ padding: "16px 20px", background: "var(--bg-sunken)" }}>
-                    <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
-                      <DecisionVariableTable
-                        title="Input variables"
-                        variables={e.inputVariables}
-                        testIdPrefix={`execution-input-${e.id}`}
-                      />
-                      <DecisionVariableTable
-                        title="Output variables"
-                        variables={e.outputVariables}
-                        testIdPrefix={`execution-output-${e.id}`}
-                      />
-                    </div>
-                    {e.executionFailed && (
-                      <div style={{ marginTop: 12 }}>
-                        <ErrorBox error={new Error(e.failureMessage ?? "Execution failed")} />
-                      </div>
-                    )}
+                    <DmnExecutionAuditPanel executionId={e.id} />
                   </td>
                 </tr>
               )}
@@ -522,4 +539,271 @@ export function DmnExecutionsList({ page }: DmnExecutionsListProps) {
       </tbody>
     </table>
   );
+}
+
+// ── Audit panel for the executions row-expand ───────────────────────────
+// Fetches the per-execution auditdata lazily (only when the row expands).
+// Surfaces hit policy, decision version, multipleResults / strictMode
+// flags, typed input + result maps, and the per-rule trace (which rule
+// fired, condition+conclusion results) — none of which are available on
+// the list endpoint.
+function DmnExecutionAuditPanel({ executionId }: { executionId: string }) {
+  const audit = useApi(() => api.getDmnHistoryAuditdata(executionId), [executionId]);
+
+  if (audit.loading) {
+    return (
+      <div className="empty" style={{ padding: 20 }}>
+        Loading audit data…
+      </div>
+    );
+  }
+  if (audit.error) {
+    return <ErrorBox error={audit.error} onRetry={audit.reload} />;
+  }
+  if (!audit.data) {
+    return (
+      <div className="empty" style={{ padding: 20 }}>
+        No audit data.
+      </div>
+    );
+  }
+
+  const a = audit.data;
+  const inputs: Record<string, unknown> = a.inputVariables ?? {};
+  const inputTypes: Record<string, string> = a.inputVariableTypes ?? {};
+  const resultTypes: Record<string, string> = a.decisionResultTypes ?? {};
+  const decisionResultRows: Array<Record<string, unknown>> = a.decisionResult ?? [];
+  const rules: Record<string, FlowableDmnRuleExecution> = a.ruleExecutions ?? {};
+  const ruleEntries: Array<[string, FlowableDmnRuleExecution]> = Object.entries(rules).sort(
+    ([x], [y]) => Number(x) - Number(y),
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* Meta strip — hit policy + flags + decision version. */}
+      <div
+        data-testid={`execution-audit-meta-${executionId}`}
+        style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}
+      >
+        {a.hitPolicy && (
+          <span>
+            <span className="mute" style={{ fontSize: 11, marginRight: 6 }}>
+              Hit policy:
+            </span>
+            <span className="badge" data-tone={hitPolicyTone(a.hitPolicy)}>
+              {a.hitPolicy}
+            </span>
+          </span>
+        )}
+        {a.decisionVersion !== undefined && (
+          <span>
+            <span className="mute" style={{ fontSize: 11, marginRight: 6 }}>
+              Version:
+            </span>
+            <span className="mono">v{a.decisionVersion}</span>
+          </span>
+        )}
+        {a.multipleResults !== undefined && (
+          <span>
+            <span className="mute" style={{ fontSize: 11, marginRight: 6 }}>
+              Multiple results:
+            </span>
+            <span className="mono">{a.multipleResults ? "yes" : "no"}</span>
+          </span>
+        )}
+        {a.strictMode !== undefined && (
+          <span>
+            <span className="mute" style={{ fontSize: 11, marginRight: 6 }}>
+              Strict mode:
+            </span>
+            <span className="mono">{a.strictMode ? "on" : "off"}</span>
+          </span>
+        )}
+        {a.failed && (
+          <span className="badge" data-tone="bad">
+            failed
+          </span>
+        )}
+      </div>
+
+      {/* Typed input table */}
+      <div data-testid={`execution-audit-inputs-${executionId}`}>
+        <div className="panel-title" style={{ marginBottom: 6 }}>
+          Input variables · {Object.keys(inputs).length}
+        </div>
+        {Object.keys(inputs).length === 0 ? (
+          <div className="empty" style={{ padding: 12 }}>
+            (none)
+          </div>
+        ) : (
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(inputs).map(([name, value]) => (
+                <tr key={name}>
+                  <td className="mono">{name}</td>
+                  <td>
+                    <span className="badge" data-tone="neutral">
+                      {inputTypes[name] ?? "—"}
+                    </span>
+                  </td>
+                  <td className="mono">{formatAuditValue(value)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Typed result table — one row group per result row (COLLECT etc.) */}
+      <div data-testid={`execution-audit-results-${executionId}`}>
+        <div className="panel-title" style={{ marginBottom: 6 }}>
+          Decision result · {decisionResultRows.length} row
+          {decisionResultRows.length === 1 ? "" : "s"}
+        </div>
+        {decisionResultRows.length === 0 ? (
+          <div className="empty" style={{ padding: 12 }}>
+            No matching rule fired — the decision produced no result rows.
+          </div>
+        ) : (
+          <table className="tbl">
+            <thead>
+              <tr>
+                {decisionResultRows.length > 1 && <th>Row</th>}
+                <th>Name</th>
+                <th>Type</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {decisionResultRows.flatMap((row, rowIdx) =>
+                Object.entries(row).map(([name, value]) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: COLLECT can repeat names across rows; composite row+name is the minimum unique key
+                  <tr key={`r${rowIdx}-${name}`}>
+                    {decisionResultRows.length > 1 && <td className="mono mute">#{rowIdx + 1}</td>}
+                    <td className="mono">{name}</td>
+                    <td>
+                      <span className="badge" data-tone="neutral">
+                        {resultTypes[name] ?? "—"}
+                      </span>
+                    </td>
+                    <td className="mono">{formatAuditValue(value)}</td>
+                  </tr>
+                )),
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Per-rule trace — which rule fired, condition + conclusion results */}
+      {ruleEntries.length > 0 && (
+        <div data-testid={`execution-audit-rules-${executionId}`}>
+          <div className="panel-title" style={{ marginBottom: 6 }}>
+            Rule executions · {ruleEntries.length}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {ruleEntries.map(([ruleNum, rule]) => (
+              <div
+                key={ruleNum}
+                data-testid={`execution-audit-rule-${executionId}-${ruleNum}`}
+                style={{
+                  border: "1px solid var(--bd)",
+                  borderRadius: 4,
+                  padding: "10px 12px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "center",
+                    marginBottom: 8,
+                    fontSize: 12,
+                  }}
+                >
+                  <span>
+                    <span className="mute" style={{ marginRight: 6 }}>
+                      Rule
+                    </span>
+                    <b className="mono">#{ruleNum}</b>
+                  </span>
+                  <span className="badge" data-tone={rule.valid ? "ok" : "mute"}>
+                    {rule.valid ? "matched" : "skipped"}
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+                  <RuleResultList title="Conditions" results={rule.conditionResults} />
+                  <RuleResultList title="Conclusions" results={rule.conclusionResults} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RuleResultList({
+  title,
+  results,
+}: {
+  title: string;
+  results: Array<{ id?: string; result?: unknown }> | undefined;
+}) {
+  if (!results || results.length === 0) {
+    return (
+      <div style={{ minWidth: 200 }}>
+        <div className="mute" style={{ fontSize: 11, marginBottom: 4 }}>
+          {title}
+        </div>
+        <div className="mute" style={{ fontSize: 12 }}>
+          —
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ minWidth: 220 }}>
+      <div className="mute" style={{ fontSize: 11, marginBottom: 4 }}>
+        {title}
+      </div>
+      <ul
+        style={{
+          margin: 0,
+          padding: 0,
+          listStyle: "none",
+          fontSize: 12,
+        }}
+      >
+        {results.map((r, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: rule-result entries are tied to a stable cell order; index is the canonical key
+          <li key={`${r.id ?? "row"}-${i}`} style={{ display: "flex", gap: 8 }}>
+            <span className="mono mute">{r.id ?? "—"}</span>
+            <span className="mono">{formatAuditValue(r.result)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function formatAuditValue(value: unknown): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "string") return `"${value}"`;
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return "[unserializable]";
+    }
+  }
+  return String(value);
 }
