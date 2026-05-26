@@ -88,6 +88,7 @@ All DMN wrappers pass `{ base: dmnBase() }`. The `dmnBase()` helper rewrites the
 | `listDmnDeployments(params)`                  | GET    | `/dmn-repository/deployments`                                         |                                                |
 | `executeDecision(body)`                       | POST   | `/dmn-rule/execute`                                                   | Body: see Flowable DMN docs (decision key + inputs) |
 | `getDmnResource(deploymentId, resourceId)`    | GET    | `/dmn-repository/deployments/{deploymentId}/resourcedata/{resourceId}` | Returns **raw XML** (`raw: true`)              |
+| `removeDmnDeployment(id, params?)`            | DELETE | `/dmn-repository/deployments/{id}`                                    | Pass `{cascade: true}` to delete decisions referenced by historic executions. Without cascade, the engine returns 409 if any historic execution references a decision. |
 
 ## Deployment uploads (multipart)
 

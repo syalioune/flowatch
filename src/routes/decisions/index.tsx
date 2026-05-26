@@ -9,20 +9,23 @@
  * Tabs: Decisions / Deployments — each tab dispatches via the URL
  * search-param to a different DMN-namespace endpoint (under dmnBase(),
  * NOT under /service per Pattern P-004). Forward-references:
- *   - 15.2 swaps the Deploy DMN placeholder + Delete DMN deployment row action.
+ *   - 15.2 swapped the Deploy DMN placeholder + Delete DMN deployment row action
+ *     for real modals + `router.invalidate()`-driven cross-tab reload.
  *   - 15.3 swaps the Test execute row action + detail-page button.
  *   - 15.4 extends loadDecisions(tab) with a third "executions" branch.
  */
 
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import type React from "react";
+import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
+import React from "react";
 import { z } from "zod";
 import { api, type FlowableDecision, type FlowableDeployment, type FlowablePage } from "../../api";
 import { fmtTime, Icon, PageHead, toast } from "../../components";
+import { DeleteDmnDeploymentModal } from "../../lib/delete-dmn-deployment-modal";
 import { EmptyState, emptyStates } from "../../lib/empty-states";
 import { ErrorBox } from "../../lib/error-box";
 import { RowActionMenu } from "../../lib/row-action-menu";
 import { TableSkeleton } from "../../lib/table-skeleton";
+import { UploadDmnDeploymentModal } from "../../lib/upload-dmn-deployment-modal";
 
 const decisionsSearch = z.object({
   tab: z.enum(["decisions", "deployments"]).optional().default("decisions"),
@@ -51,6 +54,16 @@ export const Route = createFileRoute("/decisions/")({
         method: "GET",
         path: "/dmn-repository/deployments",
         desc: "List DMN deployments (dmnBase)",
+      },
+      {
+        method: "POST",
+        path: "/dmn-repository/deployments",
+        desc: "Deploy a DMN file (multipart, dmnBase)",
+      },
+      {
+        method: "DELETE",
+        path: "/dmn-repository/deployments/{id}",
+        desc: "Delete a DMN deployment (dmnBase, cascade optional)",
       },
     ],
   },
@@ -131,39 +144,84 @@ function DecisionsError({ error, reset }: DecisionsErrorProps) {
 function DecisionsRoute() {
   const data = Route.useLoaderData();
   const { tab, onTabChange } = useTabNav();
+  const router = useRouter();
+  // Story 15.2: modal trigger refs for focus-restore per Story 10.2 AC-7.
+  const uploadTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const deleteTriggerRef = React.useRef<HTMLElement | null>(null);
+  const [uploadOpen, setUploadOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<string | null>(null);
+
+  // After a successful Upload OR a Delete-settled, re-run the active
+  // route's loader. The mental model: the operator stays on the same tab;
+  // the data refreshes. Tab switches fire a fresh loader automatically.
+  const refresh = () => {
+    void router.invalidate({ filter: (r) => r.routeId === "/decisions/" });
+  };
+
+  const handleUploadSuccess = (deployment: FlowableDeployment) => {
+    toast({
+      kind: "ok",
+      text: `Deployed DMN: ${deployment.name || deployment.id}`,
+      sub: `id ${deployment.id}`,
+      ttl: 3000,
+    });
+    refresh();
+  };
+
+  const modals = (
+    <>
+      <UploadDmnDeploymentModal
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        onSuccess={handleUploadSuccess}
+        triggerRef={uploadTriggerRef}
+      />
+      <DeleteDmnDeploymentModal
+        deploymentId={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onSettled={refresh}
+        triggerRef={deleteTriggerRef}
+      />
+    </>
+  );
 
   if (tab === "decisions") {
     return (
-      <PageChrome tab={tab} onTabChange={onTabChange}>
-        <DecisionsList page={data as FlowablePage<FlowableDecision>} />
-      </PageChrome>
+      <>
+        <PageChrome tab={tab} onTabChange={onTabChange}>
+          <DecisionsList page={data as FlowablePage<FlowableDecision>} />
+        </PageChrome>
+        {modals}
+      </>
     );
   }
 
   return (
-    <PageChrome
-      tab={tab}
-      onTabChange={onTabChange}
-      actions={
-        <button
-          type="button"
-          className="btn"
-          data-testid="deploy-dmn"
-          onClick={() =>
-            toast({
-              kind: "info",
-              text: "Deploy DMN file arrives in Story 15.2.",
-              ttl: 3500,
-            })
-          }
-        >
-          <Icon name="upload" size={12} />
-          Deploy DMN
-        </button>
-      }
-    >
-      <DmnDeploymentsList page={data as FlowablePage<FlowableDeployment>} />
-    </PageChrome>
+    <>
+      <PageChrome
+        tab={tab}
+        onTabChange={onTabChange}
+        actions={
+          <button
+            ref={uploadTriggerRef}
+            type="button"
+            className="btn"
+            data-testid="deploy-dmn"
+            onClick={() => setUploadOpen(true)}
+          >
+            <Icon name="upload" size={12} />
+            Deploy DMN
+          </button>
+        }
+      >
+        <DmnDeploymentsList
+          page={data as FlowablePage<FlowableDeployment>}
+          onDeleteClick={(id) => setDeleteTarget(id)}
+          deleteTriggerRef={deleteTriggerRef}
+        />
+      </PageChrome>
+      {modals}
+    </>
   );
 }
 
@@ -237,9 +295,11 @@ function DecisionsList({ page }: DecisionsListProps) {
 
 interface DmnDeploymentsListProps {
   page: FlowablePage<FlowableDeployment>;
+  onDeleteClick: (id: string) => void;
+  deleteTriggerRef: React.MutableRefObject<HTMLElement | null>;
 }
 
-function DmnDeploymentsList({ page }: DmnDeploymentsListProps) {
+function DmnDeploymentsList({ page, onDeleteClick, deleteTriggerRef }: DmnDeploymentsListProps) {
   if (page.data.length === 0) {
     const entry = emptyStates.dmnDeployments;
     return entry ? <EmptyState entry={entry} /> : null;
@@ -265,7 +325,15 @@ function DmnDeploymentsList({ page }: DmnDeploymentsListProps) {
             <td className="mono mute">{dep.id}</td>
             <td className="mute mono">{fmtTime(dep.deploymentTime)}</td>
             <td className="mono mute">{dep.tenantId || <span className="mute">—</span>}</td>
-            <td>
+            <td
+              onClickCapture={(e) => {
+                const target = e.target as HTMLElement | null;
+                const trigger = target?.closest(
+                  '[data-testid="row-action-trigger"]',
+                ) as HTMLElement | null;
+                if (trigger) deleteTriggerRef.current = trigger;
+              }}
+            >
               <RowActionMenu
                 ariaLabel={`Actions for DMN deployment ${dep.name || dep.id}`}
                 items={[
@@ -273,12 +341,7 @@ function DmnDeploymentsList({ page }: DmnDeploymentsListProps) {
                     label: "Delete deployment",
                     danger: true,
                     testId: "delete-dmn-deployment",
-                    onSelect: () =>
-                      toast({
-                        kind: "info",
-                        text: `Delete DMN deployment arrives in Story 15.2 for ${dep.id}.`,
-                        ttl: 3500,
-                      }),
+                    onSelect: () => onDeleteClick(dep.id),
                   },
                 ]}
               />
