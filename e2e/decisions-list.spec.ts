@@ -71,11 +71,4 @@ test.describe("/decisions canonical list (Story 15.1)", () => {
     await page.getByTestId("test-execute").click();
     await expect(page.locator("text=/Test execute arrives in Story 15.3/")).toBeVisible();
   });
-
-  test("deploy-dmn placeholder fires when clicked", async ({ page }) => {
-    await page.goto("/decisions?tab=deployments");
-    await expect(page.getByTestId("deploy-dmn")).toBeVisible();
-    await page.getByTestId("deploy-dmn").click();
-    await expect(page.locator("text=/Deploy DMN file arrives in Story 15.2/")).toBeVisible();
-  });
 });

@@ -707,6 +707,17 @@ const listDmnDeploymentResources = (deploymentId: string): Promise<FlowableResou
   request<FlowableResource[]>("GET", `/dmn-repository/deployments/${deploymentId}/resources`, {
     base: dmnBase(),
   });
+// Story 15.2: DELETE a DMN deployment. Pass `{cascade: true}` to delete
+// decisions still referenced by historic executions (mirrors BPMN's
+// removeDeployment cascade flag at /repository/deployments/{id}). Without
+// cascade, the engine returns 409 Conflict if any historic execution
+// references a decision from this deployment.
+const removeDmnDeployment = (id: string, params?: { cascade?: boolean }) =>
+  request<void>(
+    "DELETE",
+    `/dmn-repository/deployments/${id}`,
+    params?.cascade ? { params: { cascade: true }, base: dmnBase() } : { base: dmnBase() },
+  );
 
 // ── Deployment helpers (multipart upload) ────────────────────────────────
 // Flowable expects multipart/form-data, not the JSON-with-base64 shape we used
@@ -883,6 +894,7 @@ export const api = {
   executeDecision,
   getDmnResource,
   listDmnDeploymentResources,
+  removeDmnDeployment,
   deployBpmn,
   deployDmn,
   ping,
