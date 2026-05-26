@@ -240,6 +240,31 @@ export interface FlowableDecision {
   tenantId?: string;
 }
 
+// Story 15.4: historic decision-execution DTO. All fields defensive
+// (every new field optional) per the Epic 15 DTO-widening discipline.
+// The actual response shape may vary across Flowable versions; the
+// renderer treats missing fields as "—".
+export interface FlowableHistoricDecisionExecution {
+  id: string;
+  decisionDefinitionId?: string;
+  decisionKey?: string;
+  decisionName?: string;
+  processInstanceId?: string;
+  executionId?: string;
+  activityId?: string;
+  scopeType?: string;
+  scopeId?: string;
+  startTime?: string;
+  endTime?: string;
+  durationInMillis?: number;
+  hitPolicy?: string;
+  executionFailed?: boolean;
+  failureMessage?: string;
+  inputVariables?: Record<string, unknown>;
+  outputVariables?: Record<string, unknown>;
+  tenantId?: string;
+}
+
 // Historic equivalents — UI shape is close to the runtime DTOs.
 export interface FlowableHistoricProcessInstance extends FlowableProcessInstance {
   endTime?: string;
@@ -743,6 +768,22 @@ const listDmnDeploymentResources = (deploymentId: string): Promise<FlowableResou
   request<FlowableResource[]>("GET", `/dmn-repository/deployments/${deploymentId}/resources`, {
     base: dmnBase(),
   });
+// Story 15.4: list historic DMN decision executions.
+//
+// Supported params (per Flowable 7.x DMN-history REST surface):
+//   size, start, sort, order              — pagination + sort
+//   decisionKey, decisionKeyLike          — filter by decision key
+//   processInstanceId                     — filter by parent process instance
+//   executionId                           — filter by Flowable execution context
+//   activityId                            — filter by triggering activity
+//   startedBefore, startedAfter           — ISO 8601 timestamp bounds
+//   tenantId                              — tenant scoping
+const listDmnHistoryExecutions = (params?: QueryParams) =>
+  request<FlowablePage<FlowableHistoricDecisionExecution>>(
+    "GET",
+    "/dmn-history/historic-decision-executions",
+    { params, base: dmnBase() },
+  );
 // Story 15.2: DELETE a DMN deployment. Pass `{cascade: true}` to delete
 // decisions still referenced by historic executions (mirrors BPMN's
 // removeDeployment cascade flag at /repository/deployments/{id}). Without
@@ -931,6 +972,7 @@ export const api = {
   getDmnResource,
   listDmnDeploymentResources,
   removeDmnDeployment,
+  listDmnHistoryExecutions,
   deployBpmn,
   deployDmn,
   ping,

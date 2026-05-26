@@ -66,6 +66,10 @@ export const emptyStates: Record<string, EmptyStateEntry> = {
     title: "No DMN deployments yet.",
     body: "Upload a .dmn file via the 'Deploy DMN' button to push a decision table to the engine. DMN deployments are independent of BPMN deployments.",
   },
+  dmnExecutions: {
+    title: "No DMN executions yet.",
+    body: "Decision executions appear here once you run a decision (Test execute from /decisions, or a process instance evaluates a Business Rule Task). The engine records each evaluation with inputs, outputs, hit policy, and timing.",
+  },
   historicActivities: {
     title: "No recorded activities for this instance yet.",
     body: "Activities appear here as the engine records them. If the instance has just started, give it a moment and refresh.",

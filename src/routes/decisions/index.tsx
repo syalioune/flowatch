@@ -15,11 +15,18 @@
  *   - 15.4 extends loadDecisions(tab) with a third "executions" branch.
  */
 
-import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import React from "react";
 import { z } from "zod";
-import { api, type FlowableDecision, type FlowableDeployment, type FlowablePage } from "../../api";
-import { fmtTime, Icon, PageHead, toast } from "../../components";
+import {
+  api,
+  type FlowableDecision,
+  type FlowableDeployment,
+  type FlowableHistoricDecisionExecution,
+  type FlowablePage,
+} from "../../api";
+import { fmtMs, fmtTime, Icon, PageHead, toast } from "../../components";
+import { DecisionVariableTable } from "../../components/DecisionVariableTable";
 import { DeleteDmnDeploymentModal } from "../../lib/delete-dmn-deployment-modal";
 import { EmptyState, emptyStates } from "../../lib/empty-states";
 import { ErrorBox } from "../../lib/error-box";
@@ -29,18 +36,24 @@ import { TableSkeleton } from "../../lib/table-skeleton";
 import { UploadDmnDeploymentModal } from "../../lib/upload-dmn-deployment-modal";
 
 const decisionsSearch = z.object({
-  tab: z.enum(["decisions", "deployments"]).optional().default("decisions"),
+  tab: z.enum(["decisions", "deployments", "executions"]).optional().default("decisions"),
 });
 
-export type DecisionsTab = "decisions" | "deployments";
+export type DecisionsTab = "decisions" | "deployments" | "executions";
 
 // Exported for unit testing of the tab-aware dispatch. Not re-used
 // elsewhere — the route's `loader` slot is the only production caller.
+// Story 15.4 extended this from 2 to 3 branches (added "executions").
 export const loadDecisions = (
   tab: DecisionsTab,
-): Promise<FlowablePage<FlowableDecision> | FlowablePage<FlowableDeployment>> => {
+): Promise<
+  | FlowablePage<FlowableDecision>
+  | FlowablePage<FlowableDeployment>
+  | FlowablePage<FlowableHistoricDecisionExecution>
+> => {
   if (tab === "decisions") return api.listDecisions({ size: 50 });
-  return api.listDmnDeployments({ size: 50 });
+  if (tab === "deployments") return api.listDmnDeployments({ size: 50 });
+  return api.listDmnHistoryExecutions({ size: 50, sort: "startTime", order: "desc" });
 };
 
 export const Route = createFileRoute("/decisions/")({
@@ -65,6 +78,11 @@ export const Route = createFileRoute("/decisions/")({
         method: "DELETE",
         path: "/dmn-repository/deployments/{id}",
         desc: "Delete a DMN deployment (dmnBase, cascade optional)",
+      },
+      {
+        method: "GET",
+        path: "/dmn-history/historic-decision-executions",
+        desc: "List historic decision executions (sorted by startTime desc)",
       },
     ],
   },
@@ -105,6 +123,14 @@ function PageChrome({ children, tab, onTabChange, actions }: PageChromeProps) {
         >
           Deployments
         </button>
+        <button
+          type="button"
+          className="seg-btn"
+          data-on={tab === "executions" ? "1" : "0"}
+          onClick={() => onTabChange("executions")}
+        >
+          Executions
+        </button>
       </div>
       <div className="tbl-wrap">{children}</div>
     </div>
@@ -121,9 +147,10 @@ function useTabNav() {
 
 function DecisionsPending() {
   const { tab, onTabChange } = useTabNav();
+  const cols = tab === "decisions" ? 5 : tab === "deployments" ? 4 : 5;
   return (
     <PageChrome tab={tab} onTabChange={onTabChange}>
-      <TableSkeleton columns={tab === "decisions" ? 5 : 4} rows={6} />
+      <TableSkeleton columns={cols} rows={6} />
     </PageChrome>
   );
 }
@@ -203,6 +230,17 @@ function DecisionsRoute() {
             onTestExecute={(d) => setExecuteTarget(d)}
             executeTriggerRef={executeTriggerRef}
           />
+        </PageChrome>
+        {modals}
+      </>
+    );
+  }
+
+  if (tab === "executions") {
+    return (
+      <>
+        <PageChrome tab={tab} onTabChange={onTabChange}>
+          <DmnExecutionsList page={data as FlowablePage<FlowableHistoricDecisionExecution>} />
         </PageChrome>
         {modals}
       </>
@@ -368,6 +406,119 @@ function DmnDeploymentsList({ page, onDeleteClick, deleteTriggerRef }: DmnDeploy
             </td>
           </tr>
         ))}
+      </tbody>
+    </table>
+  );
+}
+
+// Story 15.4: hit-policy → tone mapping for the badge column.
+function hitPolicyTone(policy?: string): "ok" | "neutral" | "warn" | "mute" {
+  if (!policy) return "mute";
+  const upper = policy.toUpperCase();
+  if (upper === "UNIQUE" || upper === "FIRST" || upper === "ANY") return "ok";
+  if (upper === "COLLECT") return "warn";
+  if (upper === "RULE ORDER" || upper === "OUTPUT ORDER" || upper === "PRIORITY") {
+    return "neutral";
+  }
+  return "mute";
+}
+
+interface DmnExecutionsListProps {
+  page: FlowablePage<FlowableHistoricDecisionExecution>;
+}
+
+export function DmnExecutionsList({ page }: DmnExecutionsListProps) {
+  // Story 15.4: row-expand-for-detail pattern. Single string holds the
+  // currently-expanded id; clicking another row collapses the previous.
+  const [expandedId, setExpandedId] = React.useState<string | null>(null);
+
+  if (page.data.length === 0) {
+    const entry = emptyStates.dmnExecutions;
+    return entry ? <EmptyState entry={entry} /> : null;
+  }
+
+  return (
+    <table className="tbl">
+      <thead>
+        <tr>
+          <th>Decision</th>
+          <th>Process instance</th>
+          <th>Started</th>
+          <th>Duration</th>
+          <th>Hit policy</th>
+          <th />
+        </tr>
+      </thead>
+      <tbody>
+        {page.data.map((e) => {
+          const isOpen = expandedId === e.id;
+          return (
+            <React.Fragment key={e.id}>
+              <tr
+                data-testid={`execution-row-${e.id}`}
+                tabIndex={0}
+                style={{ cursor: "pointer" }}
+                onClick={() => setExpandedId((prev) => (prev === e.id ? null : e.id))}
+                onKeyDown={(ev) => {
+                  if (ev.key === "Enter" || ev.key === " ") {
+                    ev.preventDefault();
+                    setExpandedId((prev) => (prev === e.id ? null : e.id));
+                  }
+                }}
+              >
+                <td>
+                  <b style={{ fontWeight: 500 }}>{e.decisionName || e.decisionKey || e.id}</b>
+                </td>
+                <td className="mono">
+                  {e.processInstanceId ? (
+                    <Link
+                      to="/instances/$id"
+                      params={{ id: e.processInstanceId }}
+                      onClick={(ev) => ev.stopPropagation()}
+                    >
+                      {e.processInstanceId}
+                    </Link>
+                  ) : (
+                    <span className="mute">—</span>
+                  )}
+                </td>
+                <td className="mute mono">{fmtTime(e.startTime)}</td>
+                <td className="mono">{fmtMs(e.durationInMillis)}</td>
+                <td>
+                  <span className="badge" data-tone={hitPolicyTone(e.hitPolicy)}>
+                    {e.hitPolicy || "—"}
+                  </span>
+                </td>
+                <td style={{ width: 24, textAlign: "right" }}>
+                  <Icon name="chevron" size={12} />
+                </td>
+              </tr>
+              {isOpen && (
+                <tr data-testid={`execution-detail-${e.id}`}>
+                  <td colSpan={6} style={{ padding: "16px 20px", background: "var(--bg-sunken)" }}>
+                    <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+                      <DecisionVariableTable
+                        title="Input variables"
+                        variables={e.inputVariables}
+                        testIdPrefix={`execution-input-${e.id}`}
+                      />
+                      <DecisionVariableTable
+                        title="Output variables"
+                        variables={e.outputVariables}
+                        testIdPrefix={`execution-output-${e.id}`}
+                      />
+                    </div>
+                    {e.executionFailed && (
+                      <div style={{ marginTop: 12 }}>
+                        <ErrorBox error={new Error(e.failureMessage ?? "Execution failed")} />
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              )}
+            </React.Fragment>
+          );
+        })}
       </tbody>
     </table>
   );
