@@ -95,15 +95,71 @@ describe("api.listGroupMembers (Story 14.2 ?memberOfGroup workaround)", () => {
   });
 });
 
+describe("api.getUserGroups (Story 14.3 — ?member workaround)", () => {
+  it("GETs /identity/groups with the member query param", async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 200,
+        body: JSON.stringify({ data: [], total: 0, start: 0, size: 50, sort: "id", order: "asc" }),
+        contentType: "application/json",
+      }),
+    );
+    await api.getUserGroups("kermit");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${DEFAULT_BASE}/identity/groups?member=kermit`);
+    expect(init.method).toBe("GET");
+    expect(init.body).toBeUndefined();
+  });
+
+  it("returns the FlowablePage<FlowableGroup> envelope on success", async () => {
+    const enginePayload = JSON.stringify({
+      data: [{ id: "managers", name: "Managers", type: "assignment" }],
+      total: 1,
+      start: 0,
+      size: 50,
+      sort: "id",
+      order: "asc",
+    });
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ status: 200, body: enginePayload, contentType: "application/json" }),
+    );
+    const out = await api.getUserGroups("kermit");
+    expect(out.data).toHaveLength(1);
+    expect(out.data[0]?.id).toBe("managers");
+    expect(out.total).toBe(1);
+  });
+});
+
+describe("api.addUserToGroup (Story 14.3)", () => {
+  it("POSTs /identity/groups/{groupId}/members with body { userId }", async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 201 }));
+    await api.addUserToGroup("kermit", "managers");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${DEFAULT_BASE}/identity/groups/managers/members`);
+    expect(init.method).toBe("POST");
+    expect(init.body).toBe(JSON.stringify({ userId: "kermit" }));
+  });
+
+  it("propagates engine errors so the caller can surface them via toast", async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ status: 409, body: "already a member", contentType: "text/plain" }),
+    );
+    await expect(api.addUserToGroup("kermit", "managers")).rejects.toMatchObject({
+      status: 409,
+    });
+  });
+});
+
 describe("api.removeUserFromGroup (Story 14.3 symmetric pair)", () => {
-  it("DELETEs /identity/users/{userId}/groups/{groupId} with no body or params", async () => {
+  it("DELETEs /identity/groups/{groupId}/members/{userId} with no body or params", async () => {
     // Flowable returns 204 No Content on success; undici forbids a body on
     // 204 so we use 200 + empty body here — the URL + method + lack of body
-    // is what the wrapper test pins.
+    // is what the wrapper test pins. Mirrors the group-centric POST above:
+    // the inverse user-centric DELETE returns 500 "No endpoint" in 7.2 OSS.
     fetchMock.mockResolvedValueOnce(mockResponse({ status: 200 }));
     await api.removeUserFromGroup("rest-admin", "admin");
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe(`${DEFAULT_BASE}/identity/users/rest-admin/groups/admin`);
+    expect(url).toBe(`${DEFAULT_BASE}/identity/groups/admin/members/rest-admin`);
     expect(init.method).toBe("DELETE");
     expect(init.body).toBeUndefined();
   });

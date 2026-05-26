@@ -601,8 +601,13 @@ const getUser = (id: string) => request<FlowableUser>("GET", `/identity/users/${
 const listGroups = (params?: QueryParams) =>
   request<FlowablePage<FlowableGroup>>("GET", "/identity/groups", { params });
 const getGroup = (id: string) => request<FlowableGroup>("GET", `/identity/groups/${id}`);
+// flowable-rest 7.2 OSS does NOT serve GET /identity/users/{userId}/groups —
+// the working recipe is GET /identity/groups?member={userId}, symmetric to
+// listGroupMembers's ?memberOfGroup={groupId} workaround above.
 const getUserGroups = (userId: string) =>
-  request<FlowablePage<FlowableGroup>>("GET", `/identity/users/${userId}/groups`);
+  request<FlowablePage<FlowableGroup>>("GET", "/identity/groups", {
+    params: { member: userId },
+  });
 // flowable-rest 7.2 does not expose GET /identity/groups/{id}/members. The
 // supported recipe is GET /identity/users?memberOfGroup={id}, which returns
 // the FlowablePage<FlowableUser> in the group. Future flowable versions
@@ -611,15 +616,23 @@ const listGroupMembers = (groupId: string, params?: QueryParams) =>
   request<FlowablePage<FlowableUser>>("GET", "/identity/users", {
     params: { ...(params ?? {}), memberOfGroup: groupId },
   });
+// Flowable 7.2 OSS exposes the group-centric membership-write endpoint:
+// POST /identity/groups/{groupId}/members with body {userId}. The inverse
+// user-centric route (POST /identity/users/{userId}/groups {groupId}) is
+// not honoured against a live engine — confirmed via Bruno during 14.3
+// post-closure verification.
 const addUserToGroup = (userId: string, groupId: string) =>
-  request<void>("POST", `/identity/users/${userId}/groups`, { body: { groupId } });
-// Symmetric pair to addUserToGroup (POST /identity/users/{userId}/groups).
-// Flowable returns 204 No Content on success; 404 if the membership doesn't
-// exist; 403 if the caller lacks permission. ErrorBox surfaces the verbatim
-// engine message. First full application of the Epic 13 retro §3.2 spec-
-// symmetry discipline (Story 14.3).
+  request<void>("POST", `/identity/groups/${groupId}/members`, { body: { userId } });
+// Symmetric pair to addUserToGroup. Flowable 7.2 OSS does NOT honour the
+// inverse user-centric DELETE /identity/users/{userId}/groups/{groupId}
+// path — the engine returns HTTP 500 "No endpoint DELETE ...". The working
+// recipe is DELETE /identity/groups/{groupId}/members/{userId}, mirroring
+// the group-centric POST above. Returns 204 No Content on success; 404 if
+// the membership doesn't exist; 403 if the caller lacks permission.
+// ErrorBox surfaces the verbatim engine message. First full application
+// of the Epic 13 retro §3.2 spec-symmetry discipline (14.3).
 const removeUserFromGroup = (userId: string, groupId: string) =>
-  request<void>("DELETE", `/identity/users/${userId}/groups/${groupId}`);
+  request<void>("DELETE", `/identity/groups/${groupId}/members/${userId}`);
 
 // Tenants are not exposed as a dedicated endpoint in flowable-rest 7.2.
 // Derive distinct tenantIds from deployments (truthy values only).

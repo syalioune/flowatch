@@ -73,8 +73,9 @@ Every call — success or failure — pushes an entry into `API_LOG` and fires a
 | ------------------------------------ | ------ | ------------------------------------------ | ------------------------------------------------------------------------------------- |
 | `listUsers(params)`                  | GET    | `/identity/users`                          |                                                                                       |
 | `listGroups(params)`                 | GET    | `/identity/groups`                         |                                                                                       |
-| `getUserGroups(userId)`              | GET    | `/identity/users/{userId}/groups`          |                                                                                       |
-| `addUserToGroup(userId, groupId)`    | POST   | `/identity/users/{userId}/groups`          | Body `{ groupId }`                                                                    |
+| `getUserGroups(userId)`              | GET    | `/identity/groups?member={userId}`         | flowable-rest 7.2 OSS does NOT serve `/identity/users/{userId}/groups`; the `?member=` filter is the working recipe. |
+| `addUserToGroup(userId, groupId)`    | POST   | `/identity/groups/{groupId}/members`       | Body `{ userId }`. Flowable 7.2 OSS does NOT honour the inverse `POST /identity/users/{userId}/groups` path; the group-centric route is the working endpoint. |
+| `removeUserFromGroup(userId, groupId)`| DELETE | `/identity/groups/{groupId}/members/{userId}`| 204 No Content on success; 404 if the membership doesn't exist. Flowable 7.2 OSS does NOT honour the inverse `DELETE /identity/users/{userId}/groups/{groupId}` path (returns 500 "No endpoint DELETE ..."). |
 | `listTenants()`                      | (n/a)  | _(synthesized — see note)_                 | flowable-rest 7.2 doesn't expose `/identity/tenants`. Implementation calls `listDeployments({ size: 1000 })` and reduces distinct `tenantId` values, then returns `{ data: [{ id, name }] }`. |
 
 ## DMN (under `/flowable-rest/dmn-api`)
