@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * Smoke tests for the BpmnModeler component extracted in Story 16.1.
+ * Smoke tests for the BpmnModeler component extracted in Story 16.1 +
+ * extended in Story 16.2 (dirty-state, zoom-to-fit, dropdown polish).
  *
  * The full bpmn-js Modeler cannot be mounted in jsdom — it depends on SVG
  * surfaces, the DOM `Range` API, and other browser-tier capabilities that
@@ -9,16 +10,26 @@
  * is too heavy to mount in tests`), we mock `bpmn-js/lib/Modeler` to a
  * thin stub and verify the component:
  *
- *   1. Mounts without throwing.
- *   2. Calls modeler.destroy() on unmount (cleanup contract).
- *   3. Subscribes to selection.changed + commandStack.changed with typed
- *      callbacks — verified by capturing the event-bus on(...) calls and
- *      replaying typed payloads through them.
- *
- * AC-3 + AC-9, Story 16.1.
+ *   1. Mounts without throwing.                                  (16.1 AC-9)
+ *   2. Calls modeler.destroy() on unmount (cleanup contract).    (16.1 AC-9)
+ *   3. Subscribes to selection.changed + commandStack.changed
+ *      with typed callbacks — verified by capturing the event-
+ *      bus on(...) calls and replaying typed payloads through
+ *      them.                                                     (16.1 AC-3)
+ *   4. Tracks dirty state from `commandStack.canUndo()` —
+ *      initial false; flips to true on canUndo; resets to false
+ *      after a successful deploy.                                (16.2 AC-2)
+ *   5. Zooms to fit after every importXML.                        (16.2 AC-3)
  */
 
-import { render } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+  RouterProvider,
+} from "@tanstack/react-router";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Minimal stub for the bpmn-js Modeler. We capture event-bus subscriptions
@@ -56,6 +67,10 @@ const destroySpy = vi.fn();
 const zoomSpy = vi.fn();
 const filterSpy = vi.fn(() => []);
 const buses: StubBus[] = [];
+// Story 16.2: per-test override for commandStack.canUndo(). Default false
+// (clean state). Tests that exercise dirty state mutate this between fire()
+// calls + commandStack.changed replays.
+let canUndoValue = false;
 
 vi.mock("bpmn-js/lib/Modeler", () => {
   class StubModeler {
@@ -70,7 +85,7 @@ vi.mock("bpmn-js/lib/Modeler", () => {
       if (service === "elementRegistry") return { filter: filterSpy };
       if (service === "selection") return { select: vi.fn() };
       if (service === "modeling") return { updateProperties: vi.fn() };
-      if (service === "commandStack") return { canUndo: () => false };
+      if (service === "commandStack") return { canUndo: () => canUndoValue };
       return {};
     }
     importXML(_xml: string) {
@@ -106,37 +121,53 @@ vi.mock("../../api", async () => {
 // Import AFTER the mock declarations.
 import { BpmnModeler } from "../BpmnModeler";
 
+// Story 16.2: `<BpmnModeler>` now calls `useNavigate()` from tanstack-router,
+// so the test harness mounts it inside a minimal `<RouterProvider>` rooted
+// at `/`. Same shape as <InstanceHistoricPanel> tests.
+const renderModeler = () => {
+  const rootRoute = createRootRoute({ component: () => <BpmnModeler /> });
+  const router = createRouter({
+    routeTree: rootRoute,
+    history: createMemoryHistory({ initialEntries: ["/"] }),
+  });
+  return render(<RouterProvider router={router} />);
+};
+
 beforeEach(() => {
   importXMLSpy.mockClear();
   destroySpy.mockClear();
   zoomSpy.mockClear();
   filterSpy.mockClear();
   buses.length = 0;
+  canUndoValue = false;
 });
 
 afterEach(() => {
+  cleanup();
   vi.clearAllMocks();
 });
 
 describe("<BpmnModeler> — Story 16.1 AC-9 smoke", () => {
   it("mounts the vanilla bpmn-js Modeler via the ref'd container", async () => {
-    const { unmount } = render(<BpmnModeler />);
+    const { unmount } = renderModeler();
     // The component instantiated the stub Modeler exactly once + imported
     // the LOAN starter on mount
-    expect(buses.length).toBe(1);
+    await waitFor(() => expect(buses.length).toBe(1));
     expect(importXMLSpy).toHaveBeenCalled();
     unmount();
   });
 
-  it("calls modeler.destroy() on unmount (P-006 cleanup contract)", () => {
-    const { unmount } = render(<BpmnModeler />);
+  it("calls modeler.destroy() on unmount (P-006 cleanup contract)", async () => {
+    const { unmount } = renderModeler();
+    await waitFor(() => expect(buses.length).toBe(1));
     expect(destroySpy).not.toHaveBeenCalled();
     unmount();
     expect(destroySpy).toHaveBeenCalledTimes(1);
   });
 
-  it("subscribes to selection.changed + commandStack.changed with typed callbacks", () => {
-    render(<BpmnModeler />);
+  it("subscribes to selection.changed + commandStack.changed with typed callbacks", async () => {
+    renderModeler();
+    await waitFor(() => expect(buses.length).toBe(1));
     const bus = buses[0];
     if (!bus) throw new Error("bus not captured");
     const selHandlers = bus.handlers["selection.changed"];
@@ -147,8 +178,9 @@ describe("<BpmnModeler> — Story 16.1 AC-9 smoke", () => {
     expect(cmdHandlers?.length ?? 0).toBeGreaterThan(0);
   });
 
-  it("selection.changed typed payload is consumed without throwing", () => {
-    render(<BpmnModeler />);
+  it("selection.changed typed payload is consumed without throwing", async () => {
+    renderModeler();
+    await waitFor(() => expect(buses.length).toBe(1));
     const bus = buses[0];
     if (!bus) throw new Error("bus not captured");
     // Replay a typed SelectionChangedEvent — the modeler's onSel reads
@@ -164,11 +196,66 @@ describe("<BpmnModeler> — Story 16.1 AC-9 smoke", () => {
     ).not.toThrow();
   });
 
-  it("commandStack.changed typed payload is consumed without throwing", () => {
-    render(<BpmnModeler />);
+  it("commandStack.changed typed payload is consumed without throwing", async () => {
+    renderModeler();
+    await waitFor(() => expect(buses.length).toBe(1));
     const bus = buses[0];
     if (!bus) throw new Error("bus not captured");
     expect(() => bus.fire("commandStack.changed", {})).not.toThrow();
     expect(() => bus.fire("commandStack.changed", { context: { foo: "bar" } })).not.toThrow();
+  });
+});
+
+describe("<BpmnModeler> — Story 16.2 dirty-state + zoom-to-fit", () => {
+  it("Deploy button renders 'Deploy' (no asterisk) on initial mount (clean state)", async () => {
+    renderModeler();
+    await waitFor(() => expect(buses.length).toBe(1));
+    const deployBtn = screen.getByTestId("bpmn-deploy");
+    // Initial state: commandStack.canUndo() === false → dirty === false
+    expect(deployBtn.textContent).toMatch(/^Deploy$/);
+    expect(deployBtn.getAttribute("data-tone")).not.toBe("warn");
+  });
+
+  it("Deploy button flips to 'Deploy *' when commandStack.canUndo() === true", async () => {
+    renderModeler();
+    await waitFor(() => expect(buses.length).toBe(1));
+    const bus = buses[0];
+    if (!bus) throw new Error("bus not captured");
+    // Simulate an operator edit: commandStack now has an undoable command
+    canUndoValue = true;
+    bus.fire("commandStack.changed", {});
+    await waitFor(() => {
+      const deployBtn = screen.getByTestId("bpmn-deploy");
+      expect(deployBtn.textContent).toMatch(/Deploy \*/);
+      expect(deployBtn.getAttribute("data-tone")).toBe("warn");
+    });
+  });
+
+  it("zoom-to-fit fires after every importXML (mount, dropdown pick)", async () => {
+    renderModeler();
+    await waitFor(() => expect(importXMLSpy).toHaveBeenCalled());
+    // The mount imports LOAN_BPMN_XML → zoom("fit-viewport", "auto") is called
+    expect(zoomSpy).toHaveBeenCalled();
+    expect(zoomSpy.mock.calls[0]).toEqual(["fit-viewport", "auto"]);
+  });
+
+  it("dirty resets to false after a successful deploy", async () => {
+    renderModeler();
+    await waitFor(() => expect(buses.length).toBe(1));
+    const bus = buses[0];
+    if (!bus) throw new Error("bus not captured");
+    // Operator edited
+    canUndoValue = true;
+    bus.fire("commandStack.changed", {});
+    await waitFor(() => {
+      expect(screen.getByTestId("bpmn-deploy").textContent).toMatch(/Deploy \*/);
+    });
+    // Now simulate a successful deploy: canUndo restored to false (the
+    // deployed XML is the new clean baseline) + click Deploy.
+    canUndoValue = false;
+    fireEvent.click(screen.getByTestId("bpmn-deploy"));
+    await waitFor(() => {
+      expect(screen.getByTestId("bpmn-deploy").textContent).toMatch(/^Deploy$/);
+    });
   });
 });

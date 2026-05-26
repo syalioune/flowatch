@@ -1107,6 +1107,13 @@ a {
   padding: 0 var(--pad, 14px);
   line-height: calc(var(--row-h, 44px) - 16px);
 }
+/* Story 16.2 AC-4: native <option> rendering doesn't honor most CSS — line-
+   height is the only reliable lever; if the open-dropdown rendering is
+   operator-feel-poor at Compact density, fall back to a custom <div>-based
+   dropdown in a future polish story. Documented as a known limitation. */
+.mod-toolbar .modeler-dropdown option {
+  line-height: var(--row-h, 44px);
+}
 .mod-toolbar .file-name {
   display: flex;
   align-items: center;
