@@ -69,6 +69,27 @@ const bpmnIconClass = (el: AnyEl): string => {
   return "bpmn-icon-task";
 };
 
+// PR #168 follow-up: turn an operator-typed filename into a Flowable-safe
+// process id. Strips the .bpmn(20).xml extension, replaces non-id chars
+// with `-`, trims dashes, and falls back to "newProcess" on empty input.
+const bpmnIdFromFilename = (filename: string): string => {
+  const base = filename
+    .replace(/\.bpmn20?\.xml$/i, "")
+    .replace(/\.bpmn$/i, "")
+    .replace(/\.xml$/i, "");
+  const slug = base.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug || "newProcess";
+};
+
+// Rewrite the BLANK template's process id (`newProcess`) to the supplied
+// value. Targeted to `id="newProcess"` and `bpmnElement="newProcess"`
+// occurrences so it can't accidentally clobber the substring inside user
+// content (task names, documentation, etc.).
+const rewriteBlankProcessId = (xml: string, newId: string): string =>
+  xml
+    .replace(/id="newProcess"/g, `id="${newId}"`)
+    .replace(/bpmnElement="newProcess"/g, `bpmnElement="${newId}"`);
+
 function download(name: string, content: BlobPart, type: string): void {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
@@ -333,7 +354,16 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
     const m = modelerRef.current;
     if (!m) return;
     try {
-      const { xml } = await m.saveXML({ format: true });
+      const { xml: rawXml } = await m.saveXML({ format: true });
+      // PR #168 follow-up: scratch deploys had every definition coming back
+      // with key "newProcess" because BLANK_BPMN_XML hard-codes that id. When
+      // creatingNew, rewrite the process id from the operator-typed filename
+      // (slugified). For loaded-and-edited definitions, preserve the original
+      // id so a deploy creates a new VERSION of the same key rather than a
+      // sibling.
+      const xml = creatingNew
+        ? rewriteBlankProcessId(rawXml, bpmnIdFromFilename(filename))
+        : rawXml;
       const deployment = await api.deployBpmn(filename, xml);
       setDirty(false);
       // Refresh the dropdown's definitions list so the deployed definition is
@@ -476,8 +506,15 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
             data-testid="bpmn-filename"
             value={filename}
             onChange={(e) => setFilename(e.target.value)}
+            readOnly={!creatingNew}
+            size={Math.max(filename.length + 1, 24)}
             spellCheck={false}
             aria-label="BPMN filename"
+            title={
+              creatingNew
+                ? "Filename + derived process id for the new BPMN"
+                : "Filename of the deployed definition (read-only)"
+            }
           />
           {activeDef?.tenantId && (
             <span style={{ color: "var(--fg-mute)" }}>· tenant: {activeDef.tenantId}</span>

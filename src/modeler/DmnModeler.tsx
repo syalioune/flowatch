@@ -498,8 +498,15 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
             data-testid="dmn-filename"
             value={filename}
             onChange={(e) => setFilename(e.target.value)}
+            readOnly={!creatingNew}
+            size={Math.max(filename.length + 1, 24)}
             spellCheck={false}
             aria-label="DMN filename"
+            title={
+              creatingNew
+                ? "Filename for the new DMN"
+                : "Filename of the deployed decision (read-only)"
+            }
           />
           {activeDecision?.tenantId && (
             <span style={{ color: "var(--fg-mute)" }}>· tenant: {activeDecision.tenantId}</span>
