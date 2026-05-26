@@ -42,6 +42,10 @@ export const emptyStates: Record<string, EmptyStateEntry> = {
     title: "No deployments yet.",
     body: "Upload a .bpmn file or use the BPMN modeler to deploy your first process.",
   },
+  groups: {
+    title: "No groups yet.",
+    body: "Groups appear here when the engine has identity records. The Flowable Modeler 'Identity' tab can seed users + groups; the IDM REST API also accepts POST /identity/groups.",
+  },
   activeActivities: {
     title: "No active activities right now.",
     body: "This instance is idle (awaiting a timer, a message, or a parallel branch to converge) — or all branches have completed.",
@@ -97,6 +101,10 @@ export const emptyStates: Record<string, EmptyStateEntry> = {
   tasks: {
     title: "No tasks for this filter.",
     body: "Try switching the filter, or wait for a workflow to assign one.",
+  },
+  users: {
+    title: "No users yet.",
+    body: "Users appear here when the engine has identity records. The Flowable Modeler 'Identity' tab can seed users + groups; the IDM REST API also accepts POST /identity/users.",
   },
 };
 
