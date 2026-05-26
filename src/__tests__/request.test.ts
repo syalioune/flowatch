@@ -409,6 +409,20 @@ describe("api.* wrappers smoke (P-001 — every call goes through request())", (
     await api.getDmnResource("dep-1", "res-1");
   });
 
+  it("DMN: listDmnDeploymentResources hits /dmn-repository/deployments/{id}/resources", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 200,
+        json: [{ id: "loan-eligibility.dmn", url: "x", contentUrl: "y", type: "resource" }],
+      }),
+    );
+    const out = await api.listDmnDeploymentResources("dep-42");
+    expect(out[0]?.id).toBe("loan-eligibility.dmn");
+    const url = String(fetchMock.mock.calls[0]?.[0]);
+    expect(url).toMatch(/\/dmn-api\/dmn-repository\/deployments\/dep-42\/resources$/);
+  });
+
   it("deployBpmn / deployDmn upload via multipart and log the call", async () => {
     const before = API_LOG.length;
     await api.deployBpmn("loan.bpmn20.xml", "<bpmn/>");
