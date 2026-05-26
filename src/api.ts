@@ -189,8 +189,40 @@ export interface FlowableResource {
   contentUrl?: string;
 }
 
+// Story 15.3: typed input variable shape for POST /dmn-rule/execute.
+export interface FlowableDecisionExecutionInputVariable {
+  name: string;
+  type?: "string" | "number" | "long" | "double" | "boolean" | "date" | "json" | string;
+  value: unknown;
+}
+
+export interface ExecuteDecisionBody {
+  decisionKey: string;
+  inputVariables: FlowableDecisionExecutionInputVariable[];
+  parentDeploymentId?: string;
+}
+
+// Story 15.3: widened to carry matchedRules + per-variable type metadata.
+// All new fields are optional per the defensive widening discipline so
+// existing callers don't break.
+export interface FlowableDecisionExecutionMatchedRule {
+  ruleId?: string;
+  ruleIndex?: number;
+  description?: string;
+}
+
 export interface FlowableDecisionResult {
+  // Legacy shape — kept for backwards compatibility.
   resultVariables?: Record<string, unknown>;
+  // Newer Flowable 7.x shape: variable map keyed by name.
+  resultVariableMap?: Record<string, unknown>;
+  matchedRules?: FlowableDecisionExecutionMatchedRule[];
+  // Optional metadata returned by some Flowable versions.
+  decisionId?: string;
+  decisionKey?: string;
+  decisionName?: string;
+  executionId?: string;
+  evaluationTime?: number;
 }
 
 export interface FlowableTenant {
@@ -691,7 +723,11 @@ const listDmnDeployments = (params?: QueryParams) =>
     params,
     base: dmnBase(),
   });
-const executeDecision = (body: Record<string, unknown>) =>
+// Story 15.3: tightened signature. The body shape matches Flowable 7.x's
+// POST /dmn-rule/execute — `decisionKey` + an array of typed input variables.
+// Pass `parentDeploymentId` to lock execution to a specific deployment;
+// without it, the engine picks the latest version of the decision key.
+const executeDecision = (body: ExecuteDecisionBody) =>
   request<FlowableDecisionResult>("POST", "/dmn-rule/execute", { body, base: dmnBase() });
 const getDmnResource = (deploymentId: string, resourceId: string): Promise<string> =>
   request<string>("GET", `/dmn-repository/deployments/${deploymentId}/resourcedata/${resourceId}`, {

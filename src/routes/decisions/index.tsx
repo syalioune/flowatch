@@ -23,6 +23,7 @@ import { fmtTime, Icon, PageHead, toast } from "../../components";
 import { DeleteDmnDeploymentModal } from "../../lib/delete-dmn-deployment-modal";
 import { EmptyState, emptyStates } from "../../lib/empty-states";
 import { ErrorBox } from "../../lib/error-box";
+import { ExecuteDecisionModal } from "../../lib/execute-decision-modal";
 import { RowActionMenu } from "../../lib/row-action-menu";
 import { TableSkeleton } from "../../lib/table-skeleton";
 import { UploadDmnDeploymentModal } from "../../lib/upload-dmn-deployment-modal";
@@ -150,6 +151,9 @@ function DecisionsRoute() {
   const deleteTriggerRef = React.useRef<HTMLElement | null>(null);
   const [uploadOpen, setUploadOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<string | null>(null);
+  // Story 15.3: execute decision modal target — null when closed.
+  const executeTriggerRef = React.useRef<HTMLElement | null>(null);
+  const [executeTarget, setExecuteTarget] = React.useState<FlowableDecision | null>(null);
 
   // After a successful Upload OR a Delete-settled, re-run the active
   // route's loader. The mental model: the operator stays on the same tab;
@@ -182,6 +186,11 @@ function DecisionsRoute() {
         onSettled={refresh}
         triggerRef={deleteTriggerRef}
       />
+      <ExecuteDecisionModal
+        decision={executeTarget}
+        onClose={() => setExecuteTarget(null)}
+        triggerRef={executeTriggerRef}
+      />
     </>
   );
 
@@ -189,7 +198,11 @@ function DecisionsRoute() {
     return (
       <>
         <PageChrome tab={tab} onTabChange={onTabChange}>
-          <DecisionsList page={data as FlowablePage<FlowableDecision>} />
+          <DecisionsList
+            page={data as FlowablePage<FlowableDecision>}
+            onTestExecute={(d) => setExecuteTarget(d)}
+            executeTriggerRef={executeTriggerRef}
+          />
         </PageChrome>
         {modals}
       </>
@@ -227,9 +240,11 @@ function DecisionsRoute() {
 
 interface DecisionsListProps {
   page: FlowablePage<FlowableDecision>;
+  onTestExecute: (d: FlowableDecision) => void;
+  executeTriggerRef: React.MutableRefObject<HTMLElement | null>;
 }
 
-function DecisionsList({ page }: DecisionsListProps) {
+function DecisionsList({ page, onTestExecute, executeTriggerRef }: DecisionsListProps) {
   const navigate = useNavigate();
   const openDetail = (key: string) => navigate({ to: "/decisions/$key", params: { key } });
 
@@ -269,19 +284,24 @@ function DecisionsList({ page }: DecisionsListProps) {
             <td className="mono">{d.version}</td>
             <td>{d.category || <span className="mute">—</span>}</td>
             <td className="mono mute">{d.tenantId || <span className="mute">—</span>}</td>
-            <td onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+            <td
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+              onClickCapture={(e) => {
+                const target = e.target as HTMLElement | null;
+                const trigger = target?.closest(
+                  '[data-testid="row-action-trigger"]',
+                ) as HTMLElement | null;
+                if (trigger) executeTriggerRef.current = trigger;
+              }}
+            >
               <RowActionMenu
                 ariaLabel={`Actions for decision ${d.name || d.key}`}
                 items={[
                   {
                     label: "Test execute",
                     testId: "test-execute",
-                    onSelect: () =>
-                      toast({
-                        kind: "info",
-                        text: `Test execute arrives in Story 15.3 for decision ${d.key}.`,
-                        ttl: 3500,
-                      }),
+                    onSelect: () => onTestExecute(d),
                   },
                 ]}
               />

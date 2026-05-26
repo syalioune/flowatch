@@ -402,7 +402,7 @@ describe("api.* wrappers smoke (P-001 — every call goes through request())", (
   it("DMN: listDecisions / listDmnDeployments / executeDecision / getDmnResource", async () => {
     await api.listDecisions();
     await api.listDmnDeployments();
-    await api.executeDecision({ decisionKey: "k", variables: {} });
+    await api.executeDecision({ decisionKey: "k", inputVariables: [] });
     fetchMock.mockResolvedValueOnce(
       mockResponse({ status: 200, body: "<dmn/>", contentType: "application/xml" }),
     );

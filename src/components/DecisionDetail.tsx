@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * `<DecisionDetail>` (Story 15.1) — the per-decision detail surface that
- * mounts at `/decisions/$key`. Renders a property table + a placeholder
- * "Test execute" button. Story 15.3 swaps the placeholder for the real
- * `<ExecuteDecisionModal>` trigger; the `data-testid="test-execute-from-detail"`
- * attribute is the swap point.
+ * `<DecisionDetail>` — per-decision detail surface that mounts at
+ * `/decisions/$key`. Renders a property table + a "Test execute" button
+ * that opens `<ExecuteDecisionModal>` (Story 15.3 — the placeholder
+ * shipped by Story 15.1 was swapped for the real modal trigger here).
  */
 
-import type React from "react";
+import React from "react";
 import type { FlowableDecision } from "../api";
-import { Icon, PageHead, toast } from "../components";
+import { Icon, PageHead } from "../components";
+import { ExecuteDecisionModal } from "../lib/execute-decision-modal";
 
 export interface DecisionDetailProps {
   decision: FlowableDecision;
@@ -23,6 +23,9 @@ interface PropertyRow {
 }
 
 export const DecisionDetail: React.FC<DecisionDetailProps> = ({ decision }) => {
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+  const [executeOpen, setExecuteOpen] = React.useState(false);
+
   const rows: PropertyRow[] = [
     { field: "key", label: "Key", value: <span className="mono">{decision.key}</span> },
     { field: "name", label: "Name", value: decision.name || <span className="mute">—</span> },
@@ -59,16 +62,11 @@ export const DecisionDetail: React.FC<DecisionDetailProps> = ({ decision }) => {
         subtitle={`DMN decision · key ${decision.key} · v${decision.version}`}
         actions={
           <button
+            ref={triggerRef}
             type="button"
             className="btn"
             data-testid="test-execute-from-detail"
-            onClick={() =>
-              toast({
-                kind: "info",
-                text: "Test execute arrives in Story 15.3.",
-                ttl: 3500,
-              })
-            }
+            onClick={() => setExecuteOpen(true)}
           >
             <Icon name="play" size={12} />
             Test execute
@@ -92,6 +90,11 @@ export const DecisionDetail: React.FC<DecisionDetailProps> = ({ decision }) => {
           </tbody>
         </table>
       </div>
+      <ExecuteDecisionModal
+        decision={executeOpen ? decision : null}
+        onClose={() => setExecuteOpen(false)}
+        triggerRef={triggerRef}
+      />
     </div>
   );
 };

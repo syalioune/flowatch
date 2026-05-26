@@ -478,9 +478,16 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
   const runTest = async () => {
     setRunning(true);
     try {
+      // Story 15.3 tightened the wrapper signature — flat object → typed
+      // input-variable array. The local DmnDecisionResult intersects with
+      // the wider FlowableDecisionResult so the cast remains safe.
       const r = (await api.executeDecision({
         decisionKey: "loanEligibility",
-        variables: testInputs,
+        inputVariables: Object.entries(testInputs).map(([name, value]) => ({
+          name,
+          type: typeof value === "number" ? "long" : "string",
+          value,
+        })),
       })) as DmnDecisionResult;
       setTestResult(r);
     } finally {

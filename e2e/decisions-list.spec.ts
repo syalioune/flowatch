@@ -57,18 +57,4 @@ test.describe("/decisions canonical list (Story 15.1)", () => {
     await expect(page).toHaveURL(/\/decisions\/[^/]+$/);
     await expect(page.getByTestId("test-execute-from-detail")).toBeVisible();
   });
-
-  test("test execute placeholder fires from list-row action menu", async ({ page }) => {
-    await page.goto("/decisions");
-    const rows = page.locator('[data-testid^="decision-row-"]');
-    const count = await rows.count();
-    if (count === 0) {
-      test.skip(true, "No DMN decisions in the seed engine");
-      return;
-    }
-    const row = rows.first();
-    await row.locator('[data-testid="row-action-trigger"]').click();
-    await page.getByTestId("test-execute").click();
-    await expect(page.locator("text=/Test execute arrives in Story 15.3/")).toBeVisible();
-  });
 });
