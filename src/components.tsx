@@ -397,10 +397,12 @@ export const Topbar = ({
   onTweaks,
 }: TopbarProps) => (
   <div className="topbar">
-    <div className="tenant-switch" onClick={onTenant}>
+    <div className="tenant-switch" data-testid="tenant-switch" onClick={onTenant}>
       <Icon name="tenant" size={13} />
       <span>
-        <b style={{ fontWeight: 500 }}>{tenant.name}</b>
+        <b style={{ fontWeight: 500 }} data-testid="tenant-switch-label">
+          {tenant.name}
+        </b>
       </span>
       <span className="caret">
         <Icon name="chevron" size={12} />

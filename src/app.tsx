@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { Outlet, useNavigate } from "@tanstack/react-router";
+import { Outlet, useNavigate, useRouter } from "@tanstack/react-router";
 import React from "react";
 import { api } from "./api";
 import { ApiInspector, SettingsModal, Sidebar, Toaster, Topbar } from "./components";
@@ -59,6 +59,7 @@ const DEFAULT_TENANT: Tenant = { id: "", name: "All tenants" };
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const meta = useRouteMeta();
+  const router = useRouter();
   const [inspectorOpen, setInspectorOpen] = React.useState(false);
   // A fresh object identity per click so consecutive ErrorBox clicks on the
   // same id re-trigger the scroll/highlight effect (review patch — naked
@@ -240,6 +241,10 @@ function App() {
     if (!next) return;
     setTenant(next);
     api.setConfig({ tenantId: next.id });
+    // Story 14.4 AC-7: re-run the active route's loader against the new
+    // tenant. The badge-count refetch is handled separately by the
+    // refreshNavCounts effect on tenant.id change.
+    void router.invalidate();
   };
 
   return (

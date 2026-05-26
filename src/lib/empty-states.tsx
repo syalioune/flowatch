@@ -106,6 +106,10 @@ export const emptyStates: Record<string, EmptyStateEntry> = {
     title: "No tasks for this filter.",
     body: "Try switching the filter, or wait for a workflow to assign one.",
   },
+  tenants: {
+    title: "No tenant-scoped resources found.",
+    body: "Tenants are derived from deployment tenantIds (flowable-rest 7.2 has no /identity/tenants endpoint). Deploy a process with a `tenantId` to populate this view.",
+  },
   users: {
     title: "No users yet.",
     body: "Users appear here when the engine has identity records. The Flowable Modeler 'Identity' tab can seed users + groups; the IDM REST API also accepts POST /identity/users.",

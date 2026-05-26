@@ -1,16 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // size-exempt: pending split into per-screen modules per NFR-21 (deferred refactor; tracked as a separate story).
 
-import { Icon, PageHead } from "./components";
 import { ErrorBox } from "./lib/error-box";
 
 // Re-export ErrorBox at the original public path so tests that imported it
 // from "../../screens" (Story 2.2) continue to compile.
 export { ErrorBox };
-
-interface TenantsScreenProps {
-  tenants?: { id: string; name: string }[];
-}
 
 // Dashboard moved to src/routes/index.tsx (Story 7.4): four
 // Promise.allSettled KPI tiles with per-tile state handling per NFR-6.
@@ -53,36 +48,8 @@ interface TenantsScreenProps {
 // /identity/groups/$id (Story 14.2). The legacy <Identity> + <LegacyIdentityShim>
 // block was removed in the Story 14.2 follow-up refactor commit.
 
-// ── Tenants ─────────────────────────────────────────────────────
-export const Tenants = ({ tenants }: TenantsScreenProps) => {
-  return (
-    <div className="page">
-      <PageHead
-        title="Tenants"
-        subtitle="Logical isolation boundaries derived from deployment tenantIds (Flowable REST 7.2 has no /identity/tenants endpoint)."
-      />
-      {(tenants || []).length === 0 && (
-        <div className="empty" style={{ padding: 30 }}>
-          No tenant-scoped resources found. Deploy a process with a{" "}
-          <span className="mono">tenantId</span> to populate this view.
-        </div>
-      )}
-      <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-        {(tenants || []).map((t) => (
-          <div key={t.id} className="kpi" style={{ padding: 18 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <Icon name="tenant" size={16} />
-              <div style={{ fontSize: 15, fontWeight: 500 }}>{t.name}</div>
-              <span className="mono mute" style={{ marginLeft: "auto", fontSize: 11 }}>
-                {t.id}
-              </span>
-            </div>
-            <div className="text-xs mute">
-              Set this as your active tenant from the topbar; subsequent reads will filter to it.
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+// ── Tenants — moved to src/routes/tenants.tsx (Story 14.4) ────────
+// Canonical list archetype with a 60-second TTL cache on the
+// /repository/deployments derivation (api.listTenants). The legacy <Tenants>
+// body was bundled into this story's feat commit (32 LOC; under the 50-LOC
+// Epic 12 §3.4 threshold — no chore(refactor) split).
