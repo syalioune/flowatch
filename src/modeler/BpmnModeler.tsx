@@ -394,7 +394,10 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
       }
     } catch (e) {
       const msg = (e as Error)?.message || String(e);
-      setError(`Deploy failed: ${msg}`);
+      // PR #168 follow-up: rely on the toast for deploy failures — covering
+      // the canvas with an error overlay blocked the operator from
+      // continuing to edit the draft. Toast carries the verbatim message;
+      // creatingNew + dirty state are preserved so the draft survives.
       toast({ kind: "error", text: `Deploy failed: ${msg}` });
     }
   };
@@ -469,19 +472,15 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
         <div className="file-name">
           <Icon name="bpmn" size={14} />
           <input
-            className="input mono"
+            className="mod-filename"
             data-testid="bpmn-filename"
             value={filename}
             onChange={(e) => setFilename(e.target.value)}
             spellCheck={false}
             aria-label="BPMN filename"
-            style={{ fontWeight: 600, maxWidth: 260, fontSize: 13, padding: "2px 6px" }}
           />
-          {activeDef && (
-            <span style={{ color: "var(--fg-mute)" }}>
-              · {activeDef.key} v{activeDef.version}
-              {activeDef.tenantId ? ` · tenant: ${activeDef.tenantId}` : ""}
-            </span>
+          {activeDef?.tenantId && (
+            <span style={{ color: "var(--fg-mute)" }}>· tenant: {activeDef.tenantId}</span>
           )}
           {creatingNew && (
             <span data-testid="bpmn-draft-badge" style={{ color: "var(--warn)" }}>
@@ -504,7 +503,7 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
               : "Load deployed definition"
           }
         >
-          <option value="">— template (loan-approval) —</option>
+          <option value="">{creatingNew ? "— new draft —" : "— template (loan-approval) —"}</option>
           {definitions.map((d) => (
             <option key={d.id} value={d.id}>
               {d.name || d.key} v{d.version}
@@ -581,6 +580,9 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
         <div ref={containerRef} className="bpmn-host" style={{ width: "100%", height: "100%" }} />
         {error && (
           <div
+            role="alert"
+            data-testid="bpmn-error-overlay"
+            className="mono"
             style={{
               position: "absolute",
               inset: 20,
@@ -589,10 +591,27 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
               padding: 16,
               borderRadius: 8,
               color: "var(--bad)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
             }}
-            className="mono"
           >
-            {error}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <strong>Error</strong>
+              <button
+                type="button"
+                className="btn"
+                data-size="sm"
+                data-variant="ghost"
+                data-testid="bpmn-error-dismiss"
+                onClick={() => setError(null)}
+                aria-label="Dismiss error"
+              >
+                <Icon name="x" size={13} />
+                Dismiss
+              </button>
+            </div>
+            <div style={{ whiteSpace: "pre-wrap" }}>{error}</div>
           </div>
         )}
       </div>
