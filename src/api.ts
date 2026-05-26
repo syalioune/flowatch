@@ -623,13 +623,48 @@ const removeUserFromGroup = (userId: string, groupId: string) =>
 
 // Tenants are not exposed as a dedicated endpoint in flowable-rest 7.2.
 // Derive distinct tenantIds from deployments (truthy values only).
+//
+// 60-second TTL cache on the derivation. The Topbar pill, route loaders,
+// and badge probes all call api.listTenants(); without the cache, every
+// chrome render hammers /repository/deployments. The TTL is short enough
+// that newly-deployed tenantIds appear within a minute; long enough that
+// the chrome doesn't re-derive on every cycleTenant() click.
+//
+// The /repository/deployments?size=200 page caps the derivation at 200
+// deployments per page. Engines with >200 deployments (multiple tenants
+// × many definitions) may produce truncated tenant lists. Future
+// enhancement (post-MVP): page through /repository/deployments with
+// multiple ?start= requests to enumerate all tenants.
+let _tenantsCache: { value: { data: FlowableTenant[] }; at: number } | null = null;
+const TENANTS_CACHE_TTL_MS = 60_000;
+const TENANTS_PAGE_SIZE = 200;
+
 const listTenants = async (): Promise<{ data: FlowableTenant[] }> => {
-  const res = await listDeployments({ size: 1000 });
+  const now = Date.now();
+  if (_tenantsCache && now - _tenantsCache.at < TENANTS_CACHE_TTL_MS) {
+    return _tenantsCache.value;
+  }
+  const res = await listDeployments({ size: TENANTS_PAGE_SIZE });
+  if (res?.data && res.data.length === TENANTS_PAGE_SIZE) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[flowatch] api.listTenants: /repository/deployments returned ${TENANTS_PAGE_SIZE} rows (page cap reached); tenant list may be truncated for very large engines.`,
+    );
+  }
   const ids = new Set<string>();
   (res?.data || []).forEach((d) => {
     if (d.tenantId) ids.add(d.tenantId);
   });
-  return { data: [...ids].map((id) => ({ id, name: id })) };
+  const value = { data: [...ids].map((id) => ({ id, name: id })) };
+  _tenantsCache = { value, at: now };
+  return value;
+};
+
+// Test-only export — call this in tests to reset the module-scoped cache
+// between cases. Also used in production once: by api.setConfig() when the
+// engine endpoint changes (per Story 14.4 AC-9).
+export const __clearTenantsCache = (): void => {
+  _tenantsCache = null;
 };
 
 // ── DMN (mounted under /flowable-rest/dmn-api, not /service) ─────────────
@@ -770,6 +805,9 @@ export const api = {
     cfg = { ...cfg, ...next };
     saveCfg(cfg);
     if (connectionChanged) {
+      // Story 14.4 AC-9: an engine switch invalidates the cached tenants —
+      // the new engine's /repository/deployments has its own tenantIds.
+      __clearTenantsCache();
       window.dispatchEvent(new CustomEvent("conn:config-changed"));
     }
   },
