@@ -1104,8 +1104,10 @@ a {
   min-height: 24px;
 }
 .mod-toolbar .modeler-dropdown {
-  padding: 0 var(--pad, 14px);
+  padding: 0 10px;
   line-height: calc(var(--row-h, 44px) - 16px);
+  max-width: 240px;
+  font-size: 12.5px;
 }
 /* Story 16.2 AC-4: native <option> rendering doesn't honor most CSS — line-
    height is the only reliable lever; if the open-dropdown rendering is
@@ -1125,6 +1127,29 @@ a {
 .mod-toolbar .file-name b {
   color: var(--fg);
   font-weight: 500;
+}
+/* PR #168 follow-up: the toolbar filename is editable. Render as a thin
+   underlined input — clearly a control without dominating the toolbar. */
+.mod-toolbar .mod-filename {
+  width: 200px;
+  padding: 4px 6px;
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  outline: none;
+}
+.mod-toolbar .mod-filename:hover {
+  border-bottom-color: var(--fg-mute);
+}
+.mod-toolbar .mod-filename:focus {
+  border-color: var(--accent);
+  background: var(--bg);
 }
 .mod-toolbar .sep {
   width: 1px;

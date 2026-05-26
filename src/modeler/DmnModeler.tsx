@@ -469,7 +469,8 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
       }
     } catch (e) {
       const msg = (e as Error)?.message || String(e);
-      setError(`Deploy failed: ${msg}`);
+      // PR #168 follow-up: rely on the toast; don't overlay the canvas so
+      // the operator can keep editing the draft after an engine error.
       toast({ kind: "error", text: `DMN deploy failed: ${msg}` });
     }
   };
@@ -493,25 +494,18 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
         <div className="file-name">
           <Icon name="dmn" size={14} />
           <input
-            className="input mono"
+            className="mod-filename"
             data-testid="dmn-filename"
             value={filename}
             onChange={(e) => setFilename(e.target.value)}
             spellCheck={false}
             aria-label="DMN filename"
-            style={{ fontWeight: 600, maxWidth: 240, fontSize: 13, padding: "2px 6px" }}
           />
-          {activeDecision && (
-            <span style={{ color: "var(--fg-mute)" }}>
-              · {activeDecision.key} v{activeDecision.version}
-              {activeDecision.tenantId ? ` · tenant: ${activeDecision.tenantId}` : ""}
-            </span>
+          {activeDecision?.tenantId && (
+            <span style={{ color: "var(--fg-mute)" }}>· tenant: {activeDecision.tenantId}</span>
           )}
           {!decisionsAvailable && (
             <span style={{ color: "var(--warn)", fontSize: 11 }}>· DMN engine unavailable</span>
-          )}
-          {decisionsAvailable && !activeDecision && decisions.length > 0 && (
-            <span style={{ color: "var(--fg-mute)" }}>· {decisions.length} deployed</span>
           )}
           {creatingNew && (
             <span data-testid="dmn-draft-badge" style={{ color: "var(--warn)" }}>
@@ -534,7 +528,9 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
               : "Load deployed decision"
           }
         >
-          <option value="">— template (loan-eligibility) —</option>
+          <option value="">
+            {creatingNew ? "— new draft —" : "— template (loan-eligibility) —"}
+          </option>
           {decisions.map((d) => (
             <option key={d.id} value={d.id}>
               {d.key} v{d.version}
@@ -616,6 +612,9 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
         <div ref={containerRef} className="dmn-host" style={{ width: "100%", height: "100%" }} />
         {error && (
           <div
+            role="alert"
+            data-testid="dmn-error-overlay"
+            className="mono"
             style={{
               position: "absolute",
               inset: 20,
@@ -624,10 +623,27 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
               padding: 16,
               borderRadius: 8,
               color: "var(--bad)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
             }}
-            className="mono"
           >
-            {error}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <strong>Error</strong>
+              <button
+                type="button"
+                className="btn"
+                data-size="sm"
+                data-variant="ghost"
+                data-testid="dmn-error-dismiss"
+                onClick={() => setError(null)}
+                aria-label="Dismiss error"
+              >
+                <Icon name="x" size={13} />
+                Dismiss
+              </button>
+            </div>
+            <div style={{ whiteSpace: "pre-wrap" }}>{error}</div>
           </div>
         )}
       </div>
