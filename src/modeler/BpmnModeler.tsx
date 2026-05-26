@@ -22,10 +22,6 @@ import { api, type FlowableProcessDefinition } from "../api";
 import { Icon, toast } from "../components";
 import { BLANK_BPMN_XML, LOAN_BPMN_XML } from "./starters";
 
-const openInspector = () => {
-  window.dispatchEvent(new CustomEvent<void>("app:open-inspector"));
-};
-
 // @migration-any: bpmn-js DI container, event-bus payloads, and BO shapes
 // are dynamic. Per ADR-001 consequences, this file is the allowed `any`
 // zone — every cast below is documented at use site.
@@ -100,6 +96,11 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
   const [selected, setSelected] = React.useState<AnyEl | null>(null);
   const [elements, setElements] = React.useState<AnyEl[]>([]);
   const [dirty, setDirty] = React.useState(false);
+  // Story 16.3 follow-up: tracks the "New from scratch" authoring flow.
+  // True between `handleNew()` and the next discard / save / deploy / load —
+  // pins the operator to the in-progress draft so they don't accidentally
+  // switch deployed definitions and lose the draft.
+  const [creatingNew, setCreatingNew] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [version, setVersion] = React.useState(0);
   const [definitions, setDefinitions] = React.useState<FlowableProcessDefinition[]>([]);
@@ -129,6 +130,27 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
     // cycle, so we intentionally omit it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialDefinitionId, definitions]);
+
+  // Hoisted to component scope (PR #168 follow-up) so importAndFit can
+  // trigger an outline refresh — `importXML` does NOT reliably fire
+  // `commandStack.changed`, so without this call the outline shows the
+  // previous diagram's elements after a fresh load / New from scratch.
+  const refreshOutline = React.useCallback(() => {
+    const m = modelerRef.current;
+    if (!m) return;
+    try {
+      const reg = m.get("elementRegistry");
+      const all = reg.filter(
+        (el: AnyEl) =>
+          el.businessObject &&
+          el.type !== "label" &&
+          el.type !== "bpmn:Process" &&
+          el.type !== "bpmn:Collaboration" &&
+          el.parent,
+      );
+      setElements(all);
+    } catch {}
+  }, []);
 
   React.useEffect(() => {
     let m: AnyModeler;
@@ -182,44 +204,36 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
     bus.on("selection.changed", onSel);
     bus.on("commandStack.changed", onChange);
 
-    function refreshOutline() {
-      try {
-        const reg = m.get("elementRegistry");
-        const all = reg.filter(
-          (el: AnyEl) =>
-            el.businessObject &&
-            el.type !== "label" &&
-            el.type !== "bpmn:Process" &&
-            el.type !== "bpmn:Collaboration" &&
-            el.parent,
-        );
-        setElements(all);
-      } catch {}
-    }
-
     return () => {
       try {
         m.destroy();
       } catch {}
       modelerRef.current = null;
     };
-  }, []);
+  }, [refreshOutline]);
 
   // Story 16.2 AC-3: every import is followed by zoom-to-fit + dirty reset.
   // Centralizing this means we cannot drift across the multiple import sites
   // (mount, dropdown pick, "New from scratch" in Story 16.3).
-  const importAndFit = React.useCallback(async (xml: string) => {
-    const m = modelerRef.current;
-    if (!m) return;
-    await m.importXML(xml);
-    try {
-      m.get("canvas").zoom("fit-viewport", "auto");
-    } catch {}
-    // commandStack is a fresh slate after a successful import — the
-    // commandStack.changed listener will see canUndo() === false and reset
-    // dirty, but we reset explicitly here as a belt-and-braces.
-    setDirty(false);
-  }, []);
+  const importAndFit = React.useCallback(
+    async (xml: string) => {
+      const m = modelerRef.current;
+      if (!m) return;
+      await m.importXML(xml);
+      try {
+        m.get("canvas").zoom("fit-viewport", "auto");
+      } catch {}
+      // commandStack is a fresh slate after a successful import — the
+      // commandStack.changed listener will see canUndo() === false and reset
+      // dirty, but we reset explicitly here as a belt-and-braces.
+      setDirty(false);
+      // bpmn-js doesn't reliably fire `commandStack.changed` on a fresh
+      // import, so the outline-tree listener in useEffect can hold stale
+      // elements from the previous diagram. Refresh explicitly here.
+      refreshOutline();
+    },
+    [refreshOutline],
+  );
 
   const loadDefinition = async (id: string) => {
     if (!id) {
@@ -230,6 +244,9 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
         setError(String((e as Error)?.message || e));
       }
       setFilename("new-process.bpmn20.xml");
+      // Loading a deployed definition (or the empty placeholder) ends any
+      // in-progress "New from scratch" draft.
+      setCreatingNew(false);
       return;
     }
     const def = definitions.find((d) => d.id === id);
@@ -242,6 +259,7 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
     } catch (e) {
       setError(String((e as Error)?.message || e));
     }
+    setCreatingNew(false);
   };
 
   // Story 16.2 AC-5 / AC-6: dropdown pick = load + URL update + confirm on
@@ -327,17 +345,30 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
           return r.data || [];
         })
         .catch(() => [] as FlowableProcessDefinition[]);
-      // Discover the new definition (single-file deploy → latest definition
-      // for this deploymentId). The lookup is independent of the dropdown
-      // refresh so the toast doesn't wait for the longer 200-row scan.
-      const newDef = await api
-        .listProcessDefinitions({ deploymentId: deployment.id, latest: true, size: 1 })
-        .then((r) => r.data?.[0] || null)
-        .catch(() => null);
+      // Discover the new definition. Single-file deploy → exactly one
+      // definition per deploymentId, so we filter by deploymentId alone and
+      // pick the first hit. (Earlier we ANDed `latest=true` here; combining
+      // `latest=true` with `deploymentId` in flowable-rest 7.2 occasionally
+      // returned an empty page even after a successful deploy, which broke
+      // the e2e "Open the deployed definition" assertion — RC entry pending.)
+      // A short retry loop absorbs the engine's read-after-write lag.
+      let newDef: FlowableProcessDefinition | null = null;
+      for (let attempt = 0; attempt < 4 && !newDef; attempt++) {
+        if (attempt > 0) await new Promise((r) => setTimeout(r, 250));
+        try {
+          const list = await api.listProcessDefinitions({
+            deploymentId: deployment.id,
+            size: 10,
+          });
+          newDef = list.data?.[0] || null;
+        } catch {}
+      }
       // Wait for the dropdown refresh to land BEFORE the operator clicks
       // Open — that way activeDef can immediately resolve via the local
       // definitions list when the URL-driven autoload fires.
       await refresh;
+      // Successful deploy ends any in-progress "New from scratch" draft.
+      setCreatingNew(false);
       if (newDef) {
         toast({
           kind: "success",
@@ -371,7 +402,7 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
   // Story 16.3 AC-1: "New from scratch" — confirm-on-dirty, load BLANK,
   // clear ?definitionId= so the URL no longer points at any deployed def.
   const handleNew = async () => {
-    if (dirty) {
+    if (dirty || creatingNew) {
       const ok = window.confirm("You have unsaved changes. Discard and start a new BPMN?");
       if (!ok) return;
     }
@@ -386,6 +417,39 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
     // Clear any deep-link search param — the operator is now editing a
     // not-yet-deployed BPMN.
     navigate({ to: "/bpmn", search: {}, replace: true });
+    setCreatingNew(true);
+  };
+
+  // PR #168 follow-up: "Abort" / Discard — visible only while the operator
+  // is in the middle of an authoring flow (creatingNew OR dirty). Pins the
+  // dropdown's previously-selected definition (or BLANK if none) so the
+  // operator can back out of an in-progress draft.
+  const handleAbort = async () => {
+    if (!creatingNew && !dirty) return;
+    const ok = window.confirm(
+      creatingNew
+        ? "Discard the new BPMN draft? This cannot be undone."
+        : "Discard unsaved edits and reload the active definition?",
+    );
+    if (!ok) return;
+    setCreatingNew(false);
+    if (activeDef) {
+      // Re-fetch the deployed XML so the canvas matches engine state.
+      try {
+        const xml = await api.getProcessDefinitionResource(activeDef.id);
+        await importAndFit(xml);
+        setError(null);
+      } catch (e) {
+        setError(String((e as Error)?.message || e));
+      }
+    } else {
+      try {
+        await importAndFit(BLANK_BPMN_XML);
+        setError(null);
+      } catch (e) {
+        setError(String((e as Error)?.message || e));
+      }
+    }
   };
 
   const zoom = (dir: number | "fit") => {
@@ -404,11 +468,24 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
       <div className="mod-toolbar">
         <div className="file-name">
           <Icon name="bpmn" size={14} />
-          <b>{filename}</b>
+          <input
+            className="input mono"
+            data-testid="bpmn-filename"
+            value={filename}
+            onChange={(e) => setFilename(e.target.value)}
+            spellCheck={false}
+            aria-label="BPMN filename"
+            style={{ fontWeight: 600, maxWidth: 260, fontSize: 13, padding: "2px 6px" }}
+          />
           {activeDef && (
             <span style={{ color: "var(--fg-mute)" }}>
               · {activeDef.key} v{activeDef.version}
               {activeDef.tenantId ? ` · tenant: ${activeDef.tenantId}` : ""}
+            </span>
+          )}
+          {creatingNew && (
+            <span data-testid="bpmn-draft-badge" style={{ color: "var(--warn)" }}>
+              · new draft
             </span>
           )}
           {dirty && <span style={{ color: "var(--warn)" }}>· unsaved</span>}
@@ -420,7 +497,12 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
           data-size="sm"
           value={activeDef?.id || ""}
           onChange={(e) => handleDropdownChange(e.target.value, activeDef?.id || "")}
-          title="Load deployed definition"
+          disabled={creatingNew}
+          title={
+            creatingNew
+              ? "Save, deploy, or discard the new draft to switch definitions"
+              : "Load deployed definition"
+          }
         >
           <option value="">— template (loan-approval) —</option>
           {definitions.map((d) => (
@@ -466,16 +548,21 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
           <Icon name="download" size={13} />
           Export SVG
         </button>
-        <button
-          type="button"
-          className="btn"
-          data-size="sm"
-          data-variant="ghost"
-          onClick={openInspector}
-        >
-          <Icon name="api" size={13} />
-          REST
-        </button>
+        {(creatingNew || dirty) && (
+          <button
+            type="button"
+            className="btn"
+            data-size="sm"
+            data-variant="ghost"
+            data-tone="bad"
+            data-testid="bpmn-abort"
+            onClick={handleAbort}
+            title={creatingNew ? "Discard the new BPMN draft" : "Discard unsaved edits and reload"}
+          >
+            <Icon name="x" size={13} />
+            {creatingNew ? "Abort" : "Discard"}
+          </button>
+        )}
         <div className="spacer" />
         <div className="seg-row" style={{ margin: 0 }}>
           <button type="button" className="seg-btn" onClick={() => zoom(-1)} title="Zoom out">
@@ -573,6 +660,29 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
           )}
           {sel && (
             <>
+              <div
+                data-testid="bpmn-properties-pending-banner"
+                style={{
+                  margin: "0 0 12px",
+                  padding: "10px 12px",
+                  background: "var(--bg-sunken)",
+                  border: "1px solid var(--warn)",
+                  borderRadius: 6,
+                  color: "var(--fg-soft)",
+                  fontSize: 12,
+                  lineHeight: 1.45,
+                }}
+              >
+                <strong style={{ color: "var(--warn)" }}>
+                  Flowable-specific properties pending
+                </strong>
+                <br />
+                Name &amp; XML id below persist via bpmn-js. Flowable extension attributes (Service
+                Task class / async, User Task assignee &amp; form key, Business Rule decisionRef, …)
+                render here but
+                <em> edits don't yet round-trip to the BPMN XML</em> — full support lands in Epic 30
+                (Flowable properties panel).
+              </div>
               <div className="form-row">
                 <label>
                   Name <span className="mono">bpmn:name</span>

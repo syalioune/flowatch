@@ -42,10 +42,6 @@ import { api, type FlowableDecision, type FlowableDecisionResult } from "../api"
 import { Icon, toast } from "../components";
 import { LOAN_DMN_XML } from "./starters";
 
-const openInspector = () => {
-  window.dispatchEvent(new CustomEvent<void>("app:open-inspector"));
-};
-
 // @migration-any: dmn-js DI container, event-bus payloads, and view shapes
 // are dynamic. Per ADR-001 consequences, this file is the allowed `any`
 // zone — every cast below is documented at use site.
@@ -145,6 +141,10 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
   const [decisionsAvailable, setDecisionsAvailable] = React.useState(true);
   const [activeDecision, setActiveDecision] = React.useState<FlowableDecision | null>(null);
   const [filename, setFilename] = React.useState("loan-eligibility.dmn");
+  // PR #168 follow-up: tracks the "New from scratch" authoring flow.
+  // True between handleNew() and the next discard / save / deploy / load —
+  // pins the dropdown so the operator can't switch decisions mid-draft.
+  const [creatingNew, setCreatingNew] = React.useState(false);
 
   // Story 16.4 AC-4: load the deployed-decisions list for the dropdown.
   React.useEffect(() => {
@@ -275,6 +275,7 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
           setError(String((e as Error)?.message || e));
         }
         setFilename("loan-eligibility.dmn");
+        setCreatingNew(false);
         return;
       }
       const decision = decisions.find((d) => d.id === id);
@@ -295,6 +296,7 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
       } catch (e) {
         setError(String((e as Error)?.message || e));
       }
+      setCreatingNew(false);
     },
     [decisions, importAndFit, resolveResourceId],
   );
@@ -331,7 +333,7 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
   // Per the spec, LOAN_DMN_XML is the starter (no BLANK_DMN_XML yet — Epic
   // 17 polish candidate).
   const handleNew = async () => {
-    if (dirty) {
+    if (dirty || creatingNew) {
       const ok = window.confirm("You have unsaved changes. Discard and start a new DMN?");
       if (!ok) return;
     }
@@ -344,6 +346,41 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
       setError(String((e as Error)?.message || e));
     }
     navigate({ to: "/dmn", search: {}, replace: true });
+    setCreatingNew(true);
+  };
+
+  // PR #168 follow-up: Abort the in-progress draft (or unsaved edits) by
+  // re-importing the active decision's clean XML, falling back to LOAN_DMN_XML
+  // when no decision is active.
+  const handleAbort = async () => {
+    if (!creatingNew && !dirty) return;
+    const ok = window.confirm(
+      creatingNew
+        ? "Discard the new DMN draft? This cannot be undone."
+        : "Discard unsaved edits and reload the active decision?",
+    );
+    if (!ok) return;
+    setCreatingNew(false);
+    if (activeDecision) {
+      try {
+        const resourceId = await resolveResourceId(activeDecision);
+        if (!resourceId) {
+          throw new Error(`No .dmn resource found in deployment ${activeDecision.deploymentId}`);
+        }
+        const xml = await api.getDmnResource(activeDecision.deploymentId, resourceId);
+        await importAndFit(xml);
+        setError(null);
+      } catch (e) {
+        setError(String((e as Error)?.message || e));
+      }
+    } else {
+      try {
+        await importAndFit(LOAN_DMN_XML);
+        setError(null);
+      } catch (e) {
+        setError(String((e as Error)?.message || e));
+      }
+    }
   };
 
   const switchView = (which: "drd" | "table") => {
@@ -393,13 +430,22 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
           return r.data || [];
         })
         .catch(() => [] as FlowableDecision[]);
-      // Discover the new decision (single-file deploy → latest decision
-      // for this deploymentId).
-      const newDecision = await api
-        .listDecisions({ deploymentId: deployment.id, latest: true, size: 1 })
-        .then((r) => r.data?.[0] || null)
-        .catch(() => null);
+      // Discover the new decision. Single-file deploy → exactly one decision
+      // per deploymentId; combining `latest=true` with `deploymentId` in
+      // flowable-rest 7.2 dmn-api intermittently returned an empty page even
+      // after a successful deploy (mirror of the BPMN issue documented in
+      // BpmnModeler.tsx's deploy()). A short retry absorbs read-after-write
+      // lag on the engine side.
+      let newDecision: FlowableDecision | null = null;
+      for (let attempt = 0; attempt < 4 && !newDecision; attempt++) {
+        if (attempt > 0) await new Promise((r) => setTimeout(r, 250));
+        try {
+          const list = await api.listDecisions({ deploymentId: deployment.id, size: 10 });
+          newDecision = list.data?.[0] || null;
+        } catch {}
+      }
       await refresh;
+      setCreatingNew(false);
       if (newDecision) {
         toast({
           kind: "success",
@@ -446,7 +492,15 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
       <div className="mod-toolbar">
         <div className="file-name">
           <Icon name="dmn" size={14} />
-          <b>{filename}</b>
+          <input
+            className="input mono"
+            data-testid="dmn-filename"
+            value={filename}
+            onChange={(e) => setFilename(e.target.value)}
+            spellCheck={false}
+            aria-label="DMN filename"
+            style={{ fontWeight: 600, maxWidth: 240, fontSize: 13, padding: "2px 6px" }}
+          />
           {activeDecision && (
             <span style={{ color: "var(--fg-mute)" }}>
               · {activeDecision.key} v{activeDecision.version}
@@ -459,6 +513,11 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
           {decisionsAvailable && !activeDecision && decisions.length > 0 && (
             <span style={{ color: "var(--fg-mute)" }}>· {decisions.length} deployed</span>
           )}
+          {creatingNew && (
+            <span data-testid="dmn-draft-badge" style={{ color: "var(--warn)" }}>
+              · new draft
+            </span>
+          )}
           {dirty && <span style={{ color: "var(--warn)" }}>· unsaved</span>}
         </div>
         <div className="sep" />
@@ -468,7 +527,12 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
           data-size="sm"
           value={activeDecision?.id || ""}
           onChange={(e) => handleDropdownChange(e.target.value)}
-          title="Load deployed decision"
+          disabled={creatingNew}
+          title={
+            creatingNew
+              ? "Save, deploy, or discard the new draft to switch decisions"
+              : "Load deployed decision"
+          }
         >
           <option value="">— template (loan-eligibility) —</option>
           {decisions.map((d) => (
@@ -530,16 +594,21 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
           <Icon name="download" size={13} />
           Export
         </button>
-        <button
-          type="button"
-          className="btn"
-          data-size="sm"
-          data-variant="ghost"
-          onClick={openInspector}
-        >
-          <Icon name="api" size={13} />
-          REST
-        </button>
+        {(creatingNew || dirty) && (
+          <button
+            type="button"
+            className="btn"
+            data-size="sm"
+            data-variant="ghost"
+            data-tone="bad"
+            data-testid="dmn-abort"
+            onClick={handleAbort}
+            title={creatingNew ? "Discard the new DMN draft" : "Discard unsaved edits and reload"}
+          >
+            <Icon name="x" size={13} />
+            {creatingNew ? "Abort" : "Discard"}
+          </button>
+        )}
         <div className="spacer" />
       </div>
 
