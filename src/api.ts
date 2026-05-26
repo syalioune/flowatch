@@ -652,6 +652,14 @@ const listDmnDeploymentResources = (deploymentId: string): Promise<FlowableResou
 interface UploadOpts {
   base?: string;
   deploymentName?: string;
+  /**
+   * Path under `base` to POST the multipart deployment to. Defaults to
+   * `/repository/deployments` (BPMN sub-app). The DMN sub-app uses
+   * `/dmn-repository/deployments` — `deployDmn` passes that explicitly.
+   * Without this override, DMN deploys hit `/dmn-api/repository/deployments`
+   * which returns "No endpoint POST …" from flowable-rest 7.2.
+   */
+  path?: string;
 }
 const uploadDeployment = async (
   filename: string,
@@ -660,12 +668,13 @@ const uploadDeployment = async (
   opts: UploadOpts = {},
 ): Promise<FlowableDeployment> => {
   const root = (opts.base || cfg.baseUrl).replace(/\/$/, "");
-  const url = root + "/repository/deployments";
+  const path = opts.path || "/repository/deployments";
+  const url = root + path;
   const t0 = performance.now();
   const entry: ApiLogEntry = {
     id: Math.random().toString(36).slice(2, 9),
     method: "POST",
-    path: "/repository/deployments",
+    path,
     url,
     status: 0,
     ms: 0,
@@ -714,7 +723,11 @@ const uploadDeployment = async (
 const deployBpmn = (name: string, xml: string) =>
   uploadDeployment(name, xml, "application/xml", { deploymentName: name });
 const deployDmn = (name: string, xml: string) =>
-  uploadDeployment(name, xml, "application/xml", { deploymentName: name, base: dmnBase() });
+  uploadDeployment(name, xml, "application/xml", {
+    deploymentName: name,
+    base: dmnBase(),
+    path: "/dmn-repository/deployments",
+  });
 
 const ping = () => request<FlowableEngineInfo>("GET", "/management/engine");
 

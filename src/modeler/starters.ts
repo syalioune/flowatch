@@ -52,7 +52,7 @@ export const LOAN_BPMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
       <bpmn:outgoing>Flow_2</bpmn:outgoing>
     </bpmn:serviceTask>
     <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_1" targetRef="Task_Credit" />
-    <bpmn:businessRuleTask id="Task_Eligibility" name="Loan eligibility (DMN)" flowable:decisionRef="loanEligibility">
+    <bpmn:businessRuleTask id="Task_Eligibility" name="Loan eligibility (DMN)" flowable:type="dmn" flowable:decisionRef="loanEligibility">
       <bpmn:incoming>Flow_2</bpmn:incoming>
       <bpmn:outgoing>Flow_3</bpmn:outgoing>
     </bpmn:businessRuleTask>
