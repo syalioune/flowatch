@@ -331,6 +331,61 @@ The runtime DTO's `activityId` field is still useful as a *hint* (single lead ac
 
 ---
 
+## RC-13 — DMN rule cells are JUEL, not FEEL
+
+**Naive intuition:** Flowable's DMN engine speaks the DMN spec's S-FEEL — the language the dmn-js modeler renders rules in, the language ranges like `[18..65]` belong to, the language Camunda's DMN engine evaluates.
+
+**Actual behaviour:** Flowable evaluates `<inputExpression>`, `<inputEntry>`, and `<outputEntry>` text as **JUEL** (JSR-245 Jakarta EE Unified EL). DMN S-FEEL is NOT supported. The engine wraps each input cell internally as `#{<input-var> == <cell-text>}` and JUEL-parses; FEEL constructs that are not valid JUEL syntax fail with a `javax.el` parser error mid-evaluation. The audit trail (`/dmn-history/historic-decision-executions/{id}/auditdata`) shows the symptom clearly:
+
+```json
+"ruleExecutions": {
+  "2": {
+    "valid": false,
+    "conditionResults": [{ "id": "ru2i1",
+      "exception": "Error parsing '#{score == [50..80)}': syntax error at position 11, encountered '[', ..." }]
+  }
+},
+"failed": true,
+"decisionResult": []
+```
+
+Note that **rule 1 may have its condition match (`>= 80` is valid JUEL unary syntax)** yet the OVERALL execution still aborts on the broken rule 2 → `decisionResult: []` is empty. This is silent on the wire: HTTP 200, just an empty result array. A `dmn-rule/execute` POST that returns `{"resultVariables":[]}` against an input that obviously matches a rule is the signature.
+
+Affected constructs (from the migration guide):
+- Ranges: `[18..65]`, `(0..100]`, etc.
+- Comma-list alternatives: `"employed","self-employed"`
+- The `not(...)` operator
+- The `-` "any" cell (use empty cells instead)
+- All FEEL temporal literals (`date(...)`, `duration(...)`)
+- FEEL quantifiers (`some x in L satisfies ...`)
+- 1-indexed string built-ins (`substring`, `string length`)
+
+Unary tests (`< 100`, `>= 0`, `"gold"`) and bare quoted strings / numbers DO work in Flowable's JUEL parser.
+
+**Workaround:** rewrite per the [FEEL → JUEL migration guide](dmn-feel-to-juel-migration.md). Wrap every `${...}` expression in `<![CDATA[...]]>` to avoid XML escaping pitfalls. The `dmnReadableNameFromFilename` / `extractDefinitionsIdAndName` / `rewriteDefinitionsIdAndName` helpers in [src/modeler/DmnModeler.tsx](../src/modeler/DmnModeler.tsx) handle the `<definitions>` rewrite at deploy time; rule-cell rewriting is currently manual (the dmn-js modeler authors FEEL syntax by default — operators editing in the UI must hand-translate ranges/list-alternatives to JUEL or pre-translate the XML before deploy).
+
+```xml
+<!-- before (FEEL) -->
+<rule id="rr2">
+  <inputEntry id="rr2i1"><text>[700..800)</text></inputEntry>
+  <inputEntry id="rr2i2"><text>&gt;= 60000</text></inputEntry>     <!-- unary, keep -->
+  <outputEntry id="rr2o1"><text>"B"</text></outputEntry>
+</rule>
+
+<!-- after (JUEL) -->
+<rule id="rr2">
+  <inputEntry id="rr2i1"><text><![CDATA[${creditScore >= 700 && creditScore < 800}]]></text></inputEntry>
+  <inputEntry id="rr2i2"><text>&gt;= 60000</text></inputEntry>
+  <outputEntry id="rr2o1"><text>"B"</text></outputEntry>
+</rule>
+```
+
+When the source is a TypeScript template literal (e.g. [src/modeler/starters.ts](../src/modeler/starters.ts)'s `LOAN_DMN_XML`), escape the `$` as `\${...}` so the JUEL marker survives JS interpolation.
+
+**Surfaced by:** 2026-05-27 review — the operator flagged that the loan-eligibility starter and the sample.dmn e2e fixture were authored in FEEL syntax. Live audit-trail probe confirmed silent execution failures; rewrite landed in the same session.
+
+---
+
 ## How to extend this file
 
 When a review surfaces a runtime quirk that meets all three of:

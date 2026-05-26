@@ -87,7 +87,11 @@ test.describe("/deployments canonical list (Story 9.1)", () => {
 
   test("clicking the row navigates to the deployment detail page", async ({ page }) => {
     await page.goto("/deployments");
-    const firstRow = page.locator("tr[data-deployment-id]").first();
+    // The merged BPMN+DMN list lists both kinds. Both are clickable now —
+    // navigation threads the kind into ?kind=bpmn|dmn so the detail loader
+    // hits the right sub-app. Scope to BPMN here so the seed fixture
+    // (test-upload.bpmn) is the row under test.
+    const firstRow = page.locator("tr[data-deployment-id][data-kind='bpmn']").first();
     await expect(firstRow).toBeVisible({ timeout: 15_000 });
     const deploymentId = await firstRow.getAttribute("data-deployment-id");
     if (!deploymentId) throw new Error("data-deployment-id missing on the first row");
@@ -95,9 +99,12 @@ test.describe("/deployments canonical list (Story 9.1)", () => {
     // Click somewhere on the row that isn't the ⋮ trigger (the Name cell).
     await firstRow.locator("td").first().click();
 
-    // URL transitions to the detail page and the Resources panel renders.
+    // URL transitions to the detail page (with kind=bpmn) and the Resources
+    // panel renders.
     await expect(page).toHaveURL(
-      new RegExp(`/deployments/${deploymentId.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}$`),
+      new RegExp(
+        `/deployments/${deploymentId.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}\\?kind=bpmn`,
+      ),
     );
     await expect(page.locator('[data-testid="deployment-resources-table"]')).toBeVisible({
       timeout: 15_000,

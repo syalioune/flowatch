@@ -399,28 +399,10 @@ describe("api.* wrappers smoke (P-001 — every call goes through request())", (
     expect(out.data.map((t) => t.id).sort()).toEqual(["alpha", "beta"]);
   });
 
-  it("DMN: listDecisions / listDmnDeployments / executeDecision / getDmnResource", async () => {
+  it("DMN: listDecisions / listDmnDeployments / executeDecision", async () => {
     await api.listDecisions();
     await api.listDmnDeployments();
     await api.executeDecision({ decisionKey: "k", inputVariables: [] });
-    fetchMock.mockResolvedValueOnce(
-      mockResponse({ status: 200, body: "<dmn/>", contentType: "application/xml" }),
-    );
-    await api.getDmnResource("dep-1", "res-1");
-  });
-
-  it("DMN: listDmnDeploymentResources hits /dmn-repository/deployments/{id}/resources", async () => {
-    fetchMock.mockReset();
-    fetchMock.mockResolvedValueOnce(
-      mockResponse({
-        status: 200,
-        json: [{ id: "loan-eligibility.dmn", url: "x", contentUrl: "y", type: "resource" }],
-      }),
-    );
-    const out = await api.listDmnDeploymentResources("dep-42");
-    expect(out[0]?.id).toBe("loan-eligibility.dmn");
-    const url = String(fetchMock.mock.calls[0]?.[0]);
-    expect(url).toMatch(/\/dmn-api\/dmn-repository\/deployments\/dep-42\/resources$/);
   });
 
   it("deployBpmn / deployDmn upload via multipart and log the call", async () => {
@@ -428,9 +410,18 @@ describe("api.* wrappers smoke (P-001 — every call goes through request())", (
     await api.deployBpmn("loan.bpmn20.xml", "<bpmn/>");
     expect(API_LOG.length).toBe(before + 1);
     expect(API_LOG[0]?.method).toBe("POST");
+    expect(API_LOG[0]?.path).toBe("/repository/deployments");
+    expect(API_LOG[0]?.url).toBe(`${DEFAULT_BASE}/repository/deployments`);
 
     await api.deployDmn("loan.dmn", "<dmn/>");
     expect(API_LOG[0]?.method).toBe("POST");
+    // DMN deploys land on /dmn-repository/deployments under /dmn-api, not
+    // /repository/deployments under /service. Regression guard: the engine
+    // returns 404 if the dmn-api sub-app is asked for /repository/deployments.
+    expect(API_LOG[0]?.path).toBe("/dmn-repository/deployments");
+    expect(API_LOG[0]?.url).toBe(
+      "http://localhost:8080/flowable-rest/dmn-api/dmn-repository/deployments",
+    );
   });
 
   it("deployBpmn surfaces 4xx engine bodies as FlowableError", async () => {

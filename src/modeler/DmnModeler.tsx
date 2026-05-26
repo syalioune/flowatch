@@ -7,16 +7,17 @@
  * it to a ref'd <div>, and bridges save/deploy actions to api.deployDmn
  * (multipart against dmnBase()).
  *
- * Mirrors `<BpmnModeler>` shape — load via api.getDmnResource, dropdown
- * via api.listDecisions, dirty-state via commandStack.changed, zoom-to-
- * fit via canvas.zoom("fit-viewport"), New via LOAN_DMN_XML, Deploy via
- * api.deployDmn + post-deploy "Open the deployed decision".
+ * Mirrors `<BpmnModeler>` shape — load via api.getDmnDecisionResource,
+ * dropdown via api.listDecisions, dirty-state via commandStack.changed,
+ * zoom-to-fit via canvas.zoom("fit-viewport"), New via BLANK_DMN_XML
+ * (clean slate), Deploy via api.deployDmn + post-deploy "Open the
+ * deployed decision". Initial mount loads LOAN_DMN_XML so operators see
+ * what DMN can do.
  *
- * The resourceId for a decision is resolved via
- * `api.listDmnDeploymentResources(deploymentId)`. Per the live engine,
- * each resource's `id` is the filename (e.g. "loan-eligibility.dmn").
- * We pick the first `.dmn` resource — Flowable's DMN deployments
- * conventionally carry a single `.dmn` per deployment.
+ * XML load is keyed by the decision-table id — Flowable exposes
+ * `/dmn-repository/decision-tables/{id}/resourcedata` which streams the
+ * raw XML for that decision. The older deployment-resources lookup path
+ * was a dead endpoint (returned 500 "No endpoint" on the DMN sub-app).
  *
  * Per-view dirty-state: dmn-js's commandStack is per-active-view (DRD /
  * decision-table / literal-expression). We poll the active view's
@@ -38,9 +39,11 @@ import { useNavigate } from "@tanstack/react-router";
 // @ts-expect-error — dmn-js/lib/Modeler has no type declarations
 import DmnModelerClass from "dmn-js/lib/Modeler";
 import React from "react";
-import { api, type FlowableDecision, type FlowableDecisionResult } from "../api";
+import { api, type FlowableDecision } from "../api";
 import { Icon, toast } from "../components";
-import { LOAN_DMN_XML } from "./starters";
+import { DeployDmnModal, type DeployDmnModalTarget } from "../lib/deploy-dmn-modal";
+import { ExecuteDecisionModal } from "../lib/execute-decision-modal";
+import { BLANK_DMN_XML, LOAN_DMN_XML } from "./starters";
 
 // @migration-any: dmn-js DI container, event-bus payloads, and view shapes
 // are dynamic. Per ADR-001 consequences, this file is the allowed `any`
@@ -49,11 +52,6 @@ import { LOAN_DMN_XML } from "./starters";
 type AnyModeler = any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyEl = any;
-
-type DmnDecisionResult = FlowableDecisionResult & {
-  resultVariables?: Record<string, unknown>;
-  ruleFired?: number[];
-};
 
 // ─── Typed event-bus payloads (Story 16.4 AC-2) ──────────────────────
 // dmn-js publishes the EventBus surface but not the payload shapes for
@@ -118,6 +116,122 @@ const zoomActiveViewToFit = (modeler: AnyModeler): void => {
   }
 };
 
+// Workaround for dmn-js's `.dmn-definitions-name` / `.dmn-definitions-id`
+// caret-reset bug. After every `element.updateProperties` (which fires on
+// each debounced edit during typing), `DefinitionPropertiesView.update()`
+// unconditionally writes `textContent` for both the name and id elements
+// — even when the value didn't change. Setting `textContent` on a focused
+// contenteditable node wipes its child text node and recreates it, which
+// resets the caret to position 0. We monkey-patch the view's `update()`
+// to compare-and-skip so a no-op write stays a true no-op.
+//
+// The patch is idempotent (guarded via `__flowatchGuarded`) and best-
+// effort: if the DRD viewer doesn't expose `definitionPropertiesView`,
+// the catch swallows and we leave the upstream behaviour alone.
+interface DefPropertiesViewLike {
+  __flowatchGuarded?: boolean;
+  update?: () => void;
+  nameElement?: Element;
+  idElement?: Element;
+  _canvas?: {
+    getRootElement?: () => { businessObject?: { name?: string; id?: string } };
+  };
+}
+const patchDmnDefinitionsCaretReset = (modeler: AnyModeler): void => {
+  try {
+    const activeViewer = modeler.getActiveViewer?.();
+    const defView = activeViewer?.get?.("definitionPropertiesView") as
+      | DefPropertiesViewLike
+      | undefined;
+    if (!defView || typeof defView.update !== "function" || defView.__flowatchGuarded) return;
+    defView.__flowatchGuarded = true;
+    defView.update = function () {
+      const businessObject = this._canvas?.getRootElement?.()?.businessObject ?? {};
+      if (this.nameElement && this.nameElement.textContent !== (businessObject.name ?? "")) {
+        this.nameElement.textContent = businessObject.name ?? "";
+      }
+      if (this.idElement && this.idElement.textContent !== (businessObject.id ?? "")) {
+        this.idElement.textContent = businessObject.id ?? "";
+      }
+    };
+  } catch {
+    // The DRD viewer may not yet be active (table view is current) — the
+    // next views.changed event will retry.
+  }
+};
+
+// Strip .dmn / .xml extension; replace non-id chars with `-`; trim
+// dashes. Used as the deploy-modal default when the XML has no usable
+// `<definitions id>` (e.g. BLANK template placeholder).
+const dmnIdFromFilename = (filename: string): string => {
+  const base = filename.replace(/\.dmn$/i, "").replace(/\.xml$/i, "");
+  const slug = base.replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug || "Definitions";
+};
+
+// Operator-feel readable name from a filename — strips extension,
+// replaces separators with spaces, title-cases. Used as the modal's
+// definition-name default when the XML only carries an id.
+const dmnReadableNameFromFilename = (filename: string): string => {
+  const base = filename.replace(/\.dmn$/i, "").replace(/\.xml$/i, "");
+  const words = base
+    .replace(/[_.-]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.length === 0) return "New decisions";
+  return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+};
+
+// XML attribute-value escaper for operator-typed strings going into
+// id / name attributes. Mirrors BpmnModeler's helper.
+const escapeXmlAttr = (s: string): string =>
+  s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+
+// Extract the outermost `<definitions id="…" name="…">` tuple from the
+// DMN XML. dmn-js's models use no namespace prefix on the `<definitions>`
+// element (DMN spec default namespace). Returns nulls when the attribute
+// is absent.
+const extractDefinitionsIdAndName = (xml: string): { id: string | null; name: string | null } => {
+  const m = xml.match(/<definitions\b[^>]*>/);
+  if (!m) return { id: null, name: null };
+  const tag = m[0];
+  const idMatch = tag.match(/\bid="([^"]+)"/);
+  const nameMatch = tag.match(/\bname="([^"]*)"/);
+  return { id: idMatch?.[1] ?? null, name: nameMatch?.[1] ?? null };
+};
+
+// Rewrite the OUTER `<definitions>` element's id + name to the operator-
+// chosen values. Only the FIRST `<definitions …>` tag is touched —
+// inner `<decision id>` references and `<dmndi:DMNShape dmnElementRef>`
+// references point at individual decisions, not at the definitions
+// element, so we don't need a global id sweep like BPMN does.
+const rewriteDefinitionsIdAndName = (xml: string, newId: string, newName: string): string => {
+  const safeName = escapeXmlAttr(newName);
+  let next = xml;
+  // Rewrite id (or inject if missing).
+  if (/<definitions\b[^>]*\bid="[^"]*"/.test(next)) {
+    next = next.replace(/<definitions\b([^>]*?)\bid="[^"]*"/, `<definitions$1 id="${newId}"`);
+  } else {
+    next = next.replace(/<definitions\b/, `<definitions id="${newId}"`);
+  }
+  // Rewrite name (or inject if missing).
+  if (/<definitions\b[^>]*\bname="[^"]*"/.test(next)) {
+    next = next.replace(
+      /<definitions\b([^>]*?)\bname="[^"]*"/,
+      `<definitions$1 name="${safeName}"`,
+    );
+  } else {
+    next = next.replace(/<definitions\b/, `<definitions name="${safeName}"`);
+  }
+  return next;
+};
+
 // ─── DMN modeler (real dmn-js) ─────────────────────────────────────
 export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
   const navigate = useNavigate();
@@ -126,17 +240,13 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
   const [view, setView] = React.useState<"drd" | "table">("table");
   const [error, setError] = React.useState<string | null>(null);
   const [dirty, setDirty] = React.useState(false);
-  const [testInputs, setTestInputs] = React.useState<{
-    creditScore: number;
-    income: number;
-    employmentStatus: string;
-  }>({
-    creditScore: 742,
-    income: 86000,
-    employmentStatus: "employed",
-  });
-  const [testResult, setTestResult] = React.useState<DmnDecisionResult | null>(null);
-  const [running, setRunning] = React.useState(false);
+  // The old fixed-input test-runner side panel was retired in favour of
+  // the canonical <ExecuteDecisionModal> (form generation from parsed XML
+  // inputs). The modal is opened from a top-bar action button after
+  // Export, and requires an `activeDecision` (= a DEPLOYED decision) —
+  // drafts can be executed only after a deploy.
+  const [executeOpen, setExecuteOpen] = React.useState(false);
+  const executeBtnRef = React.useRef<HTMLButtonElement>(null);
   const [decisions, setDecisions] = React.useState<FlowableDecision[]>([]);
   const [decisionsAvailable, setDecisionsAvailable] = React.useState(true);
   const [activeDecision, setActiveDecision] = React.useState<FlowableDecision | null>(null);
@@ -172,7 +282,12 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
         try {
           const views = m.getViews();
           const drdView = views.find((v: AnyEl) => v.type === "drd");
-          if (drdView) m.open(drdView);
+          if (drdView) {
+            m.open(drdView);
+            // DRD viewer is now active — patch its caret-reset bug while
+            // we're here (also retried on every views.changed below).
+            patchDmnDefinitionsCaretReset(m);
+          }
           setView("drd");
           pendingTimeout = setTimeout(() => {
             pendingTimeout = null;
@@ -196,8 +311,11 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
     // to the same dirty-state probe.
     const onViewsChanged = (_event: DmnViewsChangedEvent) => {
       // Re-poll dirty after a view switch — the active view's commandStack
-      // is what's now relevant.
+      // is what's now relevant. Also attempt the .dmn-definitions caret-
+      // reset patch here: the DRD viewer is only instantiated once it
+      // becomes active, so we patch lazily on every view switch.
       setDirty(probeActiveViewDirty(m));
+      patchDmnDefinitionsCaretReset(m);
     };
     const onCommandStackChanged = (_event: DmnCommandStackChangedEvent) => {
       setDirty(probeActiveViewDirty(m));
@@ -228,53 +346,71 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
     };
   }, []);
 
-  // Story 16.4 AC-3: every import is followed by zoom-to-fit + dirty reset.
-  // Shared helper so mount / dropdown-pick / new-from-scratch sites can't
-  // drift.
-  const importAndFit = React.useCallback(async (xml: string) => {
-    const m = modelerRef.current;
-    if (!m) return;
-    await m.importXML(xml);
-    // dmn-js auto-opens the first decision-table view; wait a tick for the
-    // active viewer to mount before fitting.
-    setTimeout(() => zoomActiveViewToFit(m), 50);
-    setDirty(false);
-  }, []);
-
-  // Story 16.4 AC-4: resolve `resourceId` (filename) for a decision via the
-  // deployment's resources list. Falls back to `{decisionKey}.dmn`-name
-  // matching; if no match, returns the first `.dmn` resource.
-  const resolveResourceId = React.useCallback(
-    async (decision: FlowableDecision): Promise<string | null> => {
+  // Every import is followed by an explicit view-open + zoom-to-fit + dirty
+  // reset. Shared helper so mount / dropdown-pick / new-from-scratch sites
+  // can't drift.
+  //
+  // The view-open step is load-bearing: after `m.importXML(newXml)`, dmn-js
+  // keeps the PREVIOUSLY-active view object referenced — clicking the
+  // dropdown loads new XML but the diagram canvas keeps rendering the old
+  // view's content. We need to find a view in the freshly-parsed model and
+  // call `m.open(view)` to switch.
+  //
+  // Selection order:
+  //   1. decision-table view whose element id matches `preferKey`
+  //      (the operator picked a specific decision)
+  //   2. any decision-table view
+  //   3. any view (last-resort fallback)
+  const importAndFit = React.useCallback(
+    async (xml: string, preferKey?: string | null): Promise<void> => {
+      const m = modelerRef.current;
+      if (!m) return;
+      await m.importXML(xml);
       try {
-        const resources = await api.listDmnDeploymentResources(decision.deploymentId);
-        const dmnResources = resources.filter((r) => r.id.endsWith(".dmn"));
-        if (dmnResources.length === 0) return null;
-        // Prefer a name that includes the decision key (multi-decision
-        // deployments may carry one .dmn per decision); fall back to first.
-        const match =
-          dmnResources.find((r) => r.id.toLowerCase().includes(decision.key.toLowerCase())) ||
-          dmnResources[0];
-        return match?.id ?? null;
+        const views: AnyEl[] = m.getViews?.() ?? [];
+        let target: AnyEl | undefined;
+        if (preferKey) {
+          target = views.find(
+            (v: AnyEl) => v.type === "decisionTable" && v.element?.id === preferKey,
+          );
+        }
+        target = target ?? views.find((v: AnyEl) => v.type === "decisionTable") ?? views[0];
+        if (target) {
+          m.open(target);
+          if (target.type === "decisionTable") setView("table");
+          else if (target.type === "drd") setView("drd");
+        }
+        // Patch the caret-reset bug if the DRD viewer is the active one
+        // now. No-op when active is decision-table (then views.changed
+        // fires when operator switches to DRD).
+        patchDmnDefinitionsCaretReset(m);
       } catch {
-        return null;
+        // best-effort; the canvas stays on whatever dmn-js picked.
       }
+      // Wait a tick for the active viewer to mount before fitting.
+      setTimeout(() => zoomActiveViewToFit(m), 50);
+      setDirty(false);
     },
     [],
   );
 
-  // Story 16.4 AC-4: load a deployed decision into the modeler. Empty id
-  // resets to LOAN_DMN_XML (mirrors BpmnModeler's empty-string branch).
+  // Load a deployed decision into the modeler. Empty id resets to
+  // LOAN_DMN_XML (mirrors BpmnModeler's empty-string branch). XML is
+  // fetched directly via `/dmn-repository/decision-tables/{id}/resourcedata`
+  // — no deployment-resources lookup hop (that endpoint returns 500 on the
+  // DMN sub-app).
   const loadDecision = React.useCallback(
     async (id: string) => {
       if (!id) {
         setActiveDecision(null);
         try {
-          await importAndFit(LOAN_DMN_XML);
+          // Mirror BpmnModeler's empty-id branch: a CLEAN slate, not the
+          // demo. The dropdown's "—" entry is a "fresh start" signal.
+          await importAndFit(BLANK_DMN_XML, "decision");
         } catch (e) {
           setError(String((e as Error)?.message || e));
         }
-        setFilename("loan-eligibility.dmn");
+        setFilename("new-decision.dmn");
         setCreatingNew(false);
         return;
       }
@@ -286,19 +422,15 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
       setActiveDecision(decision);
       setFilename(`${decision.key}.dmn`);
       try {
-        const resourceId = await resolveResourceId(decision);
-        if (!resourceId) {
-          throw new Error(`No .dmn resource found in deployment ${decision.deploymentId}`);
-        }
-        const xml = await api.getDmnResource(decision.deploymentId, resourceId);
-        await importAndFit(xml);
+        const xml = await api.getDmnDecisionResource(decision.id);
+        await importAndFit(xml, decision.key);
         setError(null);
       } catch (e) {
         setError(String((e as Error)?.message || e));
       }
       setCreatingNew(false);
     },
-    [decisions, importAndFit, resolveResourceId],
+    [decisions, importAndFit],
   );
 
   // Story 16.4 AC-3: deep-link autoload from `?decisionId=`. Defer until
@@ -329,18 +461,18 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
     });
   };
 
-  // Story 16.4 AC-5: "New from scratch" loads LOAN_DMN_XML + clears the URL.
-  // Per the spec, LOAN_DMN_XML is the starter (no BLANK_DMN_XML yet — Epic
-  // 17 polish candidate).
+  // "New from scratch" loads BLANK_DMN_XML (one empty decision, one Input
+  // column, one Output column with `name="output"`) so the operator gets a
+  // clean slate. Mirrors BpmnModeler's BLANK_BPMN_XML behaviour.
   const handleNew = async () => {
     if (dirty || creatingNew) {
       const ok = window.confirm("You have unsaved changes. Discard and start a new DMN?");
       if (!ok) return;
     }
     setActiveDecision(null);
-    setFilename("loan-eligibility.dmn");
+    setFilename("new-decision.dmn");
     try {
-      await importAndFit(LOAN_DMN_XML);
+      await importAndFit(BLANK_DMN_XML, "decision");
       setError(null);
     } catch (e) {
       setError(String((e as Error)?.message || e));
@@ -363,19 +495,15 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
     setCreatingNew(false);
     if (activeDecision) {
       try {
-        const resourceId = await resolveResourceId(activeDecision);
-        if (!resourceId) {
-          throw new Error(`No .dmn resource found in deployment ${activeDecision.deploymentId}`);
-        }
-        const xml = await api.getDmnResource(activeDecision.deploymentId, resourceId);
-        await importAndFit(xml);
+        const xml = await api.getDmnDecisionResource(activeDecision.id);
+        await importAndFit(xml, activeDecision.key);
         setError(null);
       } catch (e) {
         setError(String((e as Error)?.message || e));
       }
     } else {
       try {
-        await importAndFit(LOAN_DMN_XML);
+        await importAndFit(BLANK_DMN_XML, "decision");
         setError(null);
       } catch (e) {
         setError(String((e as Error)?.message || e));
@@ -412,91 +540,94 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
   };
 
   // Story 16.4 AC-6: deploy + post-deploy "Open the deployed decision" toast.
-  // FlowableDeployment carries no inline `decisions[]` — fall-back lookup
-  // via `api.listDecisions({deploymentId, latest, size:1})`. Same shape
-  // as Story 16.3's BPMN deploy() path.
-  const deploy = async () => {
+  // Deploy now opens a confirmation modal asking for the DMN definition
+  // NAME + ID, pre-filled from the XML's `<definitions id name>` tuple
+  // (or filename-derived defaults when creatingNew). Mirrors BPMN's
+  // PR #168 round 4 shape.
+  const [deployTarget, setDeployTarget] = React.useState<DeployDmnModalTarget | null>(null);
+  const deployBtnRef = React.useRef<HTMLButtonElement>(null);
+
+  // Open the deploy modal with sensible defaults read off the current XML.
+  const handleDeployClick = async () => {
     const m = modelerRef.current;
     if (!m) return;
+    let xml = "";
     try {
-      const { xml } = await m.saveXML({ format: true });
-      const deployment = await api.deployDmn(filename, xml);
-      setDirty(false);
-      // Refresh the dropdown so the new decision is selectable.
-      const refresh = api
-        .listDecisions({ size: 200 })
-        .then((r) => {
-          setDecisions(r.data || []);
-          return r.data || [];
-        })
-        .catch(() => [] as FlowableDecision[]);
-      // Discover the new decision. Single-file deploy → exactly one decision
-      // per deploymentId; combining `latest=true` with `deploymentId` in
-      // flowable-rest 7.2 dmn-api intermittently returned an empty page even
-      // after a successful deploy (mirror of the BPMN issue documented in
-      // BpmnModeler.tsx's deploy()). A short retry absorbs read-after-write
-      // lag on the engine side.
-      let newDecision: FlowableDecision | null = null;
-      for (let attempt = 0; attempt < 4 && !newDecision; attempt++) {
-        if (attempt > 0) await new Promise((r) => setTimeout(r, 250));
-        try {
-          const list = await api.listDecisions({ deploymentId: deployment.id, size: 10 });
-          newDecision = list.data?.[0] || null;
-        } catch {}
-      }
-      await refresh;
-      setCreatingNew(false);
-      if (newDecision) {
-        toast({
-          kind: "success",
-          text: `Deployed ${deployment.name} → ${newDecision.key} v${newDecision.version}`,
-          action: {
-            label: "Open the deployed decision",
-            testId: "open-deployed-decision",
-            onClick: () =>
-              navigate({
-                to: "/dmn",
-                search: { decisionId: newDecision.id },
-              }),
-          },
-        });
-      } else {
-        toast({
-          kind: "success",
-          text: `Deployed ${deployment.name} (${deployment.id}).`,
-          sub: "Refresh /decisions to see the new revision.",
-        });
-      }
+      const out = await m.saveXML({ format: true });
+      xml = out.xml as string;
     } catch (e) {
       const msg = (e as Error)?.message || String(e);
-      // PR #168 follow-up: rely on the toast; don't overlay the canvas so
-      // the operator can keep editing the draft after an engine error.
-      toast({ kind: "error", text: `DMN deploy failed: ${msg}` });
+      toast({ kind: "error", text: `Could not read DMN XML: ${msg}` });
+      return;
     }
+    const { id: xmlId, name: xmlName } = extractDefinitionsIdAndName(xml);
+    const fallbackName = dmnReadableNameFromFilename(filename);
+    const fallbackKey = dmnIdFromFilename(filename);
+    // Defaults: prefer the XML's current id/name (= what dmn-js's
+    // .dmn-definitions-name/-id editors show). Fall back to filename-
+    // derived values on a BLANK template placeholder.
+    const placeholderIds = new Set(["Definitions_blank", "Definitions_1"]);
+    const defaultKey = creatingNew || !xmlId || placeholderIds.has(xmlId) ? fallbackKey : xmlId;
+    const defaultName = creatingNew || !xmlName ? fallbackName : xmlName;
+    setDeployTarget({ defaultKey, defaultName, filename });
   };
 
-  const runTest = async () => {
-    setRunning(true);
-    try {
-      // Story 15.3 tightened the wrapper signature — flat object → typed
-      // input-variable array. The local DmnDecisionResult intersects with
-      // the wider FlowableDecisionResult so the cast remains safe.
-      const r = (await api.executeDecision({
-        decisionKey: "loanEligibility",
-        inputVariables: Object.entries(testInputs).map(([name, value]) => ({
-          name,
-          type: typeof value === "number" ? "long" : "string",
-          value,
-        })),
-      })) as DmnDecisionResult;
-      setTestResult(r);
-    } finally {
-      setRunning(false);
+  // ACTUAL deploy. Called by DeployDmnModal on confirm with operator-typed
+  // values. Errors thrown here surface as an in-modal ErrorBox so the
+  // operator can fix-and-resubmit without re-typing.
+  const doDeploy = async (chosenName: string, chosenKey: string): Promise<void> => {
+    const m = modelerRef.current;
+    if (!m) throw new Error("DMN modeler not ready");
+    const { xml: rawXml } = await m.saveXML({ format: true });
+    const xml = rewriteDefinitionsIdAndName(rawXml, chosenKey, chosenName);
+    const deployment = await api.deployDmn(filename, xml);
+    setDirty(false);
+    // Refresh the dropdown so the new decision is selectable.
+    const refresh = api
+      .listDecisions({ size: 200 })
+      .then((r) => {
+        setDecisions(r.data || []);
+        return r.data || [];
+      })
+      .catch(() => [] as FlowableDecision[]);
+    // Single-file deploy → fetch the first decision in the new deployment.
+    // A short retry absorbs read-after-write lag on the engine side
+    // (same quirk as BPMN's deploy path).
+    let newDecision: FlowableDecision | null = null;
+    for (let attempt = 0; attempt < 4 && !newDecision; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 250));
+      try {
+        const list = await api.listDecisions({ deploymentId: deployment.id, size: 10 });
+        newDecision = list.data?.[0] || null;
+      } catch {}
+    }
+    await refresh;
+    setCreatingNew(false);
+    if (newDecision) {
+      toast({
+        kind: "success",
+        text: `Deployed ${deployment.name} → ${newDecision.key} v${newDecision.version}`,
+        action: {
+          label: "Open the deployed decision",
+          testId: "open-deployed-decision",
+          onClick: () =>
+            navigate({
+              to: "/dmn",
+              search: { decisionId: newDecision.id },
+            }),
+        },
+      });
+    } else {
+      toast({
+        kind: "success",
+        text: `Deployed ${deployment.name} (${deployment.id}).`,
+        sub: "Refresh /decisions to see the new revision.",
+      });
     }
   };
 
   return (
-    <div className="modeler" data-engine="real">
+    <div className="modeler" data-engine="real" data-kind="dmn">
       <div className="mod-toolbar">
         <div className="file-name">
           <Icon name="dmn" size={14} />
@@ -589,13 +720,14 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
           Save
         </button>
         <button
+          ref={deployBtnRef}
           type="button"
           className="btn"
           data-size="sm"
           data-variant="ghost"
           data-testid="dmn-deploy"
           data-tone={dirty ? "warn" : undefined}
-          onClick={deploy}
+          onClick={handleDeployClick}
         >
           <Icon name="upload" size={13} />
           {dirty ? "Deploy *" : "Deploy"}
@@ -603,6 +735,25 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
         <button type="button" className="btn" data-size="sm" data-variant="ghost" onClick={saveXML}>
           <Icon name="download" size={13} />
           Export
+        </button>
+        <button
+          ref={executeBtnRef}
+          type="button"
+          className="btn"
+          data-size="sm"
+          data-variant="ghost"
+          data-testid="dmn-test-execute"
+          disabled={!activeDecision || creatingNew}
+          onClick={() => setExecuteOpen(true)}
+          title={
+            !activeDecision || creatingNew
+              ? "Deploy the decision before test-executing"
+              : `Test execute ${activeDecision.key} v${activeDecision.version}`
+          }
+          aria-label="Test execute decision"
+        >
+          <Icon name="play" size={13} />
+          Test execute
         </button>
         {(creatingNew || dirty) && (
           <button
@@ -662,104 +813,17 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
         )}
       </div>
 
-      <div className="mod-props">
-        <div className="panel-hd">
-          <span className="panel-title">Test runner</span>
-          <span
-            className="mono"
-            style={{ marginLeft: "auto", fontSize: 10, color: "var(--fg-mute)" }}
-          >
-            POST /dmn-rule/execute
-          </span>
-        </div>
-        <div style={{ padding: 14, overflowY: "auto" }}>
-          <div className="form-row">
-            <label>Credit Score</label>
-            <input
-              className="input mono"
-              value={testInputs.creditScore}
-              onChange={(e) =>
-                setTestInputs({ ...testInputs, creditScore: Number(e.target.value) })
-              }
-            />
-          </div>
-          <div className="form-row">
-            <label>Annual Income</label>
-            <input
-              className="input mono"
-              value={testInputs.income}
-              onChange={(e) => setTestInputs({ ...testInputs, income: Number(e.target.value) })}
-            />
-          </div>
-          <div className="form-row">
-            <label>Employment</label>
-            <select
-              className="select"
-              value={testInputs.employmentStatus}
-              onChange={(e) => setTestInputs({ ...testInputs, employmentStatus: e.target.value })}
-            >
-              <option value="employed">employed</option>
-              <option value="self-employed">self-employed</option>
-              <option value="unemployed">unemployed</option>
-            </select>
-          </div>
-          <button
-            type="button"
-            className="btn"
-            data-variant="primary"
-            disabled={running}
-            onClick={runTest}
-            style={{ width: "100%" }}
-          >
-            <Icon name="play" size={13} />
-            {running ? "Running…" : "Run decision"}
-          </button>
-
-          {testResult && (
-            <>
-              <div className="drawer-sect">Result</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {Object.entries(testResult.resultVariables || {}).map(([k, v]) => (
-                  <div
-                    key={k}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "6px 10px",
-                      background: "var(--bg-sunken)",
-                      borderRadius: 6,
-                      border: "1px solid var(--line)",
-                    }}
-                  >
-                    <span className="mono" style={{ fontSize: 12, color: "var(--fg-soft)" }}>
-                      {k}
-                    </span>
-                    <span className="mono" style={{ fontSize: 12, fontWeight: 600 }}>
-                      {String(v)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              {testResult.ruleFired && (
-                <div className="mt-3" style={{ fontSize: 12, color: "var(--fg-soft)" }}>
-                  Matched:{" "}
-                  <span className="badge" data-tone="info">
-                    {testResult.ruleFired}
-                  </span>
-                </div>
-              )}
-            </>
-          )}
-
-          <div className="drawer-sect">Engine</div>
-          <div className="code" style={{ whiteSpace: "pre-wrap" }}>
-            {`bpmn-js  17.11.1   apache 2.0  bpmn.io
-dmn-js   16.6.1    apache 2.0  bpmn.io
-target   Flowable 7 REST API`}
-          </div>
-        </div>
-      </div>
+      <DeployDmnModal
+        target={deployTarget}
+        onConfirm={doDeploy}
+        onClose={() => setDeployTarget(null)}
+        triggerRef={deployBtnRef}
+      />
+      <ExecuteDecisionModal
+        decision={executeOpen ? activeDecision : null}
+        onClose={() => setExecuteOpen(false)}
+        triggerRef={executeBtnRef}
+      />
     </div>
   );
 };

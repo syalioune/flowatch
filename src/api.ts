@@ -202,27 +202,24 @@ export interface ExecuteDecisionBody {
   parentDeploymentId?: string;
 }
 
-// Story 15.3: widened to carry matchedRules + per-variable type metadata.
-// All new fields are optional per the defensive widening discipline so
-// existing callers don't break.
-export interface FlowableDecisionExecutionMatchedRule {
-  ruleId?: string;
-  ruleIndex?: number;
-  description?: string;
+// Per the live Flowable 7.2 DMN-rule/execute response, `resultVariables` is
+// an Array<Array<{name, type, value}>> — the OUTER array is one entry per
+// result row (for COLLECT / RULE_ORDER hit policies; length 1 for
+// UNIQUE / FIRST), the INNER array carries the typed output variables.
+// The engine does NOT surface matchedRules over the REST API — Story 15.3's
+// defensive widening assumed it might; live probing showed it never does.
+export interface FlowableDecisionResultVariable {
+  name: string;
+  // Flowable emits the engine-side type label directly: "string" / "double"
+  // / "long" / "boolean" / "date" / "json". Kept open as `string` so future
+  // type additions don't break the DTO.
+  type: string;
+  value: unknown;
 }
 
 export interface FlowableDecisionResult {
-  // Legacy shape — kept for backwards compatibility.
-  resultVariables?: Record<string, unknown>;
-  // Newer Flowable 7.x shape: variable map keyed by name.
-  resultVariableMap?: Record<string, unknown>;
-  matchedRules?: FlowableDecisionExecutionMatchedRule[];
-  // Optional metadata returned by some Flowable versions.
-  decisionId?: string;
-  decisionKey?: string;
-  decisionName?: string;
-  executionId?: string;
-  evaluationTime?: number;
+  resultVariables?: FlowableDecisionResultVariable[][];
+  url?: string;
 }
 
 export interface FlowableTenant {
@@ -249,20 +246,60 @@ export interface FlowableHistoricDecisionExecution {
   decisionDefinitionId?: string;
   decisionKey?: string;
   decisionName?: string;
-  processInstanceId?: string;
-  executionId?: string;
-  activityId?: string;
-  scopeType?: string;
-  scopeId?: string;
+  // Per flowable-rest 7.2 historic-decision-executions response, the process
+  // instance id is named `instanceId` (NOT `processInstanceId`) and `failed`
+  // (NOT `executionFailed`). The list endpoint does not surface hitPolicy,
+  // durationInMillis, inputVariables, or outputVariables — those live on
+  // the auditdata endpoint per-execution.
+  instanceId?: string | null;
+  executionId?: string | null;
+  activityId?: string | null;
+  scopeType?: string | null;
+  scopeId?: string | null;
+  deploymentId?: string;
+  decisionVersion?: string;
   startTime?: string;
   endTime?: string;
-  durationInMillis?: number;
-  hitPolicy?: string;
-  executionFailed?: boolean;
-  failureMessage?: string;
-  inputVariables?: Record<string, unknown>;
-  outputVariables?: Record<string, unknown>;
+  failed?: boolean;
   tenantId?: string;
+}
+
+// Per-execution audit response from
+// `/dmn-history/historic-decision-executions/{id}/auditdata`. Far richer
+// than the list row — surfaces the hit policy, typed input/result maps,
+// and the per-rule execution trace (which rule fired, condition+conclusion
+// results). Every field defensive (optional) because Flowable versions
+// vary on which fields are present.
+export interface FlowableDmnRuleConditionResult {
+  id?: string;
+  result?: unknown;
+}
+export interface FlowableDmnRuleExecution {
+  ruleNumber?: number;
+  startTime?: string;
+  endTime?: string;
+  valid?: boolean;
+  conditionResults?: FlowableDmnRuleConditionResult[];
+  conclusionResults?: FlowableDmnRuleConditionResult[];
+}
+export interface FlowableDmnExecutionAudit {
+  decisionKey?: string;
+  decisionName?: string;
+  decisionVersion?: number;
+  hitPolicy?: string;
+  startTime?: string;
+  endTime?: string;
+  inputVariables?: Record<string, unknown>;
+  inputVariableTypes?: Record<string, string>;
+  // decisionResult is an array of result rows (one per matched rule for
+  // COLLECT / RULE_ORDER / OUTPUT_ORDER; length 1 for UNIQUE / FIRST).
+  decisionResult?: Array<Record<string, unknown>>;
+  decisionResultTypes?: Record<string, string>;
+  multipleResults?: boolean;
+  // Keyed by rule number as a string ("1", "2", …).
+  ruleExecutions?: Record<string, FlowableDmnRuleExecution>;
+  failed?: boolean;
+  strictMode?: boolean;
 }
 
 // Historic equivalents — UI shape is close to the runtime DTOs.
@@ -435,8 +472,8 @@ const basicAuth = (): string => "Basic " + btoa(`${cfg.username}:${cfg.password}
 //
 // Generic over T (the JSON response shape). Wrappers that opt into raw text
 // pin T = string at the call site (see getProcessDefinitionResource,
-// getDmnResource, jobStacktrace). Per AC-3, the runtime guarantees the
-// declared T matches when opts.raw is true.
+// getDmnDecisionResource, jobStacktrace). Per AC-3, the runtime guarantees
+// the declared T matches when opts.raw is true.
 
 async function request<T = unknown>(
   method: HTTPMethod,
@@ -754,18 +791,16 @@ const listDmnDeployments = (params?: QueryParams) =>
 // without it, the engine picks the latest version of the decision key.
 const executeDecision = (body: ExecuteDecisionBody) =>
   request<FlowableDecisionResult>("POST", "/dmn-rule/execute", { body, base: dmnBase() });
-const getDmnResource = (deploymentId: string, resourceId: string): Promise<string> =>
-  request<string>("GET", `/dmn-repository/deployments/${deploymentId}/resourcedata/${resourceId}`, {
+// Direct DMN XML fetch by decision-table id. Mirrors the BPMN side's
+// /repository/process-definitions/{id}/resourcedata shape — one endpoint,
+// no deployment-resources discovery hop. The `decisionTableId` matches a
+// `FlowableDecision.id`. The DMN sub-app does NOT expose a
+// `/deployments/{id}/resources` listing endpoint (returns 500 "No
+// endpoint" on flowable-rest 7.2 OSS), which is why we fetch by decision
+// id rather than by deployment+filename.
+const getDmnDecisionResource = (decisionId: string): Promise<string> =>
+  request<string>("GET", `/dmn-repository/decision-tables/${decisionId}/resourcedata`, {
     raw: true,
-    base: dmnBase(),
-  });
-// Story 16.4: list the resources for a DMN deployment so DmnModeler can
-// resolve `resourceId` (the filename, e.g. "loan-eligibility.dmn") from
-// a `FlowableDecision` (which only carries `deploymentId`, not the resource
-// name directly). Each resource's `id` is the filename per the DMN parallel
-// of the BPMN /repository/deployments/{id}/resources contract.
-const listDmnDeploymentResources = (deploymentId: string): Promise<FlowableResource[]> =>
-  request<FlowableResource[]>("GET", `/dmn-repository/deployments/${deploymentId}/resources`, {
     base: dmnBase(),
   });
 // Story 15.4: list historic DMN decision executions.
@@ -783,6 +818,28 @@ const listDmnHistoryExecutions = (params?: QueryParams) =>
     "GET",
     "/dmn-history/historic-decision-executions",
     { params, base: dmnBase() },
+  );
+// Fetch the rich audit data for a single historic decision execution —
+// surfaces hit policy, typed input/result maps, and the per-rule
+// condition+conclusion trace. Used by the executions row-expand panel.
+const getDmnHistoryAuditdata = (executionId: string) =>
+  request<FlowableDmnExecutionAudit>(
+    "GET",
+    `/dmn-history/historic-decision-executions/${executionId}/auditdata`,
+    { base: dmnBase() },
+  );
+// Single-deployment GET — mirror of the BPMN side's `api.getDeployment`,
+// powers the kind-aware `/deployments/$id` route loader.
+const getDmnDeployment = (id: string) =>
+  request<FlowableDeployment>("GET", `/dmn-repository/deployments/${id}`, { base: dmnBase() });
+// Binary download for an individual DMN deployment resource — mirror of
+// BPMN's `getDeploymentResource`. Returns the raw Response so the caller
+// picks .blob() / .text(); used by the kind-aware DeploymentDetail.
+const getDmnDeploymentResource = (deploymentId: string, resourceName: string) =>
+  request<Response>(
+    "GET",
+    `/dmn-repository/deployments/${deploymentId}/resourcedata/${encodeURIComponent(resourceName)}`,
+    { asResponse: true, base: dmnBase() },
   );
 // Story 15.2: DELETE a DMN deployment. Pass `{cascade: true}` to delete
 // decisions still referenced by historic executions (mirrors BPMN's
@@ -969,10 +1026,12 @@ export const api = {
   listDecisions,
   listDmnDeployments,
   executeDecision,
-  getDmnResource,
-  listDmnDeploymentResources,
+  getDmnDecisionResource,
+  getDmnDeployment,
+  getDmnDeploymentResource,
   removeDmnDeployment,
   listDmnHistoryExecutions,
+  getDmnHistoryAuditdata,
   deployBpmn,
   deployDmn,
   ping,

@@ -8,9 +8,13 @@
     <informationRequirement><requiredInput href="#iE2EScore" /></informationRequirement>
     <decisionTable id="DT_e2e" hitPolicy="UNIQUE">
       <input id="i_score" label="Score"><inputExpression id="ie_score" typeRef="number"><text>score</text></inputExpression></input>
-      <output id="o_tier" label="Tier" typeRef="string" />
+      <output id="o_tier" name="tier" label="Tier" typeRef="string" />
+      <!-- Flowable does NOT support DMN S-FEEL; cell expressions are JUEL.
+           Unary tests (`>= 80`, `< 50`) are accepted as-is. Ranges
+           `[50..80)` must be rewritten to compound JUEL boolean
+           expressions wrapped in <![CDATA[...]]>. -->
       <rule id="ru1"><inputEntry id="ru1i1"><text>&gt;= 80</text></inputEntry><outputEntry id="ru1o1"><text>"high"</text></outputEntry></rule>
-      <rule id="ru2"><inputEntry id="ru2i1"><text>[50..80)</text></inputEntry><outputEntry id="ru2o1"><text>"mid"</text></outputEntry></rule>
+      <rule id="ru2"><inputEntry id="ru2i1"><text><![CDATA[${score >= 50 && score < 80}]]></text></inputEntry><outputEntry id="ru2o1"><text>"mid"</text></outputEntry></rule>
       <rule id="ru3"><inputEntry id="ru3i1"><text>&lt; 50</text></inputEntry><outputEntry id="ru3o1"><text>"low"</text></outputEntry></rule>
     </decisionTable>
   </decision>

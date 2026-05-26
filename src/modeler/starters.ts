@@ -35,6 +35,33 @@ export const BLANK_BPMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>`;
 
+// Minimal blank DMN starter — used by DmnModeler's "New from scratch" so
+// the operator gets a clean slate (one empty decision, one Input column,
+// one Output column with a `name` so Flowable's serialization doesn't
+// blow up on first execute). The full LOAN_DMN_XML below remains the
+// initial-mount demo so operators see what DMN can do.
+export const BLANK_DMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
+             id="Definitions_blank" name="New decisions" namespace="http://flowable.org/dmn">
+  <decision id="decision" name="Decision">
+    <decisionTable id="decisionTable" hitPolicy="UNIQUE">
+      <input id="input1" label="Input">
+        <inputExpression id="inputExpression1" typeRef="string"><text></text></inputExpression>
+      </input>
+      <output id="output1" name="output" label="Output" typeRef="string" />
+    </decisionTable>
+  </decision>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="DMNDiagram_blank">
+      <dmndi:DMNShape id="DMNShape_decision" dmnElementRef="decision">
+        <dc:Bounds x="160" y="100" width="180" height="80" />
+      </dmndi:DMNShape>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>`;
+
 // ─── Initial diagram XMLs ───────────────────────────────────────────
 export const LOAN_BPMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
@@ -154,11 +181,17 @@ export const LOAN_DMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
     <decisionTable id="DT_risk" hitPolicy="UNIQUE">
       <input id="ri_score" label="Credit Score"><inputExpression id="rie_score" typeRef="number"><text>creditScore</text></inputExpression></input>
       <input id="ri_income" label="Income"><inputExpression id="rie_income" typeRef="number"><text>income</text></inputExpression></input>
-      <output id="ro_tier" label="Tier" typeRef="string" />
+      <output id="ro_tier" name="tier" label="Tier" typeRef="string" />
+      <!-- Flowable evaluates DMN cells via JUEL (DMN S-FEEL is NOT
+           supported by flowable-dmn). Unary tests like \`>= 800\` are
+           accepted as-is; FEEL ranges \`[700..800)\` must be rewritten
+           to compound JUEL boolean expressions wrapped in <![CDATA[…]]>.
+           Empty input cells = "match any" in JUEL (FEEL's \`-\` is not
+           valid JUEL). See dmn_juel migration notes. -->
       <rule id="rr1"><inputEntry id="rr1i1"><text>&gt;= 800</text></inputEntry><inputEntry id="rr1i2"><text>&gt;= 75000</text></inputEntry><outputEntry id="rr1o1"><text>"A"</text></outputEntry></rule>
-      <rule id="rr2"><inputEntry id="rr2i1"><text>[700..800)</text></inputEntry><inputEntry id="rr2i2"><text>&gt;= 60000</text></inputEntry><outputEntry id="rr2o1"><text>"B"</text></outputEntry></rule>
-      <rule id="rr3"><inputEntry id="rr3i1"><text>[600..700)</text></inputEntry><inputEntry id="rr3i2"><text>-</text></inputEntry><outputEntry id="rr3o1"><text>"C"</text></outputEntry></rule>
-      <rule id="rr4"><inputEntry id="rr4i1"><text>&lt; 600</text></inputEntry><inputEntry id="rr4i2"><text>-</text></inputEntry><outputEntry id="rr4o1"><text>"D"</text></outputEntry></rule>
+      <rule id="rr2"><inputEntry id="rr2i1"><text><![CDATA[\${creditScore >= 700 && creditScore < 800}]]></text></inputEntry><inputEntry id="rr2i2"><text>&gt;= 60000</text></inputEntry><outputEntry id="rr2o1"><text>"B"</text></outputEntry></rule>
+      <rule id="rr3"><inputEntry id="rr3i1"><text><![CDATA[\${creditScore >= 600 && creditScore < 700}]]></text></inputEntry><inputEntry id="rr3i2"><text></text></inputEntry><outputEntry id="rr3o1"><text>"C"</text></outputEntry></rule>
+      <rule id="rr4"><inputEntry id="rr4i1"><text>&lt; 600</text></inputEntry><inputEntry id="rr4i2"><text></text></inputEntry><outputEntry id="rr4o1"><text>"D"</text></outputEntry></rule>
     </decisionTable>
   </decision>
   <decision id="loanEligibility" name="Loan Eligibility">
@@ -167,12 +200,16 @@ export const LOAN_DMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
     <decisionTable id="DT_elig" hitPolicy="FIRST">
       <input id="i_tier" label="Risk Tier"><inputExpression id="ie_tier" typeRef="string"><text>tier</text></inputExpression></input>
       <input id="i_emp" label="Employment"><inputExpression id="ie_emp" typeRef="string"><text>employmentStatus</text></inputExpression></input>
-      <output id="o_decision" label="Decision" typeRef="string" />
-      <output id="o_rate" label="Rate" typeRef="number" />
+      <output id="o_decision" name="decision" label="Decision" typeRef="string" />
+      <output id="o_rate" name="rate" label="Rate" typeRef="number" />
+      <!-- Single-value string unary tests (e.g. "A", "employed") work
+           as-is in JUEL. Multi-value alternatives (FEEL's
+           "employed","self-employed") MUST be rewritten as a compound
+           JUEL boolean. Empty input cells match anything. -->
       <rule id="re1"><inputEntry id="re1i1"><text>"A"</text></inputEntry><inputEntry id="re1i2"><text>"employed"</text></inputEntry><outputEntry id="re1o1"><text>"approve"</text></outputEntry><outputEntry id="re1o2"><text>0.0425</text></outputEntry></rule>
-      <rule id="re2"><inputEntry id="re2i1"><text>"B"</text></inputEntry><inputEntry id="re2i2"><text>"employed","self-employed"</text></inputEntry><outputEntry id="re2o1"><text>"review"</text></outputEntry><outputEntry id="re2o2"><text>0.0525</text></outputEntry></rule>
+      <rule id="re2"><inputEntry id="re2i1"><text>"B"</text></inputEntry><inputEntry id="re2i2"><text><![CDATA[\${employmentStatus == 'employed' || employmentStatus == 'self-employed'}]]></text></inputEntry><outputEntry id="re2o1"><text>"review"</text></outputEntry><outputEntry id="re2o2"><text>0.0525</text></outputEntry></rule>
       <rule id="re3"><inputEntry id="re3i1"><text>"C"</text></inputEntry><inputEntry id="re3i2"><text>"employed"</text></inputEntry><outputEntry id="re3o1"><text>"review"</text></outputEntry><outputEntry id="re3o2"><text>0.0675</text></outputEntry></rule>
-      <rule id="re4"><inputEntry id="re4i1"><text>-</text></inputEntry><inputEntry id="re4i2"><text>-</text></inputEntry><outputEntry id="re4o1"><text>"reject"</text></outputEntry><outputEntry id="re4o2"><text>null</text></outputEntry></rule>
+      <rule id="re4"><inputEntry id="re4i1"><text></text></inputEntry><inputEntry id="re4i2"><text></text></inputEntry><outputEntry id="re4o1"><text>"reject"</text></outputEntry><outputEntry id="re4o2"><text>null</text></outputEntry></rule>
     </decisionTable>
   </decision>
   <dmndi:DMNDI>

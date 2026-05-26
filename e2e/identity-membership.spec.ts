@@ -117,5 +117,10 @@ test("remove from group via user detail page", async ({ page }) => {
   await expect(membershipRow).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept());
   await membershipRow.getByTestId(`remove-membership-${E2E_GROUP}`).click();
-  await expect(page.locator("text=/Removed|Failed to remove/i")).toBeVisible();
+  // Scope to the toast — the row also gains a "removed" badge after the
+  // optimistic update, which previously made the bare `text=/Removed/i`
+  // locator match two elements and trip strict mode.
+  await expect(
+    page.locator(".toast-text").filter({ hasText: /Removed|Failed to remove/i }),
+  ).toBeVisible();
 });

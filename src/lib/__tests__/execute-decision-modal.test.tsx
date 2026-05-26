@@ -4,9 +4,12 @@
  * Unit suite for <ExecuteDecisionModal> (Story 15.3).
  *
  * Covers the console-shape modal contract — modal stays open on success,
- * input preserved between submits, result panel renders matched-rules +
- * output variables, JSON parse errors surface inline, the module-scoped
- * input cache restores per-decision input across opens.
+ * input preserved between submits, result panel renders typed output
+ * variables parsed from the engine's `resultVariables: Array<Array<...>>`
+ * shape, JSON parse errors surface inline, the module-scoped input cache
+ * restores per-decision input across opens. The Story 15.3 Matched Rules
+ * panel was removed once live-engine probing confirmed Flowable 7.2 never
+ * surfaces matched-rule metadata over the REST API.
  */
 
 import "@testing-library/jest-dom/vitest";
@@ -16,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, type FlowableDecision, type FlowableDecisionResult, FlowableError } from "../../api";
 import {
   __clearInputCache,
+  buildFormInputVariables,
   buildInputVariables,
   ExecuteDecisionModal,
   extractOutputVariables,
@@ -23,7 +27,22 @@ import {
 } from "../execute-decision-modal";
 
 type ExecuteFn = typeof api.executeDecision;
-type ExecuteHost = { executeDecision: ExecuteFn };
+type GetXmlFn = typeof api.getDmnDecisionResource;
+type ExecuteHost = { executeDecision: ExecuteFn; getDmnDecisionResource: GetXmlFn };
+
+// Minimal DMN XML for the modal's XML fetch + parse pipeline. Two simple
+// inputs: a long `creditScore` and a string `employmentStatus`.
+const FORM_DMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="D" name="D" namespace="http://x">
+  <decision id="formy" name="Formy">
+    <decisionTable id="dt" hitPolicy="UNIQUE">
+      <input id="i1" label="Credit Score"><inputExpression id="ie1" typeRef="long"><text>creditScore</text></inputExpression></input>
+      <input id="i2" label="Employment"><inputExpression id="ie2" typeRef="string"><text>employmentStatus</text></inputExpression></input>
+      <output id="o1" name="result" typeRef="string" />
+      <rule id="r1"><inputEntry id="r1i1"><text>&gt;= 700</text></inputEntry><inputEntry id="r1i2"><text>"employed"</text></inputEntry><outputEntry id="r1o1"><text>"ok"</text></outputEntry></rule>
+    </decisionTable>
+  </decision>
+</definitions>`;
 
 const decisionFor = (key: string): FlowableDecision => ({
   id: `dec-${key}`,
@@ -74,33 +93,124 @@ describe("buildInputVariables", () => {
 });
 
 describe("extractOutputVariables", () => {
-  it("prefers resultVariableMap when present", () => {
-    const out = extractOutputVariables({ resultVariableMap: { tier: "A" } });
-    expect(out).toEqual([{ name: "tier", type: "string", value: "A" }]);
+  it("flattens a single result row and preserves the engine-emitted type", () => {
+    const out = extractOutputVariables({
+      resultVariables: [
+        [
+          { name: "decision", type: "string", value: "approve" },
+          { name: "rate", type: "double", value: 0.0425 },
+        ],
+      ],
+    });
+    expect(out).toEqual([
+      { name: "decision", type: "string", value: "approve" },
+      { name: "rate", type: "double", value: 0.0425 },
+    ]);
   });
 
-  it("falls back to legacy resultVariables", () => {
-    const out = extractOutputVariables({ resultVariables: { tier: "B" } });
-    expect(out).toEqual([{ name: "tier", type: "string", value: "B" }]);
+  it("flattens multiple result rows in order (COLLECT / RULE_ORDER hit-policy shape)", () => {
+    const out = extractOutputVariables({
+      resultVariables: [
+        [{ name: "tier", type: "string", value: "A" }],
+        [{ name: "tier", type: "string", value: "B" }],
+      ],
+    });
+    expect(out.map((v) => v.value)).toEqual(["A", "B"]);
   });
 
-  it("returns empty array when no variables present", () => {
+  it("returns empty array when resultVariables is missing or empty", () => {
     expect(extractOutputVariables({})).toEqual([]);
+    expect(extractOutputVariables({ resultVariables: [] })).toEqual([]);
+    expect(extractOutputVariables({ resultVariables: [[]] })).toEqual([]);
+  });
+});
+
+describe("buildFormInputVariables", () => {
+  const inputs = [
+    { name: "score", type: "long", label: "Score", isComplex: false, expression: "score" },
+    { name: "rate", type: "double", label: "Rate", isComplex: false, expression: "rate" },
+    { name: "active", type: "boolean", label: "Active", isComplex: false, expression: "active" },
+    { name: "when", type: "date", label: "When", isComplex: false, expression: "when" },
+    { name: "tier", type: "string", label: "Tier", isComplex: false, expression: "tier" },
+  ];
+
+  it("coerces each field to its DMN type and skips empty values", () => {
+    const { variables, errors } = buildFormInputVariables(inputs, {
+      score: "750",
+      rate: "0.05",
+      active: "true",
+      when: "2026-05-26",
+      tier: "A",
+    });
+    expect(errors).toEqual([]);
+    expect(variables).toEqual([
+      { name: "score", type: "long", value: 750 },
+      { name: "rate", type: "double", value: 0.05 },
+      { name: "active", type: "boolean", value: true },
+      { name: "when", type: "date", value: "2026-05-26" },
+      { name: "tier", type: "string", value: "A" },
+    ]);
+  });
+
+  it("OMITS variables whose form value is empty (left blank → not sent)", () => {
+    const { variables } = buildFormInputVariables(inputs, { score: "750" });
+    expect(variables).toEqual([{ name: "score", type: "long", value: 750 }]);
+  });
+
+  it("returns per-field errors for invalid numeric input", () => {
+    const { variables, errors } = buildFormInputVariables(inputs, {
+      score: "abc",
+      rate: "1.5e",
+    });
+    expect(variables).toEqual([]);
+    expect(errors.map((e) => e.name).sort()).toEqual(["rate", "score"]);
+  });
+
+  it("rejects a non-integer value for type=long", () => {
+    const { errors } = buildFormInputVariables(inputs, { score: "1.5" });
+    expect(errors).toContainEqual({ name: "score", message: "Expected an integer." });
+  });
+
+  it("uses long for integer values of the generic DMN `number` type, double otherwise", () => {
+    const numericInputs = [
+      { name: "n", type: "number", label: "N", isComplex: false, expression: "n" },
+    ];
+    expect(buildFormInputVariables(numericInputs, { n: "5" }).variables[0]?.type).toBe("long");
+    expect(buildFormInputVariables(numericInputs, { n: "5.5" }).variables[0]?.type).toBe("double");
+  });
+
+  it("skips inputs flagged as complex (FEEL expressions can't be form-bound)", () => {
+    const complex = [
+      {
+        name: "creditScore * 1.1",
+        type: "number",
+        isComplex: true,
+        expression: "creditScore * 1.1",
+      },
+    ];
+    expect(buildFormInputVariables(complex, { "creditScore * 1.1": "100" }).variables).toEqual([]);
   });
 });
 
 describe("<ExecuteDecisionModal>", () => {
   const realExec = api.executeDecision;
+  const realGetXml = api.getDmnDecisionResource;
   let execSpy: ReturnType<typeof vi.fn>;
+  let getXmlSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     __clearInputCache();
     execSpy = vi.fn();
+    // Default: XML fetch rejects → modal stays in JSON fallback. Tests
+    // that need form mode override this stub explicitly.
+    getXmlSpy = vi.fn().mockRejectedValue(new Error("no XML stubbed"));
     (api as unknown as ExecuteHost).executeDecision = execSpy as unknown as ExecuteFn;
+    (api as unknown as ExecuteHost).getDmnDecisionResource = getXmlSpy as unknown as GetXmlFn;
   });
 
   afterEach(() => {
     (api as unknown as ExecuteHost).executeDecision = realExec;
+    (api as unknown as ExecuteHost).getDmnDecisionResource = realGetXml;
     cleanup();
   });
 
@@ -140,23 +250,111 @@ describe("<ExecuteDecisionModal>", () => {
     expect(execSpy).not.toHaveBeenCalled();
   });
 
-  it("successful execute renders matched-rules + output-variables; modal stays OPEN", async () => {
+  it("successful execute renders the typed output-variables table; modal stays OPEN", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     const fakeResult: FlowableDecisionResult = {
-      matchedRules: [{ ruleId: "rule-1", description: "first" }],
-      resultVariableMap: { tier: "A", approved: true },
+      resultVariables: [
+        [
+          { name: "decision", type: "string", value: "approve" },
+          { name: "rate", type: "double", value: 0.0425 },
+        ],
+      ],
     };
     execSpy.mockResolvedValue(fakeResult);
     render(<ExecuteDecisionModal decision={decisionFor("k")} onClose={onClose} />);
     await user.click(screen.getByTestId("execute-decision-submit"));
     await waitFor(() => expect(screen.getByTestId("execute-decision-result")).toBeInTheDocument());
-    expect(screen.getByTestId("matched-rule-0")).toBeInTheDocument();
-    expect(screen.getByTestId("output-variable-tier")).toBeInTheDocument();
-    expect(screen.getByTestId("output-variable-approved")).toBeInTheDocument();
+    expect(screen.getByTestId("output-variable-decision")).toBeInTheDocument();
+    expect(screen.getByTestId("output-variable-rate")).toBeInTheDocument();
+    // The engine-emitted type renders as the column badge, not a JS-inferred type.
+    expect(screen.getByTestId("output-variable-rate")).toHaveTextContent("double");
+    // No matched-rules panel — the engine doesn't surface that data.
+    expect(screen.queryByTestId("matched-rule-0")).toBeNull();
     // Modal stays open (console shape).
     expect(screen.getByTestId("execute-decision-modal")).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("switches to FORM mode when the XML fetch returns parseable inputs", async () => {
+    getXmlSpy.mockResolvedValueOnce(FORM_DMN_XML);
+    render(<ExecuteDecisionModal decision={decisionFor("formy")} onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.getByTestId("execute-decision-form")).toBeInTheDocument());
+    // JSON textarea is gone; the form has one widget per input column.
+    expect(screen.queryByTestId("execute-decision-input")).toBeNull();
+    expect(screen.getByTestId("execute-decision-input-creditScore")).toHaveAttribute(
+      "type",
+      "number",
+    );
+    expect(screen.getByTestId("execute-decision-input-employmentStatus")).toHaveAttribute(
+      "type",
+      "text",
+    );
+  });
+
+  it("form-mode submit constructs the typed-variable payload from the form values", async () => {
+    getXmlSpy.mockResolvedValueOnce(FORM_DMN_XML);
+    execSpy.mockResolvedValue({
+      resultVariables: [[{ name: "result", type: "string", value: "ok" }]],
+    });
+    const user = userEvent.setup();
+    render(<ExecuteDecisionModal decision={decisionFor("formy")} onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.getByTestId("execute-decision-form")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByTestId("execute-decision-input-creditScore"), {
+      target: { value: "750" },
+    });
+    fireEvent.change(screen.getByTestId("execute-decision-input-employmentStatus"), {
+      target: { value: "employed" },
+    });
+    await user.click(screen.getByTestId("execute-decision-submit"));
+
+    await waitFor(() => expect(execSpy).toHaveBeenCalledTimes(1));
+    expect(execSpy).toHaveBeenCalledWith({
+      decisionKey: "formy",
+      inputVariables: [
+        { name: "creditScore", type: "long", value: 750 },
+        { name: "employmentStatus", type: "string", value: "employed" },
+      ],
+    });
+    // Result panel still renders (console shape behaviour preserved).
+    await waitFor(() => expect(screen.getByTestId("execute-decision-result")).toBeInTheDocument());
+  });
+
+  it("form-mode renders per-field error and does NOT submit when coercion fails", async () => {
+    getXmlSpy.mockResolvedValueOnce(FORM_DMN_XML);
+    const user = userEvent.setup();
+    render(<ExecuteDecisionModal decision={decisionFor("formy")} onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.getByTestId("execute-decision-form")).toBeInTheDocument());
+
+    // creditScore is typed `long` per the DMN — a fractional value passes
+    // the browser-side number-input filter but fails the integer check in
+    // buildFormInputVariables, surfacing the per-field error.
+    fireEvent.change(screen.getByTestId("execute-decision-input-creditScore"), {
+      target: { value: "1.5" },
+    });
+    await user.click(screen.getByTestId("execute-decision-submit"));
+    expect(screen.getByTestId("execute-decision-field-error-creditScore")).toHaveTextContent(
+      /integer/i,
+    );
+    expect(execSpy).not.toHaveBeenCalled();
+  });
+
+  it("XML fetch failure falls back to JSON mode (the textarea is rendered)", async () => {
+    getXmlSpy.mockRejectedValueOnce(new Error("404"));
+    render(<ExecuteDecisionModal decision={decisionFor("k")} onClose={vi.fn()} />);
+    // The form is never rendered; the JSON textarea is.
+    await waitFor(() => expect(screen.getByTestId("execute-decision-input")).toBeInTheDocument());
+    expect(screen.queryByTestId("execute-decision-form")).toBeNull();
+  });
+
+  it("empty resultVariables renders the 'no output variables' empty state", async () => {
+    const user = userEvent.setup();
+    execSpy.mockResolvedValue({ resultVariables: [] });
+    render(<ExecuteDecisionModal decision={decisionFor("k")} onClose={vi.fn()} />);
+    await user.click(screen.getByTestId("execute-decision-submit"));
+    await waitFor(() => expect(screen.getByTestId("execute-decision-result")).toBeInTheDocument());
+    expect(screen.getByText(/No output variables/i)).toBeInTheDocument();
   });
 
   it("execute error renders in-modal ErrorBox and hides result panel", async () => {
@@ -173,7 +371,9 @@ describe("<ExecuteDecisionModal>", () => {
 
   it("Reset clears input and hides the result panel", async () => {
     const user = userEvent.setup();
-    execSpy.mockResolvedValue({ resultVariableMap: { tier: "A" } });
+    execSpy.mockResolvedValue({
+      resultVariables: [[{ name: "tier", type: "string", value: "A" }]],
+    });
     render(<ExecuteDecisionModal decision={decisionFor("k")} onClose={vi.fn()} />);
     const input = screen.getByTestId("execute-decision-input") as HTMLTextAreaElement;
     fireEvent.change(input, { target: { value: '{"x": 1}' } });

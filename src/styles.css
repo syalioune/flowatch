@@ -981,8 +981,17 @@ a {
 .modeler[data-engine="real"] {
   grid-template-columns: minmax(0, 1fr) 340px;
 }
+/* DMN modeler dropped its right-side test-runner panel — test execution is
+   now a top-bar action that opens <ExecuteDecisionModal>. Single column
+   takes the full width. */
+.modeler[data-engine="real"][data-kind="dmn"] {
+  grid-template-columns: minmax(0, 1fr);
+}
 .modeler[data-engine="real"] .mod-toolbar {
   grid-column: 1 / span 2;
+}
+.modeler[data-engine="real"][data-kind="dmn"] .mod-toolbar {
+  grid-column: 1;
 }
 .modeler[data-engine="real"] .mod-palette {
   display: none;
@@ -1315,72 +1324,6 @@ a {
   background: var(--accent);
   color: var(--accent-fg);
   border-color: var(--accent);
-}
-
-/* ── DMN ──────────────────────────────────────────────────────── */
-.dmn-table {
-  font-size: 12.5px;
-}
-.dmn-table th,
-.dmn-table td {
-  border: 1px solid var(--line);
-  padding: 8px 10px;
-  vertical-align: middle;
-}
-.dmn-table thead .group-input {
-  background: color-mix(in oklab, var(--info) 8%, var(--bg-sunken));
-}
-.dmn-table thead .group-output {
-  background: color-mix(in oklab, var(--ok) 8%, var(--bg-sunken));
-}
-.dmn-table thead .group-annot {
-  background: var(--bg-sunken);
-}
-.dmn-table thead tr.group-row th {
-  text-align: center;
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--fg-mute);
-  padding: 5px;
-}
-.dmn-table thead tr.col-row th {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--fg);
-}
-.dmn-table thead tr.col-row th .type {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--fg-mute);
-  margin-top: 2px;
-}
-.dmn-table td.idx {
-  width: 30px;
-  text-align: center;
-  font-family: var(--font-mono);
-  color: var(--fg-mute);
-  background: var(--bg-sunken);
-}
-.dmn-table td.feel {
-  font-family: var(--font-mono);
-  font-size: 12px;
-}
-.dmn-table tbody tr:hover td:not(.idx) {
-  background: var(--bg-hover);
-}
-.hit-policy {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-sunken);
-  border: 1px solid var(--line);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
 }
 
 /* ── API Inspector Drawer ──────────────────────────────────── */

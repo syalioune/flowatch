@@ -68,6 +68,18 @@ describe("DMN wrappers", () => {
     });
   });
 
+  describe("api.getDmnDecisionResource", () => {
+    it("issues GET against /dmn-api/dmn-repository/decision-tables/{id}/resourcedata", async () => {
+      await api.getDmnDecisionResource("dec-abc");
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.method).toBe("GET");
+      expect(calls[0]?.url).toMatch(
+        /\/dmn-api\/dmn-repository\/decision-tables\/dec-abc\/resourcedata$/,
+      );
+      expect(calls[0]?.url).not.toMatch(/\/service\//);
+    });
+  });
+
   describe("api.listDmnHistoryExecutions", () => {
     it("issues GET against /dmn-api/dmn-history/historic-decision-executions", async () => {
       await api.listDmnHistoryExecutions({ size: 50, sort: "startTime", order: "desc" });
@@ -77,6 +89,47 @@ describe("DMN wrappers", () => {
         /\/dmn-api\/dmn-history\/historic-decision-executions\?size=50&sort=startTime&order=desc$/,
       );
       expect(calls[0]?.url).not.toMatch(/\/service\//);
+    });
+  });
+
+  describe("api.getDmnHistoryAuditdata", () => {
+    it("issues GET against /dmn-api/dmn-history/historic-decision-executions/{id}/auditdata", async () => {
+      await api.getDmnHistoryAuditdata("exec-xyz");
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.method).toBe("GET");
+      expect(calls[0]?.url).toMatch(
+        /\/dmn-api\/dmn-history\/historic-decision-executions\/exec-xyz\/auditdata$/,
+      );
+      expect(calls[0]?.url).not.toMatch(/\/service\//);
+    });
+  });
+
+  describe("api.getDmnDeployment", () => {
+    it("issues GET against /dmn-api/dmn-repository/deployments/{id}", async () => {
+      await api.getDmnDeployment("dep-9");
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.method).toBe("GET");
+      expect(calls[0]?.url).toMatch(/\/dmn-api\/dmn-repository\/deployments\/dep-9$/);
+      expect(calls[0]?.url).not.toMatch(/\/service\//);
+    });
+  });
+
+  describe("api.getDmnDeploymentResource", () => {
+    it("issues GET against /dmn-api/dmn-repository/deployments/{id}/resourcedata/{name}", async () => {
+      await api.getDmnDeploymentResource("dep-9", "loan-eligibility.dmn");
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.method).toBe("GET");
+      expect(calls[0]?.url).toMatch(
+        /\/dmn-api\/dmn-repository\/deployments\/dep-9\/resourcedata\/loan-eligibility\.dmn$/,
+      );
+      expect(calls[0]?.url).not.toMatch(/\/service\//);
+    });
+
+    it("URL-encodes the resource name (spaces, slashes, etc.)", async () => {
+      await api.getDmnDeploymentResource("dep-9", "folder/sub name.dmn");
+      expect(calls[0]?.url).toMatch(
+        /\/dmn-api\/dmn-repository\/deployments\/dep-9\/resourcedata\/folder%2Fsub%20name\.dmn$/,
+      );
     });
   });
 });

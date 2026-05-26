@@ -19,8 +19,8 @@
  *   6. New button loads LOAN_DMN_XML + clears the URL.
  *   7. Deploy success surfaces a toast with the open-deployed-decision
  *      action; failure surfaces an error toast + dirty preserved.
- *   8. Dropdown pick triggers loadDecision via api.getDmnResource (and
- *      resolves resourceId via api.listDmnDeploymentResources).
+ *   8. Dropdown pick triggers loadDecision via api.getDmnDecisionResource
+ *      (direct XML fetch by decision-table id, no deployment-resources hop).
  *
  * Story 16.4 AC-9.
  */
@@ -115,13 +115,11 @@ vi.mock("dmn-js/lib/Modeler", () => {
 });
 
 // ─── api mocks ─────────────────────────────────────────────────────
-const { listDecisionsSpy, getDmnResourceSpy, deployDmnSpy, listDmnDeploymentResourcesSpy } =
-  vi.hoisted(() => ({
-    listDecisionsSpy: vi.fn(),
-    getDmnResourceSpy: vi.fn(),
-    deployDmnSpy: vi.fn(),
-    listDmnDeploymentResourcesSpy: vi.fn(),
-  }));
+const { listDecisionsSpy, getDmnDecisionResourceSpy, deployDmnSpy } = vi.hoisted(() => ({
+  listDecisionsSpy: vi.fn(),
+  getDmnDecisionResourceSpy: vi.fn(),
+  deployDmnSpy: vi.fn(),
+}));
 
 vi.mock("../../api", async () => {
   const real = await vi.importActual<typeof import("../../api")>("../../api");
@@ -130,9 +128,8 @@ vi.mock("../../api", async () => {
     api: {
       ...real.api,
       listDecisions: listDecisionsSpy,
-      getDmnResource: getDmnResourceSpy,
+      getDmnDecisionResource: getDmnDecisionResourceSpy,
       deployDmn: deployDmnSpy,
-      listDmnDeploymentResources: listDmnDeploymentResourcesSpy,
     },
   };
 });
@@ -170,12 +167,10 @@ beforeEach(() => {
   activeViewCanUndo = false;
   listDecisionsSpy.mockReset();
   listDecisionsSpy.mockResolvedValue({ data: [] });
-  getDmnResourceSpy.mockReset();
-  getDmnResourceSpy.mockResolvedValue("<dmn:definitions/>");
+  getDmnDecisionResourceSpy.mockReset();
+  getDmnDecisionResourceSpy.mockResolvedValue("<dmn:definitions/>");
   deployDmnSpy.mockReset();
   deployDmnSpy.mockResolvedValue({ id: "dmn-dep-1", name: "x" });
-  listDmnDeploymentResourcesSpy.mockReset();
-  listDmnDeploymentResourcesSpy.mockResolvedValue([]);
   capturedToasts.length = 0;
   window.addEventListener("app:toast", onToast);
 });
@@ -255,15 +250,17 @@ describe("<DmnModeler> — Story 16.4 New + Deploy + post-deploy toast", () => {
     expect(screen.getByTestId("dmn-new")).toBeInTheDocument();
   });
 
-  it("New click on clean state calls importXML with LOAN_DMN_XML (AC-5)", async () => {
+  it("New click on clean state imports BLANK_DMN_XML (one empty decision)", async () => {
     renderModeler();
     await waitFor(() => expect(buses.length).toBe(1));
     await waitFor(() => expect(importXMLSpy).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByTestId("dmn-new"));
     await waitFor(() => expect(importXMLSpy).toHaveBeenCalledTimes(2));
     const lastCall = importXMLSpy.mock.calls.at(-1);
-    // LOAN_DMN_XML carries the DMN namespace + decision id "loanEligibility".
-    expect(lastCall?.[0]).toMatch(/loanEligibility/);
+    // BLANK_DMN_XML carries the DMN namespace + the blank-decision id and
+    // crucially does NOT include the LOAN starter's loanEligibility.
+    expect(lastCall?.[0]).toMatch(/<decision id="decision"/);
+    expect(lastCall?.[0]).not.toMatch(/loanEligibility/);
   });
 
   it("New click with dirty=true prompts confirm; cancel skips the import (AC-5)", async () => {
@@ -284,7 +281,21 @@ describe("<DmnModeler> — Story 16.4 New + Deploy + post-deploy toast", () => {
     confirmSpy.mockRestore();
   });
 
-  it("Deploy success surfaces a toast with 'Open the deployed decision' action (AC-6)", async () => {
+  it("Deploy button opens a confirm modal pre-filled from the XML's <definitions>", async () => {
+    renderModeler();
+    await waitFor(() => expect(buses.length).toBe(1));
+    fireEvent.click(screen.getByTestId("dmn-deploy"));
+    await waitFor(() => expect(screen.getByTestId("deploy-dmn-modal")).toBeInTheDocument());
+    // The modal carries name + id fields seeded with filename-derived
+    // defaults (the stub's saveXML returns "<dmn/>" — no usable id/name
+    // in there, so we fall back to the filename).
+    expect(screen.getByTestId("deploy-dmn-name")).toBeInTheDocument();
+    expect(screen.getByTestId("deploy-dmn-key")).toBeInTheDocument();
+    // No deploy fired yet — modal is gating it.
+    expect(deployDmnSpy).not.toHaveBeenCalled();
+  });
+
+  it("Confirming the modal fires api.deployDmn + posts the success toast (AC-6)", async () => {
     deployDmnSpy.mockResolvedValue({ id: "dep-99", name: "loan-eligibility.dmn" });
     listDecisionsSpy.mockImplementation((params?: { deploymentId?: string }) => {
       if (params?.deploymentId === "dep-99") {
@@ -306,6 +317,8 @@ describe("<DmnModeler> — Story 16.4 New + Deploy + post-deploy toast", () => {
     renderModeler();
     await waitFor(() => expect(buses.length).toBe(1));
     fireEvent.click(screen.getByTestId("dmn-deploy"));
+    await waitFor(() => expect(screen.getByTestId("deploy-dmn-modal")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("deploy-dmn-submit"));
     await waitFor(() => expect(deployDmnSpy).toHaveBeenCalledTimes(1));
     await waitFor(() => {
       const successToast = capturedToasts.find(
@@ -317,7 +330,7 @@ describe("<DmnModeler> — Story 16.4 New + Deploy + post-deploy toast", () => {
     });
   });
 
-  it("Deploy failure surfaces an error toast + dirty stays true (AC-6)", async () => {
+  it("Deploy failure renders an in-modal ErrorBox + dirty stays true (retryable-creation shape)", async () => {
     deployDmnSpy.mockRejectedValue(new Error("Engine rejected the DMN: invalid hit policy"));
     renderModeler();
     await waitFor(() => expect(buses.length).toBe(1));
@@ -329,17 +342,22 @@ describe("<DmnModeler> — Story 16.4 New + Deploy + post-deploy toast", () => {
       expect(screen.getByTestId("dmn-deploy").textContent).toMatch(/Deploy \*/);
     });
     fireEvent.click(screen.getByTestId("dmn-deploy"));
-    await waitFor(() => {
-      const errToast = capturedToasts.find((t) => t.kind === "error");
-      expect(errToast).toBeDefined();
-      expect(errToast?.text).toMatch(/DMN deploy failed/);
-    });
+    await waitFor(() => expect(screen.getByTestId("deploy-dmn-modal")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("deploy-dmn-submit"));
+    // ErrorBox surfaces inside the modal (the retryable-creation shape).
+    await waitFor(() =>
+      expect(screen.getByTestId("error-box")).toHaveTextContent(
+        /Engine rejected the DMN: invalid hit policy/,
+      ),
+    );
+    // Modal still open + dirty pin preserved.
+    expect(screen.getByTestId("deploy-dmn-modal")).toBeInTheDocument();
     expect(screen.getByTestId("dmn-deploy").textContent).toMatch(/Deploy \*/);
   });
 });
 
-describe("<DmnModeler> — Story 16.4 dropdown + resourceId resolution", () => {
-  it("Dropdown pick resolves resourceId via listDmnDeploymentResources + loads XML", async () => {
+describe("<DmnModeler> — dropdown decision load", () => {
+  it("Dropdown pick fetches XML directly by decision-table id via getDmnDecisionResource", async () => {
     listDecisionsSpy.mockResolvedValue({
       data: [
         {
@@ -351,10 +369,7 @@ describe("<DmnModeler> — Story 16.4 dropdown + resourceId resolution", () => {
         },
       ],
     });
-    listDmnDeploymentResourcesSpy.mockResolvedValue([
-      { id: "loan-eligibility.dmn", mediaType: "application/xml" },
-    ]);
-    getDmnResourceSpy.mockResolvedValue("<dmn:definitions id='fetched'/>");
+    getDmnDecisionResourceSpy.mockResolvedValue("<dmn:definitions id='fetched'/>");
 
     renderModeler();
     await waitFor(() => expect(buses.length).toBe(1));
@@ -367,9 +382,9 @@ describe("<DmnModeler> — Story 16.4 dropdown + resourceId resolution", () => {
     // Wait for the initial mount import to settle
     await waitFor(() => expect(importXMLSpy).toHaveBeenCalledTimes(1));
     fireEvent.change(dropdown, { target: { value: "loanEligibility:3:abc" } });
-    await waitFor(() => expect(listDmnDeploymentResourcesSpy).toHaveBeenCalledWith("dep-3"));
+    // Single direct fetch by decision-table id — no deployment-resources hop.
     await waitFor(() =>
-      expect(getDmnResourceSpy).toHaveBeenCalledWith("dep-3", "loan-eligibility.dmn"),
+      expect(getDmnDecisionResourceSpy).toHaveBeenCalledWith("loanEligibility:3:abc"),
     );
     await waitFor(() => expect(importXMLSpy).toHaveBeenCalledTimes(2));
     expect(importXMLSpy.mock.calls.at(-1)?.[0]).toMatch(/fetched/);
