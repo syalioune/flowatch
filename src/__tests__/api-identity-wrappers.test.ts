@@ -74,7 +74,7 @@ describe("api.listGroupMembers (Story 14.2 ?memberOfGroup workaround)", () => {
     expect(url).toContain("sort=id");
   });
 
-  it("returns the FlowablePage<FlowableUser> envelope", async () => {
+  it("returns the FlowablePage<FlowableUser> envelope on success", async () => {
     const enginePayload = JSON.stringify({
       data: [
         { id: "rest-admin", firstName: "Admin", lastName: "User", email: "admin@example.com" },
@@ -92,5 +92,28 @@ describe("api.listGroupMembers (Story 14.2 ?memberOfGroup workaround)", () => {
     expect(out.data).toHaveLength(1);
     expect(out.data[0]?.id).toBe("rest-admin");
     expect(out.total).toBe(1);
+  });
+});
+
+describe("api.removeUserFromGroup (Story 14.3 symmetric pair)", () => {
+  it("DELETEs /identity/users/{userId}/groups/{groupId} with no body or params", async () => {
+    // Flowable returns 204 No Content on success; undici forbids a body on
+    // 204 so we use 200 + empty body here — the URL + method + lack of body
+    // is what the wrapper test pins.
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200 }));
+    await api.removeUserFromGroup("rest-admin", "admin");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${DEFAULT_BASE}/identity/users/rest-admin/groups/admin`);
+    expect(init.method).toBe("DELETE");
+    expect(init.body).toBeUndefined();
+  });
+
+  it("propagates engine errors so the caller can surface them via toast", async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ status: 404, body: "not found", contentType: "text/plain" }),
+    );
+    await expect(api.removeUserFromGroup("nobody", "admin")).rejects.toMatchObject({
+      status: 404,
+    });
   });
 });

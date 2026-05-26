@@ -613,6 +613,13 @@ const listGroupMembers = (groupId: string, params?: QueryParams) =>
   });
 const addUserToGroup = (userId: string, groupId: string) =>
   request<void>("POST", `/identity/users/${userId}/groups`, { body: { groupId } });
+// Symmetric pair to addUserToGroup (POST /identity/users/{userId}/groups).
+// Flowable returns 204 No Content on success; 404 if the membership doesn't
+// exist; 403 if the caller lacks permission. ErrorBox surfaces the verbatim
+// engine message. First full application of the Epic 13 retro §3.2 spec-
+// symmetry discipline (Story 14.3).
+const removeUserFromGroup = (userId: string, groupId: string) =>
+  request<void>("DELETE", `/identity/users/${userId}/groups/${groupId}`);
 
 // Tenants are not exposed as a dedicated endpoint in flowable-rest 7.2.
 // Derive distinct tenantIds from deployments (truthy values only).
@@ -817,6 +824,7 @@ export const api = {
   getUserGroups,
   listGroupMembers,
   addUserToGroup,
+  removeUserFromGroup,
   listTenants,
   // DMN
   listDecisions,
