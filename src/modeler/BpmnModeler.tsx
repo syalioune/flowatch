@@ -20,6 +20,7 @@ import type EventBus from "diagram-js/lib/core/EventBus";
 import React from "react";
 import { api, type FlowableProcessDefinition } from "../api";
 import { Icon, toast } from "../components";
+import { DeployBpmnModal, type DeployBpmnModalTarget } from "../lib/deploy-bpmn-modal";
 import { BLANK_BPMN_XML, LOAN_BPMN_XML } from "./starters";
 
 // @migration-any: bpmn-js DI container, event-bus payloads, and BO shapes
@@ -81,14 +82,78 @@ const bpmnIdFromFilename = (filename: string): string => {
   return slug || "newProcess";
 };
 
-// Rewrite the BLANK template's process id (`newProcess`) to the supplied
-// value. Targeted to `id="newProcess"` and `bpmnElement="newProcess"`
-// occurrences so it can't accidentally clobber the substring inside user
-// content (task names, documentation, etc.).
-const rewriteBlankProcessId = (xml: string, newId: string): string =>
-  xml
-    .replace(/id="newProcess"/g, `id="${newId}"`)
-    .replace(/bpmnElement="newProcess"/g, `bpmnElement="${newId}"`);
+// Operator-feel readable name from a filename — strips extension, replaces
+// separators with spaces, title-cases. Used as the modal's process-name
+// default when the XML only carries an id (no name attribute).
+const bpmnReadableNameFromFilename = (filename: string): string => {
+  const base = filename
+    .replace(/\.bpmn20?\.xml$/i, "")
+    .replace(/\.bpmn$/i, "")
+    .replace(/\.xml$/i, "");
+  const words = base
+    .replace(/[_.-]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.length === 0) return "New process";
+  return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+};
+
+// XML attribute-value escaper for operator-typed strings going into id /
+// name attributes. NCName-conforming keys never need escaping (validated
+// in the modal), but the readable name may contain &, <, >, ", '.
+const escapeXmlAttr = (s: string): string =>
+  s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+
+// Extract the FIRST <bpmn:process id="…" name="…"> tuple from the raw XML.
+// Used to seed the deploy modal's default values. Falls back to null
+// fields when the attributes aren't present (custom-authored XML).
+const extractProcessIdAndName = (xml: string): { id: string | null; name: string | null } => {
+  const m = xml.match(/<bpmn:process\b[^>]*>/);
+  if (!m) return { id: null, name: null };
+  const tag = m[0];
+  const idMatch = tag.match(/\bid="([^"]+)"/);
+  const nameMatch = tag.match(/\bname="([^"]*)"/);
+  return { id: idMatch?.[1] ?? null, name: nameMatch?.[1] ?? null };
+};
+
+// Rewrite the <bpmn:process> id + name AND every `bpmnElement="<oldId>"`
+// reference (used by BPMNPlane) to the operator-chosen values. Targeted
+// string-level rewrite — safer than parsing/serialising via bpmn-moddle
+// for this scope, and aligns with how `bpmnIdFromFilename`'s caller in
+// the v0 implementation worked.
+const rewriteProcessKeyAndName = (xml: string, newKey: string, newName: string): string => {
+  const { id: oldId, name: oldName } = extractProcessIdAndName(xml);
+  let next = xml;
+  if (oldId && oldId !== newKey) {
+    // Replace exact `id="<oldId>"` matches (anywhere in the XML — both
+    // the <bpmn:process> declaration and any references like
+    // `bpmnElement="<oldId>"`).
+    const idAttr = new RegExp(`\\bid="${oldId.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}"`, "g");
+    const refAttr = new RegExp(
+      `\\bbpmnElement="${oldId.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}"`,
+      "g",
+    );
+    next = next.replace(idAttr, `id="${newKey}"`).replace(refAttr, `bpmnElement="${newKey}"`);
+  }
+  // Rewrite the name attribute on the FIRST <bpmn:process …> tag only.
+  const safeName = escapeXmlAttr(newName);
+  if (oldName !== null) {
+    next = next.replace(
+      /<bpmn:process\b([^>]*?)\bname="[^"]*"([^>]*)>/,
+      `<bpmn:process$1 name="${safeName}"$2>`,
+    );
+  } else {
+    // No name attribute on the process — inject one right after the tag name.
+    next = next.replace(/<bpmn:process\b/, `<bpmn:process name="${safeName}"`);
+  }
+  return next;
+};
 
 function download(name: string, content: BlobPart, type: string): void {
   const blob = new Blob([content], { type });
@@ -344,91 +409,97 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
     const { svg } = await m.saveSVG();
     download(filename.replace(/\.bpmn.*$/, ".svg"), svg, "image/svg+xml");
   };
-  // Story 16.3 AC-2 + AC-3: Deploy exports XML, deploys via api.deployBpmn,
-  // resets dirty + surfaces a success toast with an "Open the deployed
-  // definition" action. Flowable's FlowableDeployment DTO does NOT carry an
-  // inline `definitions[]` field (verified at T-1.3 against the live engine),
-  // so we follow up with `api.listProcessDefinitions({deploymentId, latest})`
-  // to discover the new definition's id for the Open action.
-  const deploy = async () => {
+  // PR #168 follow-up round 4: deploy now opens a confirmation modal
+  // asking for the process definition NAME + KEY, pre-filled from the
+  // XML's <bpmn:process id name> tuple (or filename-derived defaults when
+  // creatingNew). The modal calls back into `doDeploy(name, key)`, which
+  // rewrites the XML and runs the actual multipart deploy.
+  const [deployTarget, setDeployTarget] = React.useState<DeployBpmnModalTarget | null>(null);
+  const deployBtnRef = React.useRef<HTMLButtonElement | null>(null);
+
+  // Open the deploy modal with sensible defaults read off the current XML.
+  const handleDeployClick = async () => {
     const m = modelerRef.current;
     if (!m) return;
+    let xml = "";
     try {
-      const { xml: rawXml } = await m.saveXML({ format: true });
-      // PR #168 follow-up: scratch deploys had every definition coming back
-      // with key "newProcess" because BLANK_BPMN_XML hard-codes that id. When
-      // creatingNew, rewrite the process id from the operator-typed filename
-      // (slugified). For loaded-and-edited definitions, preserve the original
-      // id so a deploy creates a new VERSION of the same key rather than a
-      // sibling.
-      const xml = creatingNew
-        ? rewriteBlankProcessId(rawXml, bpmnIdFromFilename(filename))
-        : rawXml;
-      const deployment = await api.deployBpmn(filename, xml);
-      setDirty(false);
-      // Refresh the dropdown's definitions list so the deployed definition is
-      // available for selection.
-      const refresh = api
-        .listProcessDefinitions({ size: 200, sort: "name" })
-        .then((r) => {
-          setDefinitions(r.data || []);
-          return r.data || [];
-        })
-        .catch(() => [] as FlowableProcessDefinition[]);
-      // Discover the new definition. Single-file deploy → exactly one
-      // definition per deploymentId, so we filter by deploymentId alone and
-      // pick the first hit. (Earlier we ANDed `latest=true` here; combining
-      // `latest=true` with `deploymentId` in flowable-rest 7.2 occasionally
-      // returned an empty page even after a successful deploy, which broke
-      // the e2e "Open the deployed definition" assertion — RC entry pending.)
-      // A short retry loop absorbs the engine's read-after-write lag.
-      let newDef: FlowableProcessDefinition | null = null;
-      for (let attempt = 0; attempt < 4 && !newDef; attempt++) {
-        if (attempt > 0) await new Promise((r) => setTimeout(r, 250));
-        try {
-          const list = await api.listProcessDefinitions({
-            deploymentId: deployment.id,
-            size: 10,
-          });
-          newDef = list.data?.[0] || null;
-        } catch {}
-      }
-      // Wait for the dropdown refresh to land BEFORE the operator clicks
-      // Open — that way activeDef can immediately resolve via the local
-      // definitions list when the URL-driven autoload fires.
-      await refresh;
-      // Successful deploy ends any in-progress "New from scratch" draft.
-      setCreatingNew(false);
-      if (newDef) {
-        toast({
-          kind: "success",
-          text: `Deployed ${deployment.name} → ${newDef.key} v${newDef.version}`,
-          action: {
-            label: "Open the deployed definition",
-            testId: "open-deployed-definition",
-            onClick: () =>
-              navigate({
-                to: "/bpmn",
-                search: { definitionId: newDef.id },
-              }),
-          },
-        });
-      } else {
-        // Defensive: if the lookup fails (engine momentarily inconsistent),
-        // show a plain success toast.
-        toast({
-          kind: "success",
-          text: `Deployed ${deployment.name} (${deployment.id}).`,
-          sub: "Refresh /definitions to see the new revision.",
-        });
-      }
+      const out = await m.saveXML({ format: true });
+      xml = out.xml as string;
     } catch (e) {
       const msg = (e as Error)?.message || String(e);
-      // PR #168 follow-up: rely on the toast for deploy failures — covering
-      // the canvas with an error overlay blocked the operator from
-      // continuing to edit the draft. Toast carries the verbatim message;
-      // creatingNew + dirty state are preserved so the draft survives.
-      toast({ kind: "error", text: `Deploy failed: ${msg}` });
+      toast({ kind: "error", text: `Could not read BPMN XML: ${msg}` });
+      return;
+    }
+    const { id: xmlId, name: xmlName } = extractProcessIdAndName(xml);
+    // Defaults:
+    //   - draft: filename-derived key + readable name
+    //   - loaded def: prefer the XML's existing id + name; fall back to
+    //     activeDef.key / activeDef.name for definitions deployed via
+    //     bpmn-js paths that strip the name attribute.
+    const fallbackName = bpmnReadableNameFromFilename(filename);
+    const fallbackKey = bpmnIdFromFilename(filename);
+    const defaultKey = creatingNew || !xmlId || xmlId === "newProcess" ? fallbackKey : xmlId;
+    const defaultName = creatingNew || !xmlName ? activeDef?.name || fallbackName : xmlName;
+    setDeployTarget({ defaultKey, defaultName, filename });
+  };
+
+  // Story 16.3 AC-2 + AC-3 + PR #168 follow-up round 4: ACTUAL deploy.
+  // Called by DeployBpmnModal on confirm with operator-typed values.
+  // Errors thrown here surface as an in-modal ErrorBox so the operator
+  // can fix-and-resubmit without re-typing.
+  const doDeploy = async (chosenName: string, chosenKey: string): Promise<void> => {
+    const m = modelerRef.current;
+    if (!m) throw new Error("BPMN modeler not ready");
+    const { xml: rawXml } = await m.saveXML({ format: true });
+    const xml = rewriteProcessKeyAndName(rawXml, chosenKey, chosenName);
+    const deployment = await api.deployBpmn(filename, xml);
+    setDirty(false);
+    // Refresh the dropdown's definitions list so the deployed definition is
+    // available for selection.
+    const refresh = api
+      .listProcessDefinitions({ size: 200, sort: "name" })
+      .then((r) => {
+        setDefinitions(r.data || []);
+        return r.data || [];
+      })
+      .catch(() => [] as FlowableProcessDefinition[]);
+    // Discover the new definition. Single-file deploy → exactly one
+    // definition per deploymentId; a short retry absorbs engine
+    // read-after-write lag (see Story 16.3 e2e fix).
+    let newDef: FlowableProcessDefinition | null = null;
+    for (let attempt = 0; attempt < 4 && !newDef; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 250));
+      try {
+        const list = await api.listProcessDefinitions({
+          deploymentId: deployment.id,
+          size: 10,
+        });
+        newDef = list.data?.[0] || null;
+      } catch {}
+    }
+    await refresh;
+    setCreatingNew(false);
+    if (newDef) {
+      toast({
+        kind: "success",
+        text: `Deployed ${deployment.name} → ${newDef.key} v${newDef.version}`,
+        action: {
+          label: "Open the deployed definition",
+          testId: "open-deployed-definition",
+          onClick: () =>
+            navigate({
+              to: "/bpmn",
+              search: { definitionId: newDef.id },
+            }),
+        },
+      });
+    } else {
+      // Defensive: lookup failed (engine momentarily inconsistent) — plain success.
+      toast({
+        kind: "success",
+        text: `Deployed ${deployment.name} (${deployment.id}).`,
+        sub: "Refresh /definitions to see the new revision.",
+      });
     }
   };
 
@@ -565,13 +636,14 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
           Save
         </button>
         <button
+          ref={deployBtnRef}
           type="button"
           className="btn"
           data-size="sm"
           data-variant="ghost"
           data-testid="bpmn-deploy"
           data-tone={dirty ? "warn" : undefined}
-          onClick={deploy}
+          onClick={handleDeployClick}
         >
           <Icon name="upload" size={13} />
           {dirty ? "Deploy *" : "Deploy"}
@@ -908,6 +980,12 @@ POST /runtime/process-instances`}
           )}
         </div>
       </div>
+      <DeployBpmnModal
+        target={deployTarget}
+        onConfirm={doDeploy}
+        onClose={() => setDeployTarget(null)}
+        triggerRef={deployBtnRef}
+      />
     </div>
   );
 };

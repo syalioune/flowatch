@@ -278,6 +278,9 @@ describe("<BpmnModeler> — Story 16.2 dirty-state + zoom-to-fit", () => {
   });
 
   it("dirty resets to false after a successful deploy", async () => {
+    // Ensure deploy + lookup succeed
+    deployBpmnSpy.mockResolvedValue({ id: "dep-77", name: "loan-approval.bpmn20.xml" });
+    listProcessDefinitionsSpy.mockResolvedValue({ data: [] });
     renderModeler();
     await waitFor(() => expect(buses.length).toBe(1));
     const bus = buses[0];
@@ -288,10 +291,13 @@ describe("<BpmnModeler> — Story 16.2 dirty-state + zoom-to-fit", () => {
     await waitFor(() => {
       expect(screen.getByTestId("bpmn-deploy").textContent).toMatch(/Deploy \*/);
     });
-    // Now simulate a successful deploy: canUndo restored to false (the
-    // deployed XML is the new clean baseline) + click Deploy.
+    // Successful deploy resets dirty. canUndo flips false (deployed XML is
+    // the new clean baseline). The deploy modal is now in front of the real
+    // deploy call — click Deploy → confirm.
     canUndoValue = false;
     fireEvent.click(screen.getByTestId("bpmn-deploy"));
+    await waitFor(() => expect(screen.getByTestId("deploy-bpmn-modal")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("deploy-bpmn-submit"));
     await waitFor(() => {
       expect(screen.getByTestId("bpmn-deploy").textContent).toMatch(/^Deploy$/);
     });
@@ -369,6 +375,9 @@ describe("<BpmnModeler> — Story 16.3 New + Deploy + post-deploy toast", () => 
     renderModeler();
     await waitFor(() => expect(buses.length).toBe(1));
     fireEvent.click(screen.getByTestId("bpmn-deploy"));
+    // PR #168 follow-up: Deploy click opens the confirmation modal first.
+    await waitFor(() => expect(screen.getByTestId("deploy-bpmn-modal")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("deploy-bpmn-submit"));
     await waitFor(() => expect(deployBpmnSpy).toHaveBeenCalledTimes(1));
     // Toast event has the Open action with the right testId
     await waitFor(() => {
@@ -382,7 +391,7 @@ describe("<BpmnModeler> — Story 16.3 New + Deploy + post-deploy toast", () => 
     });
   });
 
-  it("Deploy failure surfaces an error toast + dirty stays true (AC-2)", async () => {
+  it("Deploy failure surfaces an in-modal ErrorBox + dirty stays true (AC-2)", async () => {
     deployBpmnSpy.mockRejectedValue(new Error("Engine returned 500"));
     renderModeler();
     await waitFor(() => expect(buses.length).toBe(1));
@@ -395,13 +404,30 @@ describe("<BpmnModeler> — Story 16.3 New + Deploy + post-deploy toast", () => 
       expect(screen.getByTestId("bpmn-deploy").textContent).toMatch(/Deploy \*/);
     });
     fireEvent.click(screen.getByTestId("bpmn-deploy"));
+    // PR #168 follow-up: confirmation modal — confirm to actually attempt the deploy.
+    await waitFor(() => expect(screen.getByTestId("deploy-bpmn-modal")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("deploy-bpmn-submit"));
+    // Retryable-creation pattern: on failure the modal stays open with an
+    // in-modal ErrorBox so the operator can fix-and-resubmit without
+    // re-typing.
     await waitFor(() => {
-      const errToast = capturedToasts.find((t) => t.kind === "error");
-      expect(errToast).toBeDefined();
-      expect(errToast?.text).toMatch(/Deploy failed/);
+      expect(screen.getByTestId("deploy-bpmn-modal")).toBeInTheDocument();
+      expect(screen.getByText(/Engine returned 500/)).toBeInTheDocument();
     });
-    // Dirty stays true: commandStack.canUndo() is still true; the asterisk
-    // remains.
+    // Dirty stays true: commandStack.canUndo() is still true; asterisk remains
+    // on the deploy button under the modal.
     expect(screen.getByTestId("bpmn-deploy").textContent).toMatch(/Deploy \*/);
+  });
+
+  it("Deploy click opens the modal with filename-derived defaults (PR #168 round 4)", async () => {
+    renderModeler();
+    await waitFor(() => expect(buses.length).toBe(1));
+    fireEvent.click(screen.getByTestId("bpmn-deploy"));
+    await waitFor(() => expect(screen.getByTestId("deploy-bpmn-modal")).toBeInTheDocument());
+    // Defaults derive from the initial filename "loan-approval.bpmn20.xml"
+    const nameInput = screen.getByTestId("deploy-bpmn-name") as HTMLInputElement;
+    const keyInput = screen.getByTestId("deploy-bpmn-key") as HTMLInputElement;
+    expect(nameInput.value).toBe("Loan Approval");
+    expect(keyInput.value).toBe("loan-approval");
   });
 });
