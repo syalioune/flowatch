@@ -1216,7 +1216,10 @@ interface ToastDetail {
   text: string;
   sub?: string;
   ttl?: number;
-  action?: { label: string; onClick: () => void };
+  // Story 16.3: post-deploy "Open the deployed definition" surfaces here
+  // with a `testId` so the E2E spec can click the action without relying
+  // on the label string.
+  action?: { label: string; onClick: () => void; testId?: string };
 }
 
 interface ToastItem extends ToastDetail {
@@ -1250,9 +1253,11 @@ export const Toaster = () => {
           </div>
           {t.action && (
             <button
+              type="button"
               className="btn"
               data-size="sm"
               data-variant="ghost"
+              data-testid={t.action.testId}
               onClick={() => {
                 t.action?.onClick();
                 dismiss(t.id);

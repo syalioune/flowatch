@@ -19,7 +19,7 @@ import BpmnModelerClass from "bpmn-js/lib/Modeler";
 import type EventBus from "diagram-js/lib/core/EventBus";
 import React from "react";
 import { api, type FlowableProcessDefinition } from "../api";
-import { Icon } from "../components";
+import { Icon, toast } from "../components";
 import { BLANK_BPMN_XML, LOAN_BPMN_XML } from "./starters";
 
 const openInspector = () => {
@@ -305,20 +305,87 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
     const { svg } = await m.saveSVG();
     download(filename.replace(/\.bpmn.*$/, ".svg"), svg, "image/svg+xml");
   };
+  // Story 16.3 AC-2 + AC-3: Deploy exports XML, deploys via api.deployBpmn,
+  // resets dirty + surfaces a success toast with an "Open the deployed
+  // definition" action. Flowable's FlowableDeployment DTO does NOT carry an
+  // inline `definitions[]` field (verified at T-1.3 against the live engine),
+  // so we follow up with `api.listProcessDefinitions({deploymentId, latest})`
+  // to discover the new definition's id for the Open action.
   const deploy = async () => {
     const m = modelerRef.current;
     if (!m) return;
     try {
       const { xml } = await m.saveXML({ format: true });
-      await api.deployBpmn(filename, xml);
+      const deployment = await api.deployBpmn(filename, xml);
       setDirty(false);
-      api
+      // Refresh the dropdown's definitions list so the deployed definition is
+      // available for selection.
+      const refresh = api
         .listProcessDefinitions({ size: 200, sort: "name" })
-        .then((r) => setDefinitions(r.data || []))
-        .catch(() => {});
+        .then((r) => {
+          setDefinitions(r.data || []);
+          return r.data || [];
+        })
+        .catch(() => [] as FlowableProcessDefinition[]);
+      // Discover the new definition (single-file deploy → latest definition
+      // for this deploymentId). The lookup is independent of the dropdown
+      // refresh so the toast doesn't wait for the longer 200-row scan.
+      const newDef = await api
+        .listProcessDefinitions({ deploymentId: deployment.id, latest: true, size: 1 })
+        .then((r) => r.data?.[0] || null)
+        .catch(() => null);
+      // Wait for the dropdown refresh to land BEFORE the operator clicks
+      // Open — that way activeDef can immediately resolve via the local
+      // definitions list when the URL-driven autoload fires.
+      await refresh;
+      if (newDef) {
+        toast({
+          kind: "success",
+          text: `Deployed ${deployment.name} → ${newDef.key} v${newDef.version}`,
+          action: {
+            label: "Open the deployed definition",
+            testId: "open-deployed-definition",
+            onClick: () =>
+              navigate({
+                to: "/bpmn",
+                search: { definitionId: newDef.id },
+              }),
+          },
+        });
+      } else {
+        // Defensive: if the lookup fails (engine momentarily inconsistent),
+        // show a plain success toast.
+        toast({
+          kind: "success",
+          text: `Deployed ${deployment.name} (${deployment.id}).`,
+          sub: "Refresh /definitions to see the new revision.",
+        });
+      }
     } catch (e) {
-      setError(`Deploy failed: ${(e as Error)?.message || e}`);
+      const msg = (e as Error)?.message || String(e);
+      setError(`Deploy failed: ${msg}`);
+      toast({ kind: "error", text: `Deploy failed: ${msg}` });
     }
+  };
+
+  // Story 16.3 AC-1: "New from scratch" — confirm-on-dirty, load BLANK,
+  // clear ?definitionId= so the URL no longer points at any deployed def.
+  const handleNew = async () => {
+    if (dirty) {
+      const ok = window.confirm("You have unsaved changes. Discard and start a new BPMN?");
+      if (!ok) return;
+    }
+    setActiveDef(null);
+    setFilename("new-process.bpmn20.xml");
+    try {
+      await importAndFit(BLANK_BPMN_XML);
+      setError(null);
+    } catch (e) {
+      setError(String((e as Error)?.message || e));
+    }
+    // Clear any deep-link search param — the operator is now editing a
+    // not-yet-deployed BPMN.
+    navigate({ to: "/bpmn", search: {}, replace: true });
   };
 
   const zoom = (dir: number | "fit") => {
@@ -363,6 +430,18 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
           ))}
         </select>
         <div className="sep" />
+        <button
+          type="button"
+          className="btn"
+          data-size="sm"
+          data-variant="ghost"
+          data-testid="bpmn-new"
+          onClick={handleNew}
+          title="Start a new BPMN from blank"
+        >
+          <Icon name="plus" size={13} />
+          New
+        </button>
         <button type="button" className="btn" data-size="sm" data-variant="ghost" onClick={saveXML}>
           <Icon name="save" size={13} />
           Save

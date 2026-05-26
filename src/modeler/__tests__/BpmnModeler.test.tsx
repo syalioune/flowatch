@@ -104,6 +104,17 @@ vi.mock("bpmn-js/lib/Modeler", () => {
   return { default: StubModeler };
 });
 
+// Story 16.3: per-test handles on the api so deploy / new tests can assert
+// args + tweak return values. `vi.hoisted` lifts the spy declarations above
+// the mock factory's evaluation (which runs before module-top-level code).
+const { listProcessDefinitionsSpy, getProcessDefinitionResourceSpy, deployBpmnSpy } = vi.hoisted(
+  () => ({
+    listProcessDefinitionsSpy: vi.fn(),
+    getProcessDefinitionResourceSpy: vi.fn(),
+    deployBpmnSpy: vi.fn(),
+  }),
+);
+
 // Mock the api so the dropdown's listProcessDefinitions doesn't network.
 vi.mock("../../api", async () => {
   const real = await vi.importActual<typeof import("../../api")>("../../api");
@@ -111,15 +122,30 @@ vi.mock("../../api", async () => {
     ...real,
     api: {
       ...real.api,
-      listProcessDefinitions: vi.fn(() => Promise.resolve({ data: [] })),
-      getProcessDefinitionResource: vi.fn(() => Promise.resolve("<bpmn:definitions/>")),
-      deployBpmn: vi.fn(() => Promise.resolve({ id: "dep-1", name: "x" })),
+      listProcessDefinitions: listProcessDefinitionsSpy,
+      getProcessDefinitionResource: getProcessDefinitionResourceSpy,
+      deployBpmn: deployBpmnSpy,
     },
   };
 });
 
 // Import AFTER the mock declarations.
 import { BpmnModeler } from "../BpmnModeler";
+
+// Story 16.3: the deploy() handler dispatches `app:toast` window events.
+// Tests capture them via an event listener installed per-test so each test
+// gets a fresh queue.
+interface CapturedToast {
+  kind?: string;
+  text: string;
+  sub?: string;
+  action?: { label: string; testId?: string };
+}
+const capturedToasts: CapturedToast[] = [];
+const onToast = (e: Event) => {
+  // @ts-expect-error — CustomEvent.detail is unknown at the listener level
+  capturedToasts.push(e.detail);
+};
 
 // Story 16.2: `<BpmnModeler>` now calls `useNavigate()` from tanstack-router,
 // so the test harness mounts it inside a minimal `<RouterProvider>` rooted
@@ -140,9 +166,21 @@ beforeEach(() => {
   filterSpy.mockClear();
   buses.length = 0;
   canUndoValue = false;
+  // Story 16.3 defaults: list returns empty by default; deploy returns a
+  // canned envelope; getProcessDefinitionResource returns inert XML. Tests
+  // mutate via .mockResolvedValueOnce(...) when they need different values.
+  listProcessDefinitionsSpy.mockReset();
+  listProcessDefinitionsSpy.mockResolvedValue({ data: [] });
+  getProcessDefinitionResourceSpy.mockReset();
+  getProcessDefinitionResourceSpy.mockResolvedValue("<bpmn:definitions/>");
+  deployBpmnSpy.mockReset();
+  deployBpmnSpy.mockResolvedValue({ id: "dep-1", name: "x" });
+  capturedToasts.length = 0;
+  window.addEventListener("app:toast", onToast);
 });
 
 afterEach(() => {
+  window.removeEventListener("app:toast", onToast);
   cleanup();
   vi.clearAllMocks();
 });
@@ -257,5 +295,113 @@ describe("<BpmnModeler> — Story 16.2 dirty-state + zoom-to-fit", () => {
     await waitFor(() => {
       expect(screen.getByTestId("bpmn-deploy").textContent).toMatch(/^Deploy$/);
     });
+  });
+});
+
+describe("<BpmnModeler> — Story 16.3 New + Deploy + post-deploy toast", () => {
+  it("New button renders with data-testid='bpmn-new' (AC-1)", async () => {
+    renderModeler();
+    await waitFor(() => expect(buses.length).toBe(1));
+    const newBtn = screen.getByTestId("bpmn-new");
+    expect(newBtn).toBeInTheDocument();
+    expect(newBtn.textContent).toMatch(/New/);
+  });
+
+  it("New click on clean state calls importXML with BLANK_BPMN_XML (AC-1)", async () => {
+    renderModeler();
+    await waitFor(() => expect(buses.length).toBe(1));
+    // Wait for the initial mount-import (LOAN) to settle so the next import
+    // is the operator's "New" click.
+    await waitFor(() => expect(importXMLSpy).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByTestId("bpmn-new"));
+    await waitFor(() => expect(importXMLSpy).toHaveBeenCalledTimes(2));
+    const lastCall = importXMLSpy.mock.calls.at(-1);
+    expect(lastCall?.[0]).toMatch(/<bpmn:definitions/);
+    // The BLANK starter declares `id="newProcess"` — the LOAN starter uses
+    // `id="loanApproval"`. The new-from-scratch import must be BLANK.
+    expect(lastCall?.[0]).toMatch(/newProcess/);
+  });
+
+  it("New click with dirty=true prompts window.confirm; cancel skips the import (AC-1)", async () => {
+    renderModeler();
+    await waitFor(() => expect(buses.length).toBe(1));
+    const bus = buses[0];
+    if (!bus) throw new Error("bus not captured");
+    // Operator made edits
+    canUndoValue = true;
+    bus.fire("commandStack.changed", {});
+    await waitFor(() => {
+      expect(screen.getByTestId("bpmn-deploy").textContent).toMatch(/Deploy \*/);
+    });
+    // Wait for mount import to settle
+    await waitFor(() => expect(importXMLSpy).toHaveBeenCalledTimes(1));
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    fireEvent.click(screen.getByTestId("bpmn-new"));
+    expect(confirmSpy).toHaveBeenCalled();
+    // confirm returned false → import was NOT called a second time
+    expect(importXMLSpy).toHaveBeenCalledTimes(1);
+    confirmSpy.mockRestore();
+  });
+
+  it("Deploy success surfaces a toast with 'Open the deployed definition' action (AC-3)", async () => {
+    // Set up the post-deploy lookup to return a definition
+    deployBpmnSpy.mockResolvedValue({ id: "dep-99", name: "loan-approval.bpmn20.xml" });
+    // The deploy() handler issues TWO listProcessDefinitions calls:
+    // (1) refresh the dropdown's 200-row list
+    // (2) lookup the deployed definition by deploymentId+latest
+    listProcessDefinitionsSpy.mockImplementation((params?: { deploymentId?: string }) => {
+      if (params?.deploymentId === "dep-99") {
+        return Promise.resolve({
+          data: [
+            {
+              id: "loanApproval:42:abc",
+              key: "loanApproval",
+              version: 42,
+              name: "Loan approval",
+              deploymentId: "dep-99",
+            },
+          ],
+        });
+      }
+      return Promise.resolve({ data: [] });
+    });
+
+    renderModeler();
+    await waitFor(() => expect(buses.length).toBe(1));
+    fireEvent.click(screen.getByTestId("bpmn-deploy"));
+    await waitFor(() => expect(deployBpmnSpy).toHaveBeenCalledTimes(1));
+    // Toast event has the Open action with the right testId
+    await waitFor(() => {
+      expect(capturedToasts.length).toBeGreaterThan(0);
+      const successToast = capturedToasts.find(
+        (t) => t.action?.testId === "open-deployed-definition",
+      );
+      expect(successToast).toBeDefined();
+      expect(successToast?.kind).toBe("success");
+      expect(successToast?.text).toMatch(/loanApproval v42/);
+    });
+  });
+
+  it("Deploy failure surfaces an error toast + dirty stays true (AC-2)", async () => {
+    deployBpmnSpy.mockRejectedValue(new Error("Engine returned 500"));
+    renderModeler();
+    await waitFor(() => expect(buses.length).toBe(1));
+    const bus = buses[0];
+    if (!bus) throw new Error("bus not captured");
+    // Make operator-dirty so we can check it stays after the failed deploy
+    canUndoValue = true;
+    bus.fire("commandStack.changed", {});
+    await waitFor(() => {
+      expect(screen.getByTestId("bpmn-deploy").textContent).toMatch(/Deploy \*/);
+    });
+    fireEvent.click(screen.getByTestId("bpmn-deploy"));
+    await waitFor(() => {
+      const errToast = capturedToasts.find((t) => t.kind === "error");
+      expect(errToast).toBeDefined();
+      expect(errToast?.text).toMatch(/Deploy failed/);
+    });
+    // Dirty stays true: commandStack.canUndo() is still true; the asterisk
+    // remains.
+    expect(screen.getByTestId("bpmn-deploy").textContent).toMatch(/Deploy \*/);
   });
 });
