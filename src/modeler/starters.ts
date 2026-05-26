@@ -52,10 +52,10 @@ export const LOAN_BPMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
       <bpmn:outgoing>Flow_2</bpmn:outgoing>
     </bpmn:serviceTask>
     <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_1" targetRef="Task_Credit" />
-    <bpmn:businessRuleTask id="Task_Eligibility" name="Loan eligibility (DMN)" flowable:type="dmn" flowable:decisionRef="loanEligibility">
+    <bpmn:serviceTask id="Task_Eligibility" name="Loan eligibility" flowable:class="com.acme.loan.EligibilityDelegate">
       <bpmn:incoming>Flow_2</bpmn:incoming>
       <bpmn:outgoing>Flow_3</bpmn:outgoing>
-    </bpmn:businessRuleTask>
+    </bpmn:serviceTask>
     <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_Credit" targetRef="Task_Eligibility" />
     <bpmn:exclusiveGateway id="Gateway_1" name="Decision?">
       <bpmn:incoming>Flow_3</bpmn:incoming>
