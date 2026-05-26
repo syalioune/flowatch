@@ -46,6 +46,10 @@ export const emptyStates: Record<string, EmptyStateEntry> = {
     title: "No groups yet.",
     body: "Groups appear here when the engine has identity records. The Flowable Modeler 'Identity' tab can seed users + groups; the IDM REST API also accepts POST /identity/groups.",
   },
+  groupMembers: {
+    title: "No members in this group.",
+    body: "Add users to this group via the 'Add user' action (arrives in Story 14.3) or via POST /identity/users/{userId}/groups directly.",
+  },
   activeActivities: {
     title: "No active activities right now.",
     body: "This instance is idle (awaiting a timer, a message, or a parallel branch to converge) — or all branches have completed.",

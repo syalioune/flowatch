@@ -17,16 +17,32 @@ import * as apiModule from "../api";
 import { loadIdentity } from "../routes/identity/index";
 
 type ListUsersFn = typeof apiModule.api.listUsers;
+type ListGroupsFn = typeof apiModule.api.listGroups;
 
 describe("/identity route loader", () => {
   const realListUsers = apiModule.api.listUsers;
+  const realListGroups = apiModule.api.listGroups;
   let listUsersSpy: ReturnType<typeof vi.fn>;
-  let lastParams: unknown = null;
+  let listGroupsSpy: ReturnType<typeof vi.fn>;
+  let lastUsersParams: unknown = null;
+  let lastGroupsParams: unknown = null;
 
   beforeEach(() => {
-    lastParams = null;
+    lastUsersParams = null;
+    lastGroupsParams = null;
     listUsersSpy = vi.fn((p: unknown) => {
-      lastParams = p;
+      lastUsersParams = p;
+      return Promise.resolve({
+        data: [],
+        total: 0,
+        start: 0,
+        size: 50,
+        sort: "id",
+        order: "asc",
+      });
+    });
+    listGroupsSpy = vi.fn((p: unknown) => {
+      lastGroupsParams = p;
       return Promise.resolve({
         data: [],
         total: 0,
@@ -38,24 +54,27 @@ describe("/identity route loader", () => {
     });
     (apiModule.api as unknown as { listUsers: ListUsersFn }).listUsers =
       listUsersSpy as unknown as ListUsersFn;
+    (apiModule.api as unknown as { listGroups: ListGroupsFn }).listGroups =
+      listGroupsSpy as unknown as ListGroupsFn;
   });
 
   afterEach(() => {
     (apiModule.api as unknown as { listUsers: ListUsersFn }).listUsers = realListUsers;
-  });
-
-  it("returns null when tab is 'groups' (legacy shim path)", () => {
-    const result = loadIdentity("groups");
-    expect(result).toBeNull();
-    expect(listUsersSpy).not.toHaveBeenCalled();
+    (apiModule.api as unknown as { listGroups: ListGroupsFn }).listGroups = realListGroups;
   });
 
   it("calls api.listUsers with size 50 when tab is 'users'", async () => {
-    const result = loadIdentity("users");
-    expect(result).not.toBeNull();
-    await result;
+    await loadIdentity("users");
     expect(listUsersSpy).toHaveBeenCalledOnce();
-    expect(lastParams).toEqual({ size: 50 });
+    expect(listGroupsSpy).not.toHaveBeenCalled();
+    expect(lastUsersParams).toEqual({ size: 50 });
+  });
+
+  it("calls api.listGroups with size 50 when tab is 'groups'", async () => {
+    await loadIdentity("groups");
+    expect(listGroupsSpy).toHaveBeenCalledOnce();
+    expect(listUsersSpy).not.toHaveBeenCalled();
+    expect(lastGroupsParams).toEqual({ size: 50 });
   });
 
   it("returns the FlowablePage from api.listUsers", async () => {
@@ -69,6 +88,20 @@ describe("/identity route loader", () => {
     };
     listUsersSpy.mockResolvedValueOnce(fake);
     const result = await loadIdentity("users");
+    expect(result).toEqual(fake);
+  });
+
+  it("returns the FlowablePage from api.listGroups", async () => {
+    const fake = {
+      data: [{ id: "admin", name: "Admin group", type: "security" }],
+      total: 1,
+      start: 0,
+      size: 50,
+      sort: "id",
+      order: "asc",
+    };
+    listGroupsSpy.mockResolvedValueOnce(fake);
+    const result = await loadIdentity("groups");
     expect(result).toEqual(fake);
   });
 });

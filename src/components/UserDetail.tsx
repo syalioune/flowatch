@@ -112,6 +112,7 @@ export function UserDetail({ user }: Props) {
           {memberships.data?.data.map((g) => (
             <div
               key={g.id}
+              data-testid={`user-group-row-${g.id}`}
               style={{
                 display: "flex",
                 alignItems: "center",
