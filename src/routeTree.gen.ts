@@ -20,10 +20,12 @@ import { Route as IdentityIndexRouteImport } from "./routes/identity/index"
 import { Route as HistoryIndexRouteImport } from "./routes/history/index"
 import { Route as DeploymentsIndexRouteImport } from "./routes/deployments/index"
 import { Route as DefinitionsIndexRouteImport } from "./routes/definitions/index"
+import { Route as DecisionsIndexRouteImport } from "./routes/decisions/index"
 import { Route as TasksIdRouteImport } from "./routes/tasks/$id"
 import { Route as InstancesIdRouteImport } from "./routes/instances/$id"
 import { Route as DeploymentsIdRouteImport } from "./routes/deployments/$id"
 import { Route as DefinitionsIdRouteImport } from "./routes/definitions/$id"
+import { Route as DecisionsKeyRouteImport } from "./routes/decisions/$key"
 import { Route as IdentityUsersIdRouteImport } from "./routes/identity/users/$id"
 import { Route as IdentityGroupsIdRouteImport } from "./routes/identity/groups/$id"
 
@@ -82,6 +84,11 @@ const DefinitionsIndexRoute = DefinitionsIndexRouteImport.update({
   path: "/definitions/",
   getParentRoute: () => rootRouteImport,
 } as any)
+const DecisionsIndexRoute = DecisionsIndexRouteImport.update({
+  id: "/decisions/",
+  path: "/decisions/",
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TasksIdRoute = TasksIdRouteImport.update({
   id: "/tasks/$id",
   path: "/tasks/$id",
@@ -102,6 +109,11 @@ const DefinitionsIdRoute = DefinitionsIdRouteImport.update({
   path: "/definitions/$id",
   getParentRoute: () => rootRouteImport,
 } as any)
+const DecisionsKeyRoute = DecisionsKeyRouteImport.update({
+  id: "/decisions/$key",
+  path: "/decisions/$key",
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IdentityUsersIdRoute = IdentityUsersIdRouteImport.update({
   id: "/identity/users/$id",
   path: "/identity/users/$id",
@@ -118,10 +130,12 @@ export interface FileRoutesByFullPath {
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
   "/tenants": typeof TenantsRoute
+  "/decisions/$key": typeof DecisionsKeyRoute
   "/definitions/$id": typeof DefinitionsIdRoute
   "/deployments/$id": typeof DeploymentsIdRoute
   "/instances/$id": typeof InstancesIdRoute
   "/tasks/$id": typeof TasksIdRoute
+  "/decisions/": typeof DecisionsIndexRoute
   "/definitions/": typeof DefinitionsIndexRoute
   "/deployments/": typeof DeploymentsIndexRoute
   "/history/": typeof HistoryIndexRoute
@@ -137,10 +151,12 @@ export interface FileRoutesByTo {
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
   "/tenants": typeof TenantsRoute
+  "/decisions/$key": typeof DecisionsKeyRoute
   "/definitions/$id": typeof DefinitionsIdRoute
   "/deployments/$id": typeof DeploymentsIdRoute
   "/instances/$id": typeof InstancesIdRoute
   "/tasks/$id": typeof TasksIdRoute
+  "/decisions": typeof DecisionsIndexRoute
   "/definitions": typeof DefinitionsIndexRoute
   "/deployments": typeof DeploymentsIndexRoute
   "/history": typeof HistoryIndexRoute
@@ -157,10 +173,12 @@ export interface FileRoutesById {
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
   "/tenants": typeof TenantsRoute
+  "/decisions/$key": typeof DecisionsKeyRoute
   "/definitions/$id": typeof DefinitionsIdRoute
   "/deployments/$id": typeof DeploymentsIdRoute
   "/instances/$id": typeof InstancesIdRoute
   "/tasks/$id": typeof TasksIdRoute
+  "/decisions/": typeof DecisionsIndexRoute
   "/definitions/": typeof DefinitionsIndexRoute
   "/deployments/": typeof DeploymentsIndexRoute
   "/history/": typeof HistoryIndexRoute
@@ -178,10 +196,12 @@ export interface FileRouteTypes {
     | "/bpmn"
     | "/dmn"
     | "/tenants"
+    | "/decisions/$key"
     | "/definitions/$id"
     | "/deployments/$id"
     | "/instances/$id"
     | "/tasks/$id"
+    | "/decisions/"
     | "/definitions/"
     | "/deployments/"
     | "/history/"
@@ -197,10 +217,12 @@ export interface FileRouteTypes {
     | "/bpmn"
     | "/dmn"
     | "/tenants"
+    | "/decisions/$key"
     | "/definitions/$id"
     | "/deployments/$id"
     | "/instances/$id"
     | "/tasks/$id"
+    | "/decisions"
     | "/definitions"
     | "/deployments"
     | "/history"
@@ -216,10 +238,12 @@ export interface FileRouteTypes {
     | "/bpmn"
     | "/dmn"
     | "/tenants"
+    | "/decisions/$key"
     | "/definitions/$id"
     | "/deployments/$id"
     | "/instances/$id"
     | "/tasks/$id"
+    | "/decisions/"
     | "/definitions/"
     | "/deployments/"
     | "/history/"
@@ -236,10 +260,12 @@ export interface RootRouteChildren {
   BpmnRoute: typeof BpmnRoute
   DmnRoute: typeof DmnRoute
   TenantsRoute: typeof TenantsRoute
+  DecisionsKeyRoute: typeof DecisionsKeyRoute
   DefinitionsIdRoute: typeof DefinitionsIdRoute
   DeploymentsIdRoute: typeof DeploymentsIdRoute
   InstancesIdRoute: typeof InstancesIdRoute
   TasksIdRoute: typeof TasksIdRoute
+  DecisionsIndexRoute: typeof DecisionsIndexRoute
   DefinitionsIndexRoute: typeof DefinitionsIndexRoute
   DeploymentsIndexRoute: typeof DeploymentsIndexRoute
   HistoryIndexRoute: typeof HistoryIndexRoute
@@ -330,6 +356,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof DefinitionsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    "/decisions/": {
+      id: "/decisions/"
+      path: "/decisions"
+      fullPath: "/decisions/"
+      preLoaderRoute: typeof DecisionsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     "/tasks/$id": {
       id: "/tasks/$id"
       path: "/tasks/$id"
@@ -358,6 +391,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof DefinitionsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    "/decisions/$key": {
+      id: "/decisions/$key"
+      path: "/decisions/$key"
+      fullPath: "/decisions/$key"
+      preLoaderRoute: typeof DecisionsKeyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     "/identity/users/$id": {
       id: "/identity/users/$id"
       path: "/identity/users/$id"
@@ -380,10 +420,12 @@ const rootRouteChildren: RootRouteChildren = {
   BpmnRoute: BpmnRoute,
   DmnRoute: DmnRoute,
   TenantsRoute: TenantsRoute,
+  DecisionsKeyRoute: DecisionsKeyRoute,
   DefinitionsIdRoute: DefinitionsIdRoute,
   DeploymentsIdRoute: DeploymentsIdRoute,
   InstancesIdRoute: InstancesIdRoute,
   TasksIdRoute: TasksIdRoute,
+  DecisionsIndexRoute: DecisionsIndexRoute,
   DefinitionsIndexRoute: DefinitionsIndexRoute,
   DeploymentsIndexRoute: DeploymentsIndexRoute,
   HistoryIndexRoute: HistoryIndexRoute,

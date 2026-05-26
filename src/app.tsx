@@ -37,6 +37,7 @@ const QUICK_JUMP: ReadonlyArray<{ label: string; path: string }> = [
   { label: "DMN modeler", path: "/dmn" },
   { label: "Deployments", path: "/deployments" },
   { label: "Process definitions", path: "/definitions" },
+  { label: "Decisions", path: "/decisions" },
   { label: "Process instances", path: "/instances" },
   { label: "Jobs", path: "/jobs" },
   { label: "Tasks", path: "/tasks" },

@@ -34,6 +34,10 @@ export interface EmptyStateEntry {
 }
 
 export const emptyStates: Record<string, EmptyStateEntry> = {
+  decisions: {
+    title: "No DMN decisions yet.",
+    body: "Deploy a .dmn file via the Deployments tab (Story 15.2) or use the DMN modeler at /dmn to author and deploy a decision table.",
+  },
   definitions: {
     title: "No process definitions yet.",
     body: "Upload a BPMN deployment to see process definitions here.",
@@ -57,6 +61,10 @@ export const emptyStates: Record<string, EmptyStateEntry> = {
   deploymentResources: {
     title: "No resources.",
     body: "This deployment has no files. That's unusual — deployments typically bundle at least one BPMN / DMN file.",
+  },
+  dmnDeployments: {
+    title: "No DMN deployments yet.",
+    body: "Upload a .dmn file via the 'Deploy DMN' button to push a decision table to the engine. DMN deployments are independent of BPMN deployments.",
   },
   historicActivities: {
     title: "No recorded activities for this instance yet.",
