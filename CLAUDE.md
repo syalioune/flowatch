@@ -67,7 +67,7 @@ Persisted in `localStorage` under `flowatch.connection.v1` (`baseUrl`, `username
 
 ### Modelers
 
-[src/modeler.jsx](src/modeler.jsx) wraps `bpmn-js/lib/Modeler` and `dmn-js/lib/Modeler` directly (not the React bindings). Each component instantiates the vanilla class in a `useEffect`, attaches it to a ref'd `<div>`, and bridges save actions to `api.deployBpmn` / `api.deployDmn`. CSS for the modelers is imported once in [src/main.jsx](src/main.jsx) — both `bpmn-js/dist/assets/*.css` and `dmn-js/dist/assets/*.css`.
+The modeler components live in [src/modeler/](src/modeler/) as a small directory of sibling files: `BpmnModeler.tsx`, `DmnModeler.tsx` (Story 16.4), and `starters.ts` (shared starter XMLs — `BLANK_BPMN_XML`, `LOAN_BPMN_XML`, `LOAN_DMN_XML`). Both modelers wrap `bpmn-js/lib/Modeler` and `dmn-js/lib/Modeler` directly (not the React bindings). Each component instantiates the vanilla class in a `useEffect`, attaches it to a ref'd `<div>`, and bridges save actions to `api.deployBpmn` / `api.deployDmn`. CSS for the modelers is imported once in [src/main.tsx](src/main.tsx) — both `bpmn-js/dist/assets/*.css` and `dmn-js/dist/assets/*.css`.
 
 The BPMN modeler:
 - Lists deployed definitions in a dropdown and loads the raw XML via `GET /repository/process-definitions/{id}/resourcedata`.
@@ -77,6 +77,17 @@ The BPMN modeler:
 The DMN modeler is similar but its REST calls go to the `dmn-api` sub-app (see API layer note above).
 
 The Upload modal at [src/lib/upload-deployment-modal.tsx](src/lib/upload-deployment-modal.tsx) (Story 9.2) is the GUI-driven counterpart to the modeler's Save-and-deploy — both routes ultimately call `api.deployBpmn(filename, xml)`.
+
+**Pattern P-006 — Vanilla bpmn-js / dmn-js wrapping (Story 16.1).** The modelers are wrapped via direct vanilla-class instantiation, NOT via the `bpmn-js-react` (or `dmn-js-react`) bindings (per ADR-001). The pattern:
+
+1. The vanilla `Modeler` class is instantiated inside a `useEffect` and attached to a ref'd `<div>` (`containerRef`).
+2. Event-bus subscriptions (`selection.changed`, `commandStack.changed`, `element.dblclick`, `views.changed`, etc.) are typed via `diagram-js`'s `EventBus<EventMap>` — with **local payload interfaces** naming the actually-observed fields, since diagram-js doesn't publish BPMN/DMN-specific event payloads. The local interface lives alongside the modeler component (see `SelectionChangedEvent` + `CommandStackChangedEvent` in [src/modeler/BpmnModeler.tsx](src/modeler/BpmnModeler.tsx)).
+3. The cleanup function unsubscribes ALL handlers + calls `modeler.destroy()` to release WebGL / canvas resources. Wrap the `destroy()` call in try/catch — bpmn-js can throw on already-disposed modelers when React strict-mode double-mounts.
+4. CSS for the modeler is imported once in `src/main.tsx` (NOT per-component) — both `bpmn-js/dist/assets/*.css` and `dmn-js/dist/assets/*.css` load at module init.
+5. The modeler chrome (toolbar + dropdown + deploy button row) honors `data-density` via CSS variables — `var(--row-h)`, `var(--pad)`, `var(--gap)` — so toggling density in TweaksPanel rescales the chrome WITHOUT remounting the canvas (UX Q-5). Hardcoded pixel values inside `.mod-toolbar` and its children are no longer permitted.
+6. Shared starter XMLs live in [src/modeler/starters.ts](src/modeler/starters.ts) as named exports — not embedded literals inside the modeler component. `BLANK_BPMN_XML` is the "New from scratch" template; `LOAN_BPMN_XML` and `LOAN_DMN_XML` are the demo defaults loaded when no real definition / decision is selected.
+
+See [src/modeler/BpmnModeler.tsx](src/modeler/BpmnModeler.tsx) for the BPMN reference implementation and [src/modeler/DmnModeler.tsx](src/modeler/DmnModeler.tsx) (Story 16.4) for the DMN counterpart. The pattern is preserved verbatim through the TypeScript migration (ADR-001) — no shift to React bindings is justifiable for v0.0.2.
 
 ### Modal conventions
 
