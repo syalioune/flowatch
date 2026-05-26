@@ -20,11 +20,10 @@
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import type React from "react";
 import { z } from "zod";
-import { api, type FlowablePage, type FlowableUser } from "../../api";
+import { api, type FlowableGroup, type FlowablePage, type FlowableUser } from "../../api";
 import { Icon, PageHead } from "../../components";
 import { EmptyState, emptyStates } from "../../lib/empty-states";
 import { ErrorBox } from "../../lib/error-box";
-import { LegacyIdentityShim } from "../../lib/legacy-identity-shim";
 import { TableSkeleton } from "../../lib/table-skeleton";
 
 const identitySearch = z.object({
@@ -33,14 +32,16 @@ const identitySearch = z.object({
 
 export type IdentityTab = "users" | "groups";
 
-// Loader dispatches per tab. Story 14.1 only fetches users; the legacy
-// shim handles its own `useApi` for the groups tab so the loader returns
-// `null` to short-circuit the route-level four-state contract. Story
-// 14.2 extends this to call `api.listGroups({size:50})` for the groups
-// branch and drops the null return.
-export const loadIdentity = (tab: IdentityTab): Promise<FlowablePage<FlowableUser>> | null => {
-  if (tab !== "users") return null;
-  return api.listUsers({ size: 50 });
+// Loader dispatches per tab — fourth indisputable consumer of the
+// tab-aware action-verb dispatch pattern (Execute / Move / history-tab
+// read / identity-tab read). The discriminant stays inline at the call
+// site per CLAUDE.md "Tab-aware action-verb dispatch" (project policy:
+// never extract).
+export const loadIdentity = (
+  tab: IdentityTab,
+): Promise<FlowablePage<FlowableUser>> | Promise<FlowablePage<FlowableGroup>> => {
+  if (tab === "users") return api.listUsers({ size: 50 });
+  return api.listGroups({ size: 50 });
 };
 
 export const Route = createFileRoute("/identity/")({
@@ -51,7 +52,12 @@ export const Route = createFileRoute("/identity/")({
     title: "Identity",
     endpoints: [
       { method: "GET", path: "/identity/users", desc: "List users" },
-      { method: "GET", path: "/identity/groups", desc: "List groups (legacy shim)" },
+      { method: "GET", path: "/identity/groups", desc: "List groups" },
+      {
+        method: "GET",
+        path: "/identity/users?memberOfGroup={id}",
+        desc: "Group members (workaround)",
+      },
       { method: "GET", path: "/identity/users/{userId}/groups", desc: "User groups (detail page)" },
     ],
   },
@@ -144,34 +150,23 @@ function IdentityRoute() {
   const router = useRouter();
   const refresh = () => router.invalidate({ filter: (r) => r.routeId === "/identity/" });
 
-  if (tab !== "users") {
-    return (
-      <PageChrome tab={tab} onTabChange={onTabChange}>
-        <LegacyIdentityShim type="groups" />
-      </PageChrome>
-    );
-  }
-
   return (
     <PageChrome tab={tab} onTabChange={onTabChange} onRefresh={refresh}>
-      <UsersList page={data as FlowablePage<FlowableUser> | null} />
+      {tab === "users" ? (
+        <UsersList page={data as FlowablePage<FlowableUser>} />
+      ) : (
+        <GroupsList page={data as FlowablePage<FlowableGroup>} />
+      )}
     </PageChrome>
   );
 }
 
 interface UsersListProps {
-  page: FlowablePage<FlowableUser> | null;
+  page: FlowablePage<FlowableUser>;
 }
 
 function UsersList({ page }: UsersListProps) {
   const navigate = useNavigate();
-  if (!page) {
-    return (
-      <div className="tbl-wrap">
-        <TableSkeleton columns={4} rows={5} />
-      </div>
-    );
-  }
   const users = page.data;
   if (users.length === 0) {
     return <EmptyState entry={emptyStates.users as NonNullable<typeof emptyStates.users>} />;
@@ -228,6 +223,60 @@ function UsersList({ page }: UsersListProps) {
               </tr>
             );
           })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+interface GroupsListProps {
+  page: FlowablePage<FlowableGroup>;
+}
+
+function GroupsList({ page }: GroupsListProps) {
+  const navigate = useNavigate();
+  const groups = page.data;
+  if (groups.length === 0) {
+    return <EmptyState entry={emptyStates.groups as NonNullable<typeof emptyStates.groups>} />;
+  }
+  const openGroup = (id: string) => navigate({ to: "/identity/groups/$id", params: { id } });
+  return (
+    <div className="tbl-wrap">
+      <table className="tbl">
+        <thead>
+          <tr>
+            <th>Group</th>
+            <th>ID</th>
+            <th>Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          {groups.map((g) => (
+            <tr
+              key={g.id}
+              data-testid={`group-row-${g.id}`}
+              style={{ cursor: "pointer" }}
+              tabIndex={0}
+              onClick={() => openGroup(g.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") openGroup(g.id);
+              }}
+            >
+              <td>
+                <b style={{ fontWeight: 500 }}>{g.name || g.id}</b>
+              </td>
+              <td className="mono mute">{g.id}</td>
+              <td>
+                {g.type ? (
+                  <span className="badge" data-tone={g.type === "security" ? "warn" : "neutral"}>
+                    {g.type}
+                  </span>
+                ) : (
+                  <span className="mute">—</span>
+                )}
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>

@@ -603,6 +603,14 @@ const listGroups = (params?: QueryParams) =>
 const getGroup = (id: string) => request<FlowableGroup>("GET", `/identity/groups/${id}`);
 const getUserGroups = (userId: string) =>
   request<FlowablePage<FlowableGroup>>("GET", `/identity/users/${userId}/groups`);
+// flowable-rest 7.2 does not expose GET /identity/groups/{id}/members. The
+// supported recipe is GET /identity/users?memberOfGroup={id}, which returns
+// the FlowablePage<FlowableUser> in the group. Future flowable versions
+// may add the direct endpoint; if so, prefer it and deprecate this wrapper.
+const listGroupMembers = (groupId: string, params?: QueryParams) =>
+  request<FlowablePage<FlowableUser>>("GET", "/identity/users", {
+    params: { ...(params ?? {}), memberOfGroup: groupId },
+  });
 const addUserToGroup = (userId: string, groupId: string) =>
   request<void>("POST", `/identity/users/${userId}/groups`, { body: { groupId } });
 
@@ -807,6 +815,7 @@ export const api = {
   listGroups,
   getGroup,
   getUserGroups,
+  listGroupMembers,
   addUserToGroup,
   listTenants,
   // DMN

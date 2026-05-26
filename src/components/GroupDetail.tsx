@@ -13,6 +13,7 @@
 import { Link } from "@tanstack/react-router";
 import type { FlowableGroup } from "../api";
 import { Icon, PageHead } from "../components";
+import { GroupMembersPanel } from "./GroupMembersPanel";
 
 interface Props {
   group: FlowableGroup;
@@ -65,16 +66,7 @@ export function GroupDetail({ group }: Props) {
           </table>
         </div>
       </div>
-      <div className="panel" style={{ marginTop: 18 }}>
-        <div className="panel-hd">
-          <span className="panel-title">Members</span>
-        </div>
-        <div className="panel-body">
-          <div className="mute">
-            Reverse membership lookup is not available in flowable-rest 7.2.
-          </div>
-        </div>
-      </div>
+      <GroupMembersPanel groupId={g.id} />
     </div>
   );
 }
