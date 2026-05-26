@@ -309,6 +309,28 @@ This means:
 
 ---
 
+## RC-14 — Use `/history/historic-activity-instances?finished=false` for "what's running NOW" on parallel-branch instances
+
+**Naive intuition:** the runtime process-instance DTO's `activityId` field carries the activity the instance is currently sitting on. Render it as the Activity column in `/instances` and as the Activity row inside `<InstanceRuntimePanel>`.
+
+**Actual behaviour:** the runtime DTO carries a SINGLE lead `activityId` per instance — useful for linearly-progressing instances, but for instances with parallel branches (parallel gateway, inclusive gateway with multiple active paths, multi-instance subprocess, event-based gateway with multiple waiting handlers), the engine cannot pick one lead and the field is often `null`. Operator-visible instances rendering `"—"` for Activity is the bug shape.
+
+The supported recipe for "what activities are running RIGHT NOW on this instance" lives in the historic surface with a `finished=false` filter:
+
+```
+GET /history/historic-activity-instances?processInstanceId={id}&finished=false&size=200
+```
+
+This is a cross-namespace recipe — a runtime question answered via the historic endpoint. The result is the full set of active activities (each with `activityId`, `activityName`, `activityType`, `assignee`, `startTime`). The runtime namespace does NOT expose an equivalent.
+
+**Workaround:** use `api.listHistoricActivities({ processInstanceId, finished: false, size: 200 })` (already in [src/api.ts](../src/api.ts)). The `<InstanceActiveActivitiesPanel>` ([src/components/InstanceActiveActivitiesPanel.tsx](../src/components/InstanceActiveActivitiesPanel.tsx)) renders the result as a 4-column table (Activity / Type / Assignee / Started). On the `/instances` list, the Activity column reads from a parallel "active activities" lookup keyed by instance id — falling back to `"—"` only when truly no rows come back.
+
+The runtime DTO's `activityId` field is still useful as a *hint* (single lead activity for linearly-progressing instances) but it is not the source of truth. Future stories that ask "what's CURRENTLY happening on this entity" should evaluate whether the answer lives in `/runtime/*` (the obvious choice) or `/history/*?finished=false` (the surprising choice). The general rule: Flowable's runtime and historic surfaces are designed independently; symmetry is not guaranteed even where the entity is conceptually the same.
+
+**Surfaced by:** Story 13.1 post-closure scope expansion (`78b323a`, 2026-05-26) — the live-engine walkthrough showed Activity columns rendering `"—"` for any instance with a parallel branch; the fix added the 8th panel-as-sibling consumer and the cross-namespace recipe ([Epic 13 retro §4.2](../_bmad-output/implementation-artifacts/epic-13-retro-2026-05-26.md)).
+
+---
+
 ## How to extend this file
 
 When a review surfaces a runtime quirk that meets all three of:
