@@ -14,6 +14,7 @@
  * Story 16.1 — extracted from src/modeler.tsx; established src/modeler/.
  */
 
+import { useNavigate } from "@tanstack/react-router";
 import BpmnModelerClass from "bpmn-js/lib/Modeler";
 import type EventBus from "diagram-js/lib/core/EventBus";
 import React from "react";
@@ -93,6 +94,7 @@ interface BpmnModelerProps {
 
 // ─── BPMN modeler (real bpmn-js) ───────────────────────────────────
 export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
+  const navigate = useNavigate();
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const modelerRef = React.useRef<AnyModeler | null>(null);
   const [selected, setSelected] = React.useState<AnyEl | null>(null);
@@ -147,6 +149,7 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
         try {
           m.get("canvas").zoom("fit-viewport", "auto");
         } catch {}
+        setDirty(false);
         refreshOutline();
       })
       .catch((e: Error) => setError(String(e.message || e)));
@@ -154,7 +157,9 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
     // Story 16.1 AC-3: typed event-bus callbacks. The cast to `EventBus` lets
     // us call .on/.off with a typed signature; the payload typings are local
     // (diagram-js doesn't publish BPMN-specific event payloads). Story 16.2
-    // consumes the CommandStackChangedEvent typing for dirty-state.
+    // consumes the CommandStackChangedEvent typing for dirty-state — the
+    // event payload itself is unused; we read dirtiness from the modeler's
+    // commandStack DI service (`canUndo()`).
     const bus = m.get("eventBus") as EventBus;
     const onSel = (event: SelectionChangedEvent) => {
       const els = event.newSelection || [];
@@ -162,7 +167,15 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
       setVersion((v) => v + 1);
     };
     const onChange = (_event: CommandStackChangedEvent) => {
-      setDirty(true);
+      try {
+        const cmdStack = m.get("commandStack");
+        // Story 16.2: dirty iff the operator has executed >= 1 undoable
+        // command since the last clean state (mount, import, deploy).
+        setDirty(!!cmdStack?.canUndo?.());
+      } catch {
+        // Defensive: if the DI service throws, fall back to "edits happened".
+        setDirty(true);
+      }
       setVersion((v) => v + 1);
       refreshOutline();
     };
@@ -192,13 +205,30 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
     };
   }, []);
 
+  // Story 16.2 AC-3: every import is followed by zoom-to-fit + dirty reset.
+  // Centralizing this means we cannot drift across the multiple import sites
+  // (mount, dropdown pick, "New from scratch" in Story 16.3).
+  const importAndFit = React.useCallback(async (xml: string) => {
+    const m = modelerRef.current;
+    if (!m) return;
+    await m.importXML(xml);
+    try {
+      m.get("canvas").zoom("fit-viewport", "auto");
+    } catch {}
+    // commandStack is a fresh slate after a successful import — the
+    // commandStack.changed listener will see canUndo() === false and reset
+    // dirty, but we reset explicitly here as a belt-and-braces.
+    setDirty(false);
+  }, []);
+
   const loadDefinition = async (id: string) => {
     if (!id) {
       setActiveDef(null);
-      const m = modelerRef.current;
-      if (m)
-        await m.importXML(BLANK_BPMN_XML).catch((e: Error) => setError(String(e.message || e)));
-      setDirty(false);
+      try {
+        await importAndFit(BLANK_BPMN_XML);
+      } catch (e) {
+        setError(String((e as Error)?.message || e));
+      }
       setFilename("new-process.bpmn20.xml");
       return;
     }
@@ -207,18 +237,40 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
     setFilename((def?.key || "process") + ".bpmn20.xml");
     try {
       const xml = await api.getProcessDefinitionResource(id);
-      const m = modelerRef.current;
-      if (m) {
-        await m.importXML(xml);
-        try {
-          m.get("canvas").zoom("fit-viewport", "auto");
-        } catch {}
-        setDirty(false);
-        setError(null);
-      }
+      await importAndFit(xml);
+      setError(null);
     } catch (e) {
       setError(String((e as Error)?.message || e));
     }
+  };
+
+  // Story 16.2 AC-5 / AC-6: dropdown pick = load + URL update + confirm on
+  // dirty. The dropdown is the operator's "switch to a different deployed
+  // definition" affordance; the URL bookmark reflects the active definition.
+  const handleDropdownChange = async (newId: string, prevId: string) => {
+    if (dirty) {
+      const ok = window.confirm(
+        "You have unsaved changes. Discard and load the selected definition?",
+      );
+      if (!ok) {
+        // Restore the <select>'s value to the currently-loaded definition.
+        // Because activeDef.id drives the controlled value, we just return —
+        // React re-renders with the unchanged activeDef and the dropdown
+        // snaps back. The `prevId` arg is retained for explicit
+        // documentation that the cancel path keeps prevId active.
+        void prevId;
+        return;
+      }
+    }
+    await loadDefinition(newId);
+    // Sync the URL to the new definition (or clear when the placeholder is
+    // re-picked). Use `replace: true` to avoid stuffing the history stack
+    // with every dropdown pick.
+    navigate({
+      to: "/bpmn",
+      search: newId ? { definitionId: newId } : {},
+      replace: true,
+    });
   };
 
   const updateName = (val: string) => {
@@ -300,7 +352,7 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
           data-testid="bpmn-definition-dropdown"
           data-size="sm"
           value={activeDef?.id || ""}
-          onChange={(e) => loadDefinition(e.target.value)}
+          onChange={(e) => handleDropdownChange(e.target.value, activeDef?.id || "")}
           title="Load deployed definition"
         >
           <option value="">— template (loan-approval) —</option>
@@ -321,10 +373,11 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
           data-size="sm"
           data-variant="ghost"
           data-testid="bpmn-deploy"
+          data-tone={dirty ? "warn" : undefined}
           onClick={deploy}
         >
           <Icon name="upload" size={13} />
-          Deploy
+          {dirty ? "Deploy *" : "Deploy"}
         </button>
         <button type="button" className="btn" data-size="sm" data-variant="ghost" onClick={saveXML}>
           <Icon name="download" size={13} />
