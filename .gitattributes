@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Story 17.4 — Playwright visual snapshot baselines are PNG binaries.
+# Declaring them as binary keeps git from attempting text-diff or
+# line-ending normalization, both of which corrupt the baseline.
+
+*.png binary
+e2e/visual/*-snapshots/*.png binary
