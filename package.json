@@ -1,6 +1,6 @@
 {
   "name": "flowatch",
-  "version": "0.0.2-beta.19",
+  "version": "0.0.2-beta.20",
   "private": true,
   "description": "Modern Flowable 7 OSS REST GUI — BPMN/DMN modeler + runtime operations",
   "scripts": {
