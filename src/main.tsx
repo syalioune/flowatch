@@ -6,7 +6,7 @@ import ReactDOM from "react-dom/client";
 import "./styles/fonts.css";
 import "./lib/route-meta";
 import { routeTree } from "./routeTree.gen";
-import "./styles.css";
+import "./styles/index.css";
 
 // bpmn-js assets
 import "bpmn-js/dist/assets/diagram-js.css";

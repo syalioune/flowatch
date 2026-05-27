@@ -187,7 +187,7 @@ Screens use a small `useApi(fn, deps)` hook in [src/screens.jsx](src/screens.jsx
 
 ### Design system (3 looks × 2 themes × 3 densities)
 
-[src/styles.css](src/styles.css) is a single ~32KB stylesheet. There is no Tailwind, CSS Modules, or component library. All theming is driven by **data attributes on `<html>`**:
+The stylesheet lives under [src/styles/](src/styles/) — a three-file split totalling ~32KB: [tokens.css](src/styles/tokens.css) (every `:root` / `html[data-look]` / `html[data-density]` variable block), [components.css](src/styles/components.css) (every class hook + `@keyframes` + scrollbar + modeler chrome), and [index.css](src/styles/index.css) (the entry point — `@import` tokens, inline global resets, `@import` components). The split landed in Story 17.1 (atomic `chore(refactor):` — verbatim preservation per ADR-005; no rename of any variable or class hook). There is no Tailwind, CSS Modules, or component library. All theming is driven by **data attributes on `<html>`**:
 
 - `data-look="editorial|terminal|industrial"` — typography + accent character
 - `data-theme="light|dark"` — background/foreground swap
@@ -220,6 +220,6 @@ When `_bmad/` is not a symlink (code-only contributors), the sync script silentl
 
 - **No TypeScript.** All source is `.jsx` / `.js`. Don't introduce `.ts(x)` files without explicit ask.
 - **No state library.** `useState` / `useEffect` only. Cross-component coordination uses `window` events (see API log) or prop drilling from `App`.
-- **No CSS-in-JS.** Add styles to [styles.css](src/styles.css) using the existing CSS-variable vocabulary.
+- **No CSS-in-JS.** Add component CSS to [src/styles/components.css](src/styles/components.css); add new tokens to [src/styles/tokens.css](src/styles/tokens.css); use the existing CSS-variable vocabulary.
 - **Live API only.** Don't reintroduce mock fixtures into screens — show `{loading, error, empty}` states from the real `useApi` hook instead. [src/data.js](src/data.js) only holds REST endpoint metadata for the Inspector and PageHead chips.
-- **`landing/` is the project presentation page**, not part of the app. It's a hand-authored static HTML+CSS one-pager that deploys to GitHub Pages (PRD FR-F12 / FR-F13). Don't pull `src/`, `vite.config.js`, TanStack Router, or React into it. Don't add CDN references — NFR-9 is enforced by `make landing-check`. Visual tokens come from [src/styles.css](src/styles.css) editorial-light-regular — kept in sync by hand, not via build coupling. README.md is the source of truth for project facts; the landing page is a curated reflection. Preview locally with `make landing-preview`.
+- **`landing/` is the project presentation page**, not part of the app. It's a hand-authored static HTML+CSS one-pager that deploys to GitHub Pages (PRD FR-F12 / FR-F13). Don't pull `src/`, `vite.config.js`, TanStack Router, or React into it. Don't add CDN references — NFR-9 is enforced by `make landing-check`. Visual tokens come from [src/styles/tokens.css](src/styles/tokens.css) editorial-light-regular — kept in sync by hand, not via build coupling. README.md is the source of truth for project facts; the landing page is a curated reflection. Preview locally with `make landing-preview`.

@@ -1,0 +1,203 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* Flowatch — design-system tokens
+ *
+ * Per ADR-005 / Pattern P-007: every CSS variable name preserved VERBATIM
+ * from the pre-17.1 src/styles.css. No renames; no consolidation. Future
+ * stories (17.2 TweaksPanel shortcut, 17.3 WCAG audit, 17.4 snapshot
+ * baselines) enumerate the look × theme × density matrix by parsing
+ * THIS file.
+ *
+ * Source layout:
+ *   1. :root                                          — universal defaults
+ *   2. html[data-look="editorial"][data-theme="*"]   — editorial tokens
+ *   3. html[data-look="terminal"][data-theme="*"]    — terminal tokens
+ *   4. html[data-look="industrial"][data-theme="*"]  — industrial tokens
+ *   5. html[data-density="*"]                         — density tokens
+ *
+ * Runtime override: src/app.tsx's ACCENT_PALETTES map sets `--accent`
+ * inline on <html>; that is a TS-side concern, not a token-file concern.
+ */
+
+:root {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-serif: "IBM Plex Serif", "Iowan Old Style", Georgia, serif;
+
+  --r-xs: 3px;
+  --r-sm: 5px;
+  --r-md: 8px;
+  --r-lg: 12px;
+
+  --sidebar-w: 232px;
+  --topbar-h: 52px;
+
+  --t-fast: 120ms cubic-bezier(0.3, 0.7, 0.4, 1);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+}
+
+/* ── EDITORIAL (default light) ─────────────────────────────────────────── */
+html[data-look="editorial"][data-theme="light"] {
+  --bg: oklch(98.2% 0.005 80);
+  --bg-elev: oklch(99.5% 0.003 80);
+  --bg-sunken: oklch(96% 0.008 80);
+  --bg-hover: oklch(94% 0.01 80);
+  --line: oklch(89% 0.008 80);
+  --line-strong: oklch(80% 0.012 80);
+  --fg: oklch(22% 0.01 60);
+  --fg-soft: oklch(45% 0.015 60);
+  --fg-mute: oklch(62% 0.012 60);
+  --accent: oklch(52% 0.16 32);
+  --accent-soft: oklch(94% 0.04 32);
+  --accent-fg: #fff;
+  --ok: oklch(54% 0.13 145);
+  --warn: oklch(62% 0.15 70);
+  --bad: oklch(55% 0.18 27);
+  --info: oklch(55% 0.12 230);
+
+  --font-display: var(--font-serif);
+  --font-body: var(--font-sans);
+  --tracking-display: -0.01em;
+  --display-weight: 500;
+}
+html[data-look="editorial"][data-theme="dark"] {
+  --bg: oklch(18% 0.005 80);
+  --bg-elev: oklch(21% 0.006 80);
+  --bg-sunken: oklch(15% 0.005 80);
+  --bg-hover: oklch(25% 0.008 80);
+  --line: oklch(28% 0.008 80);
+  --line-strong: oklch(38% 0.012 80);
+  --fg: oklch(95% 0.005 80);
+  --fg-soft: oklch(75% 0.012 60);
+  --fg-mute: oklch(58% 0.012 60);
+  --accent: oklch(72% 0.16 32);
+  --accent-soft: oklch(28% 0.06 32);
+  --accent-fg: oklch(18% 0.02 30);
+  --ok: oklch(72% 0.14 145);
+  --warn: oklch(78% 0.15 70);
+  --bad: oklch(70% 0.17 27);
+  --info: oklch(72% 0.13 230);
+
+  --font-display: var(--font-serif);
+  --font-body: var(--font-sans);
+  --tracking-display: -0.01em;
+  --display-weight: 500;
+}
+
+/* ── TERMINAL (dense, mono-heavy, dark-leaning) ─────────────────────── */
+html[data-look="terminal"][data-theme="light"] {
+  --bg: oklch(98% 0 0);
+  --bg-elev: #fff;
+  --bg-sunken: oklch(96% 0 0);
+  --bg-hover: oklch(94% 0 0);
+  --line: oklch(90% 0 0);
+  --line-strong: oklch(80% 0 0);
+  --fg: oklch(20% 0 0);
+  --fg-soft: oklch(45% 0 0);
+  --fg-mute: oklch(60% 0 0);
+  --accent: oklch(58% 0.21 264);
+  --accent-soft: oklch(94% 0.05 264);
+  --accent-fg: #fff;
+  --ok: oklch(54% 0.18 145);
+  --warn: oklch(68% 0.17 80);
+  --bad: oklch(58% 0.21 27);
+  --info: oklch(58% 0.16 230);
+
+  --font-display: var(--font-mono);
+  --font-body: var(--font-sans);
+  --tracking-display: -0.02em;
+  --display-weight: 600;
+}
+html[data-look="terminal"][data-theme="dark"] {
+  --bg: oklch(13% 0.005 260);
+  --bg-elev: oklch(16% 0.008 260);
+  --bg-sunken: oklch(10% 0.005 260);
+  --bg-hover: oklch(20% 0.01 260);
+  --line: oklch(23% 0.012 260);
+  --line-strong: oklch(35% 0.018 260);
+  --fg: oklch(96% 0.005 260);
+  --fg-soft: oklch(72% 0.015 260);
+  --fg-mute: oklch(55% 0.012 260);
+  --accent: oklch(72% 0.18 264);
+  --accent-soft: oklch(28% 0.08 264);
+  --accent-fg: oklch(14% 0.02 260);
+  --ok: oklch(78% 0.17 145);
+  --warn: oklch(82% 0.16 80);
+  --bad: oklch(72% 0.19 27);
+  --info: oklch(75% 0.15 230);
+
+  --font-display: var(--font-mono);
+  --font-body: var(--font-sans);
+  --tracking-display: -0.02em;
+  --display-weight: 600;
+}
+
+/* ── INDUSTRIAL (cool neutral, dashboard-y) ─────────────────────────── */
+html[data-look="industrial"][data-theme="light"] {
+  --bg: oklch(97% 0.008 240);
+  --bg-elev: #fff;
+  --bg-sunken: oklch(95% 0.01 240);
+  --bg-hover: oklch(93% 0.012 240);
+  --line: oklch(89% 0.013 240);
+  --line-strong: oklch(78% 0.018 240);
+  --fg: oklch(20% 0.02 250);
+  --fg-soft: oklch(44% 0.025 250);
+  --fg-mute: oklch(60% 0.022 250);
+  --accent: oklch(52% 0.17 250);
+  --accent-soft: oklch(94% 0.045 250);
+  --accent-fg: #fff;
+  --ok: oklch(56% 0.14 160);
+  --warn: oklch(66% 0.15 75);
+  --bad: oklch(56% 0.19 22);
+  --info: oklch(58% 0.14 230);
+
+  --font-display: var(--font-sans);
+  --font-body: var(--font-sans);
+  --tracking-display: -0.018em;
+  --display-weight: 600;
+}
+html[data-look="industrial"][data-theme="dark"] {
+  --bg: oklch(16% 0.012 250);
+  --bg-elev: oklch(19% 0.014 250);
+  --bg-sunken: oklch(13% 0.01 250);
+  --bg-hover: oklch(23% 0.018 250);
+  --line: oklch(26% 0.02 250);
+  --line-strong: oklch(38% 0.025 250);
+  --fg: oklch(94% 0.01 250);
+  --fg-soft: oklch(72% 0.018 250);
+  --fg-mute: oklch(56% 0.018 250);
+  --accent: oklch(70% 0.18 250);
+  --accent-soft: oklch(28% 0.08 250);
+  --accent-fg: oklch(15% 0.03 250);
+  --ok: oklch(74% 0.15 160);
+  --warn: oklch(82% 0.16 75);
+  --bad: oklch(72% 0.2 22);
+  --info: oklch(74% 0.15 230);
+
+  --font-display: var(--font-sans);
+  --font-body: var(--font-sans);
+  --tracking-display: -0.018em;
+  --display-weight: 600;
+}
+
+/* ── Density ───────────────────────────────────────────────────────── */
+html[data-density="compact"] {
+  --gap: 8px;
+  --row-h: 30px;
+  --pad: 10px;
+  --fs: 12.5px;
+}
+html[data-density="regular"] {
+  --gap: 12px;
+  --row-h: 36px;
+  --pad: 14px;
+  --fs: 13.5px;
+}
+html[data-density="comfy"] {
+  --gap: 16px;
+  --row-h: 44px;
+  --pad: 18px;
+  --fs: 14.5px;
+}
