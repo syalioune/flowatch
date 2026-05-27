@@ -31,9 +31,11 @@ preview:  ## Serve the production bundle locally
 	npm run preview
 
 # --- Engine (Docker Compose: postgres + flowable-rest + nginx CORS proxy) --
-.PHONY: engine-up engine-down engine-stop engine-restart engine-ps engine-logs engine-clean engine-health engine-shell engine-psql
+.PHONY: engine-up engine-up-flowatch engine-down engine-stop engine-restart engine-ps engine-logs engine-clean engine-health engine-shell engine-psql
 engine-up:       ## Start the engine stack (detached)
 	$(COMPOSE) up -d
+engine-up-flowatch: ## Start engine stack + the published Flowatch SPA image (profile: flowatch)
+	$(COMPOSE) --profile flowatch up -d
 engine-down:     ## Stop and remove engine containers
 	$(COMPOSE) down
 engine-stop:     ## Stop engine containers (preserve state)

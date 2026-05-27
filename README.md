@@ -48,9 +48,11 @@ docker buildx imagetools inspect ghcr.io/syalioune/flowatch:latest --format '{{ 
 Run it pointed at any reachable Flowable backend (configure the URL in the Settings modal after the SPA loads):
 
 ```bash
-docker run --rm -p 8081:8080 ghcr.io/syalioune/flowatch:latest
-# open http://localhost:8081 — set baseUrl in Settings to your Flowable instance
+docker run --rm -p 5173:8080 ghcr.io/syalioune/flowatch:latest
+# open http://localhost:5173 — set baseUrl in Settings to your Flowable instance
 ```
+
+Or bring up the SPA image alongside the bundled engine stack via the `flowatch` Compose profile (`docker compose --profile flowatch up -d` — also exposed as `make engine-up-flowatch`). The SPA lands on `:5173` and the engine on `:8080`; override `FLOWATCH_TAG` (defaults to `:latest`; `:develop` / `:sha-<short>` also published) and `FLOWATCH_PORT` to taste. Running this profile is mutually exclusive with `make dev` — both want port 5173.
 
 The image carries only the static SPA bundle and a tiny nginx — no Node, no JRE. **Runs as non-root** (`uid 101`, `nginx`) and listens on the **unprivileged port 8080**, so it drops cleanly into Kubernetes restricted-baseline policies and can run with all Linux capabilities dropped. CPU/RAM at idle: <5 MB / <50 m-cpu.
 
@@ -109,6 +111,7 @@ The sidebar footer shows a connection pill: **green** = engine reachable, **red*
 | `make build`          | `npm run build`                          | Production bundle to `dist/`                          |
 | `make preview`        | `npm run preview`                        | Serve the production bundle locally                   |
 | `make engine-up`      | `docker compose up -d`                   | Start the Docker stack (postgres + flowable + nginx)  |
+| `make engine-up-flowatch` | `docker compose --profile flowatch up -d` | Same stack + the published Flowatch SPA image on `:5173` |
 | `make engine-down`    | `docker compose down`                    | Stop & remove engine containers                       |
 | `make engine-logs`    | `docker compose logs -f`                 | Tail logs from all engine services                    |
 | `make engine-health`  | `curl -u rest-admin:test …/management/engine` | Hit the Flowable management endpoint            |
@@ -148,6 +151,10 @@ Flowatch is built openly with AI as a first-class collaborator. Treat that as a 
 **For contributors:** every BMAD skill is committed and every Claude Code permission allowlist is reproducible from this repo. There is no maintainer-only sauce. See [DEVELOPERS.md](DEVELOPERS.md) for first-time setup and [BOOTSTRAP.md](BOOTSTRAP.md) for the one-time GitHub repo provisioning. Personal Claude Code overrides go in `.claude/settings.local.json` (gitignored) so the shared surface stays clean.
 
 **Attribution & responsibility.** Claude Code and BMAD are tools; the design choices, the QA, and the responsibility for what ships are the maintainer's. Bug reports and feedback go to the same [issue tracker](https://github.com/syalioune/flowatch/issues) regardless of which keystrokes were AI-assisted.
+
+## Release process
+
+Releases follow `develop → release/X.Y.Z → main` per [ADR-011](_bmad-output/planning-artifacts/architecture.md#adr-011--release-pipeline-conventional-commits--semantic-release). The operational runbook with exact commands is at [docs/release-runbook.md](docs/release-runbook.md).
 
 ## License
 

@@ -6,19 +6,26 @@ import ReactDOM from "react-dom/client";
 import "./styles/fonts.css";
 import "./lib/route-meta";
 import { routeTree } from "./routeTree.gen";
-import "./styles.css";
+import "./styles/index.css";
 
 // bpmn-js assets
 import "bpmn-js/dist/assets/diagram-js.css";
 import "bpmn-js/dist/assets/bpmn-js.css";
 import "bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css";
 
-// dmn-js assets
+// dmn-js assets.
+// `*-controls.css` bundles are load-bearing for the in-cell editing
+// popovers (input expression, type selector, predefined values, hit
+// policy). Without them, the popovers render unstyled and get clipped /
+// hidden by our app chrome.
 import "dmn-js/dist/assets/diagram-js.css";
 import "dmn-js/dist/assets/dmn-js-shared.css";
 import "dmn-js/dist/assets/dmn-js-drd.css";
 import "dmn-js/dist/assets/dmn-js-decision-table.css";
+import "dmn-js/dist/assets/dmn-js-decision-table-controls.css";
 import "dmn-js/dist/assets/dmn-js-literal-expression.css";
+import "dmn-js/dist/assets/dmn-js-boxed-expression.css";
+import "dmn-js/dist/assets/dmn-js-boxed-expression-controls.css";
 import "dmn-js/dist/assets/dmn-font/css/dmn-embedded.css";
 
 const router = createRouter({ routeTree });

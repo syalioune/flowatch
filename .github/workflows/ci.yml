@@ -55,6 +55,12 @@ jobs:
       - name: Verify SPDX headers
         run: bash scripts/ci/check-spdx.sh
 
+      - name: Verify Pattern P-001 (fetch funnel)
+        run: bash scripts/ci/check-fetch-funnel.sh
+
+      - name: Self-test Pattern P-001 check
+        run: bash scripts/ci/__tests__/check-fetch-funnel.test.sh
+
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
@@ -63,6 +69,24 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # Severity threshold MUST match the image-job Trivy step at the top of
+      # the image: job (CRITICAL,HIGH + ignore-unfixed: true). The two
+      # scans cover different surfaces (fs = package-lock.json + Dockerfile
+      # at repo root; image = built layers including the Node runtime and
+      # bundled artifacts) and the gate bar should evolve in lockstep —
+      # tightening one without the other is a config-drift smell. Per
+      # milestone-0.0.1 retro §3.2.
+      - name: Run Trivy filesystem scan
+        id: trivy-fs
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+          format: table
 
       - name: Biome (lint + format check)
         id: biome
@@ -110,6 +134,7 @@ jobs:
           {
             echo "### check"
             echo ""
+            echo "- Trivy filesystem scan: ${{ steps['trivy-fs'].outcome }}"
             echo "- Biome: ${{ steps.biome.outcome }}"
             echo "- tsc --noEmit: ${{ steps.tsc.outcome }}"
             echo "- License allow-list: ${{ steps.licenses.outcome }}"

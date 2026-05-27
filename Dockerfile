@@ -53,7 +53,7 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 # Stage 2: runtime
 # ---------------------------------------------------------------------------
-FROM nginxinc/nginx-unprivileged:alpine@sha256:4c18337659c90a01627f2e152b7c89524521c82dcedb255dc83d3689642b0803
+FROM nginxinc/nginx-unprivileged:alpine@sha256:3707417e3304492667a63c90ac0103465330437f9cdfaa38f8cd19f9975cbeed
 # nginxinc/nginx-unprivileged:alpine — static SPA serving as non-root.
 #
 # The upstream nginx team maintains this variant specifically for non-root

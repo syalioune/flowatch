@@ -8,11 +8,17 @@
  *   - error    → route's errorComponent
  *   - empty    → "No groups." when membership list is empty
  *   - data     → property table + group memberships
+ *
+ * Story 14.3 — adds Add to group + Remove from group write ops. Map-
+ * symmetry per CLAUDE.md "Map-symmetry for reverse-action pairs":
+ * single `optimisticMembership` Map consumed by both handlers.
  */
 
 import { Link } from "@tanstack/react-router";
-import { api, type FlowableUser } from "../api";
-import { Icon, PageHead } from "../components";
+import React from "react";
+import { api, type FlowableGroup, type FlowableUser } from "../api";
+import { Icon, PageHead, toast } from "../components";
+import { AddMembershipModal } from "../lib/add-membership-modal";
 import { ErrorBox } from "../lib/error-box";
 import { useApi } from "../lib/useApi";
 
@@ -21,11 +27,55 @@ interface Props {
 }
 
 type UserWide = FlowableUser & { displayName?: string };
+type OptimisticStatus = "added" | "removed";
 
 export function UserDetail({ user }: Props) {
   const memberships = useApi(() => api.getUserGroups(user.id), [user.id]);
   const u = user as UserWide;
   const initials = `${(u.firstName || "?")[0]}${(u.lastName || "?")[0]}`;
+  const [addOpen, setAddOpen] = React.useState(false);
+  const addTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const [optimisticMembership, setOptimisticMembership] = React.useState<
+    Map<string, OptimisticStatus>
+  >(new Map());
+
+  // Clear optimistic state once the engine response settles
+  React.useEffect(() => {
+    if (memberships.data && optimisticMembership.size > 0) {
+      setOptimisticMembership(new Map());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memberships.data]);
+
+  const handleRemove = async (g: FlowableGroup) => {
+    const fullName = `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.id;
+    const ok = window.confirm(
+      `Remove ${fullName} (${u.id}) from group ${g.name || g.id} (${g.id})? This cannot be undone.`,
+    );
+    if (!ok) return;
+    setOptimisticMembership((prev) => {
+      const next = new Map(prev);
+      next.set(g.id, "removed");
+      return next;
+    });
+    try {
+      await api.removeUserFromGroup(u.id, g.id);
+      toast({ kind: "ok", text: `Removed ${fullName} from ${g.name || g.id}.`, ttl: 3000 });
+      memberships.reload();
+    } catch (err) {
+      setOptimisticMembership((prev) => {
+        const next = new Map(prev);
+        next.delete(g.id);
+        return next;
+      });
+      toast({
+        kind: "err",
+        text: `Failed to remove: ${err instanceof Error ? err.message : String(err)}`,
+        ttl: 5000,
+      });
+    }
+  };
+
   return (
     <div className="page">
       <PageHead
@@ -96,6 +146,18 @@ export function UserDetail({ user }: Props) {
           >
             GET /identity/users/{u.id}/groups
           </span>
+          <button
+            type="button"
+            className="btn"
+            data-size="sm"
+            data-testid="add-user-to-group"
+            ref={addTriggerRef}
+            onClick={() => setAddOpen(true)}
+            style={{ marginLeft: 8 }}
+          >
+            <Icon name="plus" size={12} />
+            Add to group
+          </button>
         </div>
         <div className="panel-body" style={{ padding: 0 }}>
           {memberships.loading && (
@@ -109,34 +171,66 @@ export function UserDetail({ user }: Props) {
               No group memberships.
             </div>
           )}
-          {memberships.data?.data.map((g) => (
-            <div
-              key={g.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                padding: "10px 14px",
-                borderBottom: "1px solid var(--line)",
-                gap: 10,
-              }}
-            >
-              <Link
-                to="/identity/groups/$id"
-                params={{ id: g.id }}
-                className="mono"
-                style={{ flex: 1 }}
+          {memberships.data?.data.map((g) => {
+            const optimistic = optimisticMembership.get(g.id);
+            return (
+              <div
+                key={g.id}
+                data-testid={`user-group-row-${g.id}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "10px 14px",
+                  borderBottom: "1px solid var(--line)",
+                  gap: 10,
+                }}
               >
-                {g.name || g.id}
-              </Link>
-              {g.type && (
-                <span className="badge" data-tone={g.type === "security" ? "warn" : "neutral"}>
-                  {g.type}
-                </span>
-              )}
-            </div>
-          ))}
+                <Link
+                  to="/identity/groups/$id"
+                  params={{ id: g.id }}
+                  className="mono"
+                  style={{ flex: 1 }}
+                >
+                  {g.name || g.id}
+                </Link>
+                {optimistic && (
+                  <span className="badge" data-tone={optimistic === "added" ? "ok" : "mute"}>
+                    <span className="sr-only">Status: </span>
+                    {optimistic}
+                  </span>
+                )}
+                {g.type && (
+                  <span className="badge" data-tone={g.type === "security" ? "warn" : "neutral"}>
+                    <span className="sr-only">Group type: </span>
+                    {g.type}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="btn"
+                  data-variant="ghost"
+                  data-size="sm"
+                  data-testid={`remove-membership-${g.id}`}
+                  onClick={() => void handleRemove(g)}
+                >
+                  Remove
+                </button>
+              </div>
+            );
+          })}
         </div>
       </div>
+      <AddMembershipModal
+        open={addOpen}
+        mode="add-group-to-user"
+        userId={u.id}
+        triggerRef={addTriggerRef}
+        onClose={() => setAddOpen(false)}
+        onSuccess={() => {
+          setOptimisticMembership((prev) => new Map(prev));
+          memberships.reload();
+        }}
+      />
     </div>
   );
 }

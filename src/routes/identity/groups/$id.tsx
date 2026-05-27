@@ -11,7 +11,11 @@ export const Route = createFileRoute("/identity/groups/$id")({
     title: "Group detail",
     endpoints: [
       { method: "GET", path: "/identity/groups/{id}", desc: "Get group" },
-      { method: "GET", path: "/identity/groups/{id}/members", desc: "Group members" },
+      {
+        method: "GET",
+        path: "/identity/users?memberOfGroup={id}",
+        desc: "Group members (workaround)",
+      },
     ],
   },
   component: GroupDetailRoute,

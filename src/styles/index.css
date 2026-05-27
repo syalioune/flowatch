@@ -1,0 +1,76 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* Flowatch — CSS entry point
+ *
+ * Per W3C CSS, all `@import` rules MUST precede any other rules (sole
+ * exception: `@charset`, `@layer`). The spec author's initial design
+ * placed `@import url("./components.css")` AFTER the inline resets to
+ * mirror the pre-17.1 monolith's top-down source order; biome's
+ * `lint/correctness/noInvalidPositionAtImportRule` rejected it. Both
+ * `@import`s now sit at the top.
+ *
+ * Cascade impact: the post-split source order becomes
+ *   tokens → components → resets
+ * vs the monolith's
+ *   tokens → resets → components.
+ *
+ * Visual output is identical because no component rule overrides a
+ * reset declaration at equal specificity:
+ *   - `* { box-sizing }` (specificity 0,0,0): no component declares
+ *     box-sizing on a more-specific selector → reset wins for the
+ *     universal default regardless of source order.
+ *   - `body { font-family, ... }` (specificity 0,0,1): no component
+ *     touches the `body` element → reset wins.
+ *   - `button { font: inherit; color: inherit }` (specificity 0,0,1):
+ *     `.btn` (specificity 0,1,0) overrides via class — wins on
+ *     specificity, not source order.
+ *   - `a { color: inherit; text-decoration: none }`: only
+ *     `.about-license a` overrides — wins on specificity.
+ *   - `::selection`: no component overrides.
+ *   - CSS custom properties (tokens) resolve at USE time, not
+ *     declaration time, so the body's `var(--font-body)` resolves
+ *     correctly regardless of where tokens load in the cascade.
+ *
+ * Verified at T-8 (live-engine visual walkthrough — all 18 look ×
+ * theme × density combinations render byte-identical to pre-17.1).
+ *
+ * The `src/main.tsx` import is `./styles/index.css` (changed from
+ * `./styles.css` in Story 17.1). `src/styles/fonts.css` is imported
+ * SEPARATELY in `src/main.tsx` per its pre-17.1 contract — it loads
+ * @font-face declarations that must reach the browser before any text
+ * paints.
+ */
+
+@import url("./tokens.css");
+@import url("./components.css");
+
+/* ── Base resets ───────────────────────────────────────────────────── */
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+body {
+  font-family: var(--font-body);
+  font-size: var(--fs);
+  color: var(--fg);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "ss01", "ss02", "cv02";
+}
+button {
+  font: inherit;
+  color: inherit;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+::selection {
+  background: var(--accent);
+  color: var(--accent-fg);
+}

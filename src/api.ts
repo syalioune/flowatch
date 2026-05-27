@@ -53,6 +53,8 @@ export interface ApiLogEntry {
   status: number;
   ms: number;
   at: string;
+  headers?: Record<string, string>;
+  body?: unknown;
   error?: string;
 }
 
@@ -63,6 +65,11 @@ export interface RequestOpts {
   body?: unknown;
   base?: string | undefined;
   raw?: boolean | undefined;
+  // Story 9.6: when set, request() returns the raw `Response` object instead
+  // of a parsed body. Used by binary downloads where the caller picks the body
+  // method (`.blob()` / `.arrayBuffer()`). Mutually exclusive with `raw` — if
+  // both are set, `asResponse` wins.
+  asResponse?: boolean | undefined;
 }
 
 export class FlowableError extends Error {
@@ -119,6 +126,26 @@ export interface FlowableTask {
   tenantId?: string;
 }
 
+// Story 11.3 (closes the Story 1.1 deferred-work entry for FlowableTaskForm).
+// Per the Flowable FormProperty contract, `type` is a curated union; the
+// trailing `string` keeps unknown engine-extension types type-checking so
+// the form panel can fall through to a text-input render.
+export interface FlowableFormProperty {
+  id: string;
+  name?: string;
+  type: "string" | "long" | "double" | "enum" | "date" | "boolean" | string;
+  value?: string;
+  required?: boolean;
+  readable?: boolean;
+  writable?: boolean;
+  enumValues?: Array<string | { id?: string; name?: string }>;
+}
+
+export interface FlowableTaskForm {
+  formKey?: string;
+  formProperties?: FlowableFormProperty[];
+}
+
 export interface FlowableJob {
   id: string;
   processInstanceId?: string;
@@ -152,15 +179,47 @@ export interface FlowableVariable {
 }
 
 export interface FlowableResource {
+  // Per the live flowable-rest 7.2 response: `id` is the filename
+  // (e.g. "Helpdesk.bpmn20.xml") and there is NO `name` field. Earlier DTO
+  // versions declared `name: string` — that field never existed on the wire.
   id: string;
-  name: string;
   mediaType: string;
   type?: string;
   url?: string;
+  contentUrl?: string;
+}
+
+// Story 15.3: typed input variable shape for POST /dmn-rule/execute.
+export interface FlowableDecisionExecutionInputVariable {
+  name: string;
+  type?: "string" | "number" | "long" | "double" | "boolean" | "date" | "json" | string;
+  value: unknown;
+}
+
+export interface ExecuteDecisionBody {
+  decisionKey: string;
+  inputVariables: FlowableDecisionExecutionInputVariable[];
+  parentDeploymentId?: string;
+}
+
+// Per the live Flowable 7.2 DMN-rule/execute response, `resultVariables` is
+// an Array<Array<{name, type, value}>> — the OUTER array is one entry per
+// result row (for COLLECT / RULE_ORDER hit policies; length 1 for
+// UNIQUE / FIRST), the INNER array carries the typed output variables.
+// The engine does NOT surface matchedRules over the REST API — Story 15.3's
+// defensive widening assumed it might; live probing showed it never does.
+export interface FlowableDecisionResultVariable {
+  name: string;
+  // Flowable emits the engine-side type label directly: "string" / "double"
+  // / "long" / "boolean" / "date" / "json". Kept open as `string` so future
+  // type additions don't break the DTO.
+  type: string;
+  value: unknown;
 }
 
 export interface FlowableDecisionResult {
-  resultVariables?: Record<string, unknown>;
+  resultVariables?: FlowableDecisionResultVariable[][];
+  url?: string;
 }
 
 export interface FlowableTenant {
@@ -176,6 +235,71 @@ export interface FlowableDecision {
   deploymentId: string;
   category?: string;
   tenantId?: string;
+}
+
+// Story 15.4: historic decision-execution DTO. All fields defensive
+// (every new field optional) per the Epic 15 DTO-widening discipline.
+// The actual response shape may vary across Flowable versions; the
+// renderer treats missing fields as "—".
+export interface FlowableHistoricDecisionExecution {
+  id: string;
+  decisionDefinitionId?: string;
+  decisionKey?: string;
+  decisionName?: string;
+  // Per flowable-rest 7.2 historic-decision-executions response, the process
+  // instance id is named `instanceId` (NOT `processInstanceId`) and `failed`
+  // (NOT `executionFailed`). The list endpoint does not surface hitPolicy,
+  // durationInMillis, inputVariables, or outputVariables — those live on
+  // the auditdata endpoint per-execution.
+  instanceId?: string | null;
+  executionId?: string | null;
+  activityId?: string | null;
+  scopeType?: string | null;
+  scopeId?: string | null;
+  deploymentId?: string;
+  decisionVersion?: string;
+  startTime?: string;
+  endTime?: string;
+  failed?: boolean;
+  tenantId?: string;
+}
+
+// Per-execution audit response from
+// `/dmn-history/historic-decision-executions/{id}/auditdata`. Far richer
+// than the list row — surfaces the hit policy, typed input/result maps,
+// and the per-rule execution trace (which rule fired, condition+conclusion
+// results). Every field defensive (optional) because Flowable versions
+// vary on which fields are present.
+export interface FlowableDmnRuleConditionResult {
+  id?: string;
+  result?: unknown;
+}
+export interface FlowableDmnRuleExecution {
+  ruleNumber?: number;
+  startTime?: string;
+  endTime?: string;
+  valid?: boolean;
+  conditionResults?: FlowableDmnRuleConditionResult[];
+  conclusionResults?: FlowableDmnRuleConditionResult[];
+}
+export interface FlowableDmnExecutionAudit {
+  decisionKey?: string;
+  decisionName?: string;
+  decisionVersion?: number;
+  hitPolicy?: string;
+  startTime?: string;
+  endTime?: string;
+  inputVariables?: Record<string, unknown>;
+  inputVariableTypes?: Record<string, string>;
+  // decisionResult is an array of result rows (one per matched rule for
+  // COLLECT / RULE_ORDER / OUTPUT_ORDER; length 1 for UNIQUE / FIRST).
+  decisionResult?: Array<Record<string, unknown>>;
+  decisionResultTypes?: Record<string, string>;
+  multipleResults?: boolean;
+  // Keyed by rule number as a string ("1", "2", …).
+  ruleExecutions?: Record<string, FlowableDmnRuleExecution>;
+  failed?: boolean;
+  strictMode?: boolean;
 }
 
 // Historic equivalents — UI shape is close to the runtime DTOs.
@@ -195,13 +319,26 @@ export interface FlowableHistoricActivity {
   durationInMillis?: number;
 }
 
+// Flowable 7.x returns historic variables with the variable payload nested
+// under a `variable` object — `{id, processInstanceId, taskId, executionId,
+// variable: {name, type, value, scope}}` — NOT flattened with top-level
+// `variableName` / `variableType` like the runtime variable endpoint
+// (`/runtime/process-instances/{id}/variables`). Operator-side render code
+// must read `entry.variable.name` / `entry.variable.type` / `entry.variable.value`.
+// See RC-12 in docs/runtime-caveats.md.
+export interface FlowableHistoricVariableValue {
+  name: string;
+  type?: string;
+  value: unknown;
+  scope?: string;
+}
+
 export interface FlowableHistoricVariable {
   id: string;
-  variableName: string;
-  variableType?: string;
-  value: unknown;
+  variable: FlowableHistoricVariableValue;
   processInstanceId?: string;
   taskId?: string;
+  executionId?: string;
 }
 
 export interface FlowableHistoricTask extends FlowableTask {
@@ -218,7 +355,7 @@ const defaultCfg: FlowableConfig = {
   password: "test",
   tenantId: "",
 };
-const loadCfg = (): FlowableConfig => {
+export const loadCfg = (): FlowableConfig => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? { ...defaultCfg, ...JSON.parse(raw) } : { ...defaultCfg };
@@ -247,6 +384,51 @@ const logCall = (entry: ApiLogEntry): void => {
   API_LOG.unshift(entry);
   if (API_LOG.length > MAX_LOG) API_LOG.length = MAX_LOG;
   window.dispatchEvent(new CustomEvent<ApiLogEntry>("api:log", { detail: entry }));
+};
+
+// NFR-8: scheme-preserving redaction of the Authorization header before the
+// entry lands in API_LOG. Splits on the first space so "Basic <base64>" becomes
+// "Basic ***" and a future "Bearer <jwt>" becomes "Bearer ***". The clone via
+// spread is what makes this safe — the headers object passed to fetch() is
+// never mutated; only the captured copy is.
+function redactAuthHeader(headers: Record<string, string>): Record<string, string> {
+  const out = { ...headers };
+  if (out.Authorization) {
+    const space = out.Authorization.indexOf(" ");
+    out.Authorization = space > 0 ? `${out.Authorization.slice(0, space)} ***` : "***";
+  }
+  return out;
+}
+
+// Epic 9 retro A-3 (Story 10.2): body byte-budget guard. The Inspector's
+// previewBody synchronously JSON.stringifies entry.body on click; a 100 KB
+// variables blob from startProcessInstance would lock the main thread. We
+// truncate at capture time so the ring buffer's memory footprint is bounded
+// and the drawer's preview stays interactive. Bodies whose stringified form
+// throws (circular refs, BigInt, throwing toJSON) pass through unchanged —
+// the render-time fallback in previewBody handles those.
+export const BODY_BYTE_BUDGET = 16 * 1024;
+
+export interface TruncatedBody {
+  __truncated: true;
+  __originalBytes: number;
+  __preview: string;
+}
+
+export const captureBody = (body: unknown): unknown => {
+  try {
+    const json = JSON.stringify(body);
+    if (json === undefined) return body;
+    if (json.length <= BODY_BYTE_BUDGET) return body;
+    const envelope: TruncatedBody = {
+      __truncated: true,
+      __originalBytes: json.length,
+      __preview: json.slice(0, BODY_BYTE_BUDGET),
+    };
+    return envelope;
+  } catch {
+    return body;
+  }
 };
 
 // Dev-only seed hook: lets Playwright visual tests inject deterministic API_LOG
@@ -290,15 +472,15 @@ const basicAuth = (): string => "Basic " + btoa(`${cfg.username}:${cfg.password}
 //
 // Generic over T (the JSON response shape). Wrappers that opt into raw text
 // pin T = string at the call site (see getProcessDefinitionResource,
-// getDmnResource, jobStacktrace). Per AC-3, the runtime guarantees the
-// declared T matches when opts.raw is true.
+// getDmnDecisionResource, jobStacktrace). Per AC-3, the runtime guarantees
+// the declared T matches when opts.raw is true.
 
 async function request<T = unknown>(
   method: HTTPMethod,
   path: string,
   opts: RequestOpts = {},
 ): Promise<T> {
-  const { params, body, base, raw } = opts;
+  const { params, body, base, raw, asResponse } = opts;
   const root = (base || cfg.baseUrl).replace(/\/$/, "");
   const url = root + path + qs(params);
   const t0 = performance.now();
@@ -321,8 +503,23 @@ async function request<T = unknown>(
       headers["Content-Type"] = "application/json";
     }
     const init: RequestInit = { method, headers };
+    // Per AC-2/AC-6/AC-7: redact the Authorization header on the captured
+    // copy before any further work so success, 4xx, 5xx, network-error, AND
+    // body-serialization-error (circular ref, BigInt, throwing toJSON) paths
+    // all surface the redacted form in API_LOG. The `headers` object handed
+    // to fetch() is untouched — redactAuthHeader clones via spread.
+    entry.headers = redactAuthHeader(headers);
     if (body) {
       init.body = JSON.stringify(body);
+      // Per Story 8.1 AC-3 + Story 10.2 A-3: capture the original JS value
+      // (not the stringified form) so the Inspector can pretty-print, but
+      // truncate at capture time when the stringified form exceeds the
+      // byte budget. Note: entry.body and init.body diverge above the
+      // budget — init.body always carries the real bytes sent on the
+      // wire; entry.body may carry the truncated envelope. The Inspector's
+      // "Copy as curl" surfaces entry.body and therefore the envelope on
+      // oversized requests — accepted (a 100 KB clipboard isn't useful).
+      entry.body = captureBody(body);
     }
     const res = await fetch(url, init);
     entry.status = res.status;
@@ -332,6 +529,14 @@ async function request<T = unknown>(
       entry.error = text || `HTTP ${res.status}`;
       logCall(entry);
       throw new FlowableError(entry.error, res.status);
+    }
+    // Story 9.6: when asResponse is set, log the entry and hand the caller the
+    // raw Response so they pick the body method (.blob() for binary, .text()
+    // for XML, etc.). NFR-8 is preserved — entry.body stays undefined; the
+    // response bytes never enter API_LOG.
+    if (asResponse) {
+      logCall(entry);
+      return res as unknown as T;
     }
     const data: T = raw
       ? ((await res.text()) as unknown as T)
@@ -365,6 +570,15 @@ const deleteDeployment = (id: string, cascade?: boolean) =>
   );
 const listDeploymentResources = (id: string) =>
   request<FlowableResource[]>("GET", `/repository/deployments/${id}/resources`);
+// Story 9.6: binary download path. Returns the raw Response so callers pick
+// the body method (.blob() for octet-stream, .text() for XML). Mirrors
+// getProcessDefinitionResource but at the deployment-resource level.
+const getDeploymentResource = (deploymentId: string, resourceName: string) =>
+  request<Response>(
+    "GET",
+    `/repository/deployments/${deploymentId}/resourcedata/${encodeURIComponent(resourceName)}`,
+    { asResponse: true },
+  );
 const listProcessDefinitions = (params?: QueryParams) =>
   request<FlowablePage<FlowableProcessDefinition>>("GET", "/repository/process-definitions", {
     params,
@@ -403,9 +617,15 @@ const getTaskVariables = (taskId: string) =>
 
 // ── Form ──────────────────────────────────────────────────────────────────
 const getTaskForm = (taskId: string) =>
-  request<Record<string, unknown>>("GET", "/form/form-data", { params: { taskId } });
-const submitTaskForm = (taskId: string, properties: unknown) =>
-  request<Record<string, unknown>>("POST", "/form/form-data", { body: { taskId, properties } });
+  request<FlowableTaskForm>("GET", "/form/form-data", { params: { taskId } });
+// Story 11.3: body shape is `{ taskId, properties }` per the Flowable contract;
+// `properties` is an array of `{ id, value }` envelopes (value is always a
+// string at the wire — booleans become "true" / "false"; numbers serialise
+// via their JS string form).
+const submitTaskForm = (
+  taskId: string,
+  body: { properties: Array<{ id: string; value: string }> },
+) => request<FlowableTaskForm>("POST", "/form/form-data", { body: { taskId, ...body } });
 
 // ── Management ───────────────────────────────────────────────────────────
 const listJobs = (params?: QueryParams) =>
@@ -417,10 +637,31 @@ const listDeadLetterJobs = (params?: QueryParams) =>
   request<FlowablePage<FlowableJob>>("GET", "/management/deadletter-jobs", { params });
 const executeJob = (id: string) =>
   request<void>("POST", `/management/jobs/${id}`, { body: { action: "execute" } });
+// Timer-job IDs live in a different namespace than executable-job IDs in
+// Flowable 7.x — a POST to /management/jobs/{timerId} returns 404, and the
+// timer-jobs endpoint only accepts `move` or `reschedule` (NOT `execute`).
+// The supported "fire timer now" recipe is `move` (queues to executable;
+// the async executor picks it up on its next poll). The handler-side label
+// "Execute now" reflects the operator-feel; the wire-level verb is `move`.
+const executeTimerJob = (id: string) =>
+  request<void>("POST", `/management/timer-jobs/${id}`, { body: { action: "move" } });
+// Reschedule a timer job to a new dueDate (Flowable 7.x action verb). The
+// payload key is `dueDate` per the engine contract; format is ISO-8601.
+const rescheduleTimerJob = (id: string, dueDate: string) =>
+  request<FlowableJob>("POST", `/management/timer-jobs/${id}`, {
+    body: { action: "reschedule", dueDate },
+  });
 const moveDeadLetterJob = (id: string) =>
   request<FlowableJob>("POST", `/management/deadletter-jobs/${id}`, { body: { action: "move" } });
 const jobStacktrace = (id: string): Promise<string> =>
   request<string>("GET", `/management/jobs/${id}/exception-stacktrace`, { raw: true });
+// Timer / dead-letter jobs live in separate namespaces — their stacktrace
+// endpoints are NOT under /management/jobs/{id}. Mirrors the executeJob /
+// executeTimerJob / moveDeadLetterJob namespace separation.
+const timerJobStacktrace = (id: string): Promise<string> =>
+  request<string>("GET", `/management/timer-jobs/${id}/exception-stacktrace`, { raw: true });
+const deadLetterJobStacktrace = (id: string): Promise<string> =>
+  request<string>("GET", `/management/deadletter-jobs/${id}/exception-stacktrace`, { raw: true });
 
 // ── History ──────────────────────────────────────────────────────────────
 const listHistoricInstances = (params?: QueryParams) =>
@@ -429,6 +670,11 @@ const listHistoricInstances = (params?: QueryParams) =>
     "/history/historic-process-instances",
     { params },
   );
+// Story 13.1: per-id GET for the historic detail panel — the runtime sibling
+// is api.getProcessInstance. Returns the same DTO as items in the list
+// response (Flowable's historic surface re-uses the shape).
+const getHistoricProcessInstance = (id: string) =>
+  request<FlowableHistoricProcessInstance>("GET", `/history/historic-process-instances/${id}`);
 const listHistoricActivities = (params?: QueryParams) =>
   request<FlowablePage<FlowableHistoricActivity>>("GET", "/history/historic-activity-instances", {
     params,
@@ -449,20 +695,83 @@ const getUser = (id: string) => request<FlowableUser>("GET", `/identity/users/${
 const listGroups = (params?: QueryParams) =>
   request<FlowablePage<FlowableGroup>>("GET", "/identity/groups", { params });
 const getGroup = (id: string) => request<FlowableGroup>("GET", `/identity/groups/${id}`);
+// flowable-rest 7.2 OSS does NOT serve GET /identity/users/{userId}/groups —
+// the working recipe is GET /identity/groups?member={userId}, symmetric to
+// listGroupMembers's ?memberOfGroup={groupId} workaround above.
 const getUserGroups = (userId: string) =>
-  request<FlowablePage<FlowableGroup>>("GET", `/identity/users/${userId}/groups`);
+  request<FlowablePage<FlowableGroup>>("GET", "/identity/groups", {
+    params: { member: userId },
+  });
+// flowable-rest 7.2 does not expose GET /identity/groups/{id}/members. The
+// supported recipe is GET /identity/users?memberOfGroup={id}, which returns
+// the FlowablePage<FlowableUser> in the group. Future flowable versions
+// may add the direct endpoint; if so, prefer it and deprecate this wrapper.
+const listGroupMembers = (groupId: string, params?: QueryParams) =>
+  request<FlowablePage<FlowableUser>>("GET", "/identity/users", {
+    params: { ...(params ?? {}), memberOfGroup: groupId },
+  });
+// Flowable 7.2 OSS exposes the group-centric membership-write endpoint:
+// POST /identity/groups/{groupId}/members with body {userId}. The inverse
+// user-centric route (POST /identity/users/{userId}/groups {groupId}) is
+// not honoured against a live engine — confirmed via Bruno during 14.3
+// post-closure verification.
 const addUserToGroup = (userId: string, groupId: string) =>
-  request<void>("POST", `/identity/users/${userId}/groups`, { body: { groupId } });
+  request<void>("POST", `/identity/groups/${groupId}/members`, { body: { userId } });
+// Symmetric pair to addUserToGroup. Flowable 7.2 OSS does NOT honour the
+// inverse user-centric DELETE /identity/users/{userId}/groups/{groupId}
+// path — the engine returns HTTP 500 "No endpoint DELETE ...". The working
+// recipe is DELETE /identity/groups/{groupId}/members/{userId}, mirroring
+// the group-centric POST above. Returns 204 No Content on success; 404 if
+// the membership doesn't exist; 403 if the caller lacks permission.
+// ErrorBox surfaces the verbatim engine message. First full application
+// of the Epic 13 retro §3.2 spec-symmetry discipline (14.3).
+const removeUserFromGroup = (userId: string, groupId: string) =>
+  request<void>("DELETE", `/identity/groups/${groupId}/members/${userId}`);
 
 // Tenants are not exposed as a dedicated endpoint in flowable-rest 7.2.
 // Derive distinct tenantIds from deployments (truthy values only).
+//
+// 60-second TTL cache on the derivation. The Topbar pill, route loaders,
+// and badge probes all call api.listTenants(); without the cache, every
+// chrome render hammers /repository/deployments. The TTL is short enough
+// that newly-deployed tenantIds appear within a minute; long enough that
+// the chrome doesn't re-derive on every cycleTenant() click.
+//
+// The /repository/deployments?size=200 page caps the derivation at 200
+// deployments per page. Engines with >200 deployments (multiple tenants
+// × many definitions) may produce truncated tenant lists. Future
+// enhancement (post-MVP): page through /repository/deployments with
+// multiple ?start= requests to enumerate all tenants.
+let _tenantsCache: { value: { data: FlowableTenant[] }; at: number } | null = null;
+const TENANTS_CACHE_TTL_MS = 60_000;
+const TENANTS_PAGE_SIZE = 200;
+
 const listTenants = async (): Promise<{ data: FlowableTenant[] }> => {
-  const res = await listDeployments({ size: 1000 });
+  const now = Date.now();
+  if (_tenantsCache && now - _tenantsCache.at < TENANTS_CACHE_TTL_MS) {
+    return _tenantsCache.value;
+  }
+  const res = await listDeployments({ size: TENANTS_PAGE_SIZE });
+  if (res?.data && res.data.length === TENANTS_PAGE_SIZE) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[flowatch] api.listTenants: /repository/deployments returned ${TENANTS_PAGE_SIZE} rows (page cap reached); tenant list may be truncated for very large engines.`,
+    );
+  }
   const ids = new Set<string>();
   (res?.data || []).forEach((d) => {
     if (d.tenantId) ids.add(d.tenantId);
   });
-  return { data: [...ids].map((id) => ({ id, name: id })) };
+  const value = { data: [...ids].map((id) => ({ id, name: id })) };
+  _tenantsCache = { value, at: now };
+  return value;
+};
+
+// Test-only export — call this in tests to reset the module-scoped cache
+// between cases. Also used in production once: by api.setConfig() when the
+// engine endpoint changes (per Story 14.4 AC-9).
+export const __clearTenantsCache = (): void => {
+  _tenantsCache = null;
 };
 
 // ── DMN (mounted under /flowable-rest/dmn-api, not /service) ─────────────
@@ -476,13 +785,73 @@ const listDmnDeployments = (params?: QueryParams) =>
     params,
     base: dmnBase(),
   });
-const executeDecision = (body: Record<string, unknown>) =>
+// Story 15.3: tightened signature. The body shape matches Flowable 7.x's
+// POST /dmn-rule/execute — `decisionKey` + an array of typed input variables.
+// Pass `parentDeploymentId` to lock execution to a specific deployment;
+// without it, the engine picks the latest version of the decision key.
+const executeDecision = (body: ExecuteDecisionBody) =>
   request<FlowableDecisionResult>("POST", "/dmn-rule/execute", { body, base: dmnBase() });
-const getDmnResource = (deploymentId: string, resourceId: string): Promise<string> =>
-  request<string>("GET", `/dmn-repository/deployments/${deploymentId}/resourcedata/${resourceId}`, {
+// Direct DMN XML fetch by decision-table id. Mirrors the BPMN side's
+// /repository/process-definitions/{id}/resourcedata shape — one endpoint,
+// no deployment-resources discovery hop. The `decisionTableId` matches a
+// `FlowableDecision.id`. The DMN sub-app does NOT expose a
+// `/deployments/{id}/resources` listing endpoint (returns 500 "No
+// endpoint" on flowable-rest 7.2 OSS), which is why we fetch by decision
+// id rather than by deployment+filename.
+const getDmnDecisionResource = (decisionId: string): Promise<string> =>
+  request<string>("GET", `/dmn-repository/decision-tables/${decisionId}/resourcedata`, {
     raw: true,
     base: dmnBase(),
   });
+// Story 15.4: list historic DMN decision executions.
+//
+// Supported params (per Flowable 7.x DMN-history REST surface):
+//   size, start, sort, order              — pagination + sort
+//   decisionKey, decisionKeyLike          — filter by decision key
+//   processInstanceId                     — filter by parent process instance
+//   executionId                           — filter by Flowable execution context
+//   activityId                            — filter by triggering activity
+//   startedBefore, startedAfter           — ISO 8601 timestamp bounds
+//   tenantId                              — tenant scoping
+const listDmnHistoryExecutions = (params?: QueryParams) =>
+  request<FlowablePage<FlowableHistoricDecisionExecution>>(
+    "GET",
+    "/dmn-history/historic-decision-executions",
+    { params, base: dmnBase() },
+  );
+// Fetch the rich audit data for a single historic decision execution —
+// surfaces hit policy, typed input/result maps, and the per-rule
+// condition+conclusion trace. Used by the executions row-expand panel.
+const getDmnHistoryAuditdata = (executionId: string) =>
+  request<FlowableDmnExecutionAudit>(
+    "GET",
+    `/dmn-history/historic-decision-executions/${executionId}/auditdata`,
+    { base: dmnBase() },
+  );
+// Single-deployment GET — mirror of the BPMN side's `api.getDeployment`,
+// powers the kind-aware `/deployments/$id` route loader.
+const getDmnDeployment = (id: string) =>
+  request<FlowableDeployment>("GET", `/dmn-repository/deployments/${id}`, { base: dmnBase() });
+// Binary download for an individual DMN deployment resource — mirror of
+// BPMN's `getDeploymentResource`. Returns the raw Response so the caller
+// picks .blob() / .text(); used by the kind-aware DeploymentDetail.
+const getDmnDeploymentResource = (deploymentId: string, resourceName: string) =>
+  request<Response>(
+    "GET",
+    `/dmn-repository/deployments/${deploymentId}/resourcedata/${encodeURIComponent(resourceName)}`,
+    { asResponse: true, base: dmnBase() },
+  );
+// Story 15.2: DELETE a DMN deployment. Pass `{cascade: true}` to delete
+// decisions still referenced by historic executions (mirrors BPMN's
+// removeDeployment cascade flag at /repository/deployments/{id}). Without
+// cascade, the engine returns 409 Conflict if any historic execution
+// references a decision from this deployment.
+const removeDmnDeployment = (id: string, params?: { cascade?: boolean }) =>
+  request<void>(
+    "DELETE",
+    `/dmn-repository/deployments/${id}`,
+    params?.cascade ? { params: { cascade: true }, base: dmnBase() } : { base: dmnBase() },
+  );
 
 // ── Deployment helpers (multipart upload) ────────────────────────────────
 // Flowable expects multipart/form-data, not the JSON-with-base64 shape we used
@@ -491,6 +860,14 @@ const getDmnResource = (deploymentId: string, resourceId: string): Promise<strin
 interface UploadOpts {
   base?: string;
   deploymentName?: string;
+  /**
+   * Path under `base` to POST the multipart deployment to. Defaults to
+   * `/repository/deployments` (BPMN sub-app). The DMN sub-app uses
+   * `/dmn-repository/deployments` — `deployDmn` passes that explicitly.
+   * Without this override, DMN deploys hit `/dmn-api/repository/deployments`
+   * which returns "No endpoint POST …" from flowable-rest 7.2.
+   */
+  path?: string;
 }
 const uploadDeployment = async (
   filename: string,
@@ -499,26 +876,36 @@ const uploadDeployment = async (
   opts: UploadOpts = {},
 ): Promise<FlowableDeployment> => {
   const root = (opts.base || cfg.baseUrl).replace(/\/$/, "");
-  const url = root + "/repository/deployments";
+  const path = opts.path || "/repository/deployments";
+  const url = root + path;
   const t0 = performance.now();
   const entry: ApiLogEntry = {
     id: Math.random().toString(36).slice(2, 9),
     method: "POST",
-    path: "/repository/deployments",
+    path,
     url,
     status: 0,
     ms: 0,
     at: new Date().toISOString(),
   };
-  const fd = new FormData();
-  fd.append("file", new Blob([content], { type }), filename);
-  if (cfg.tenantId) fd.append("tenantId", cfg.tenantId);
-  if (opts.deploymentName) fd.append("deploymentName", opts.deploymentName);
-
   try {
+    // Multipart setup lives inside the try (Story 9.2, AC-7). FormData /
+    // Blob constructors and redactAuthHeader CAN throw — moving them inside
+    // the try ensures the entry lands in API_LOG with status=0 + the
+    // engine-visible error message even on these "throw before fetch" paths.
+    // Closes the Story 8.1 deferred-work item.
+    const fd = new FormData();
+    fd.append("file", new Blob([content], { type }), filename);
+    if (cfg.tenantId) fd.append("tenantId", cfg.tenantId);
+    if (opts.deploymentName) fd.append("deploymentName", opts.deploymentName);
+
+    // Multipart uploads don't set Content-Type — fetch derives it from FormData.
+    // We mirror that in the captured headers (Authorization only), per AC-3.
+    const uploadHeaders: Record<string, string> = { Authorization: basicAuth() };
+    entry.headers = redactAuthHeader(uploadHeaders);
     const res = await fetch(url, {
       method: "POST",
-      headers: { Authorization: basicAuth() },
+      headers: uploadHeaders,
       body: fd,
     });
     entry.status = res.status;
@@ -544,7 +931,11 @@ const uploadDeployment = async (
 const deployBpmn = (name: string, xml: string) =>
   uploadDeployment(name, xml, "application/xml", { deploymentName: name });
 const deployDmn = (name: string, xml: string) =>
-  uploadDeployment(name, xml, "application/xml", { deploymentName: name, base: dmnBase() });
+  uploadDeployment(name, xml, "application/xml", {
+    deploymentName: name,
+    base: dmnBase(),
+    path: "/dmn-repository/deployments",
+  });
 
 const ping = () => request<FlowableEngineInfo>("GET", "/management/engine");
 
@@ -561,8 +952,22 @@ const runRaw = (method: HTTPMethod, path: string, body?: unknown) => {
 export const api = {
   config: (): FlowableConfig => ({ ...cfg }),
   setConfig: (next: Partial<FlowableConfig>): void => {
+    // Per AC-5 the re-probe fires when the *connection* changes — baseUrl,
+    // username, or password. Tenant-only updates (e.g. Topbar's cycleTenant
+    // or SettingsModal's Test button before Save) must not flash the conn
+    // pill or trigger a redundant /management/engine round-trip.
+    const connectionChanged =
+      (next.baseUrl !== undefined && next.baseUrl !== cfg.baseUrl) ||
+      (next.username !== undefined && next.username !== cfg.username) ||
+      (next.password !== undefined && next.password !== cfg.password);
     cfg = { ...cfg, ...next };
     saveCfg(cfg);
+    if (connectionChanged) {
+      // Story 14.4 AC-9: an engine switch invalidates the cached tenants —
+      // the new engine's /repository/deployments has its own tenantIds.
+      __clearTenantsCache();
+      window.dispatchEvent(new CustomEvent("conn:config-changed"));
+    }
   },
   log: (): ApiLogEntry[] => [...API_LOG],
   // BPMN repository
@@ -571,6 +976,7 @@ export const api = {
   createDeployment,
   deleteDeployment,
   listDeploymentResources,
+  getDeploymentResource,
   listProcessDefinitions,
   getProcessDefinition,
   suspendProcessDefinition,
@@ -594,10 +1000,15 @@ export const api = {
   listTimerJobs,
   listDeadLetterJobs,
   executeJob,
+  executeTimerJob,
+  rescheduleTimerJob,
   moveDeadLetterJob,
   jobStacktrace,
+  timerJobStacktrace,
+  deadLetterJobStacktrace,
   // History
   listHistoricInstances,
+  getHistoricProcessInstance,
   listHistoricActivities,
   listHistoricVariables,
   listHistoricTasks,
@@ -607,13 +1018,20 @@ export const api = {
   listGroups,
   getGroup,
   getUserGroups,
+  listGroupMembers,
   addUserToGroup,
+  removeUserFromGroup,
   listTenants,
   // DMN
   listDecisions,
   listDmnDeployments,
   executeDecision,
-  getDmnResource,
+  getDmnDecisionResource,
+  getDmnDeployment,
+  getDmnDeploymentResource,
+  removeDmnDeployment,
+  listDmnHistoryExecutions,
+  getDmnHistoryAuditdata,
   deployBpmn,
   deployDmn,
   ping,

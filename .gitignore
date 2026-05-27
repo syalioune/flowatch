@@ -28,6 +28,10 @@ codeql.sarif
 # local runs write the same paths and should never be committed.
 .stryker-tmp/
 reports/mutation/
+# Trivy filesystem scan (.github/workflows/ci.yml) downloads its vuln DB to
+# .cache/trivy/ inside the workspace; biome's ci step (which uses .gitignore
+# via vcs.useIgnoreFile) would otherwise flag the unformatted metadata.json.
+.cache/
 .env
 .env.local
 .DS_Store

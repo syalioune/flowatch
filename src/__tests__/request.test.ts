@@ -239,6 +239,45 @@ describe("request() — api:log event bus", () => {
     expect(ev.detail.error).toBe("bad request");
   });
 
+  it("entry includes headers with Authorization redacted to 'Basic ***'", async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 200,
+        json: { data: [], total: 0, start: 0, size: 0, sort: "", order: "" },
+      }),
+    );
+    await api.listDeployments();
+
+    expect(API_LOG[0]?.headers?.Authorization).toBe("Basic ***");
+    expect(API_LOG[0]?.headers?.Accept).toBe("application/json");
+  });
+
+  it("entry includes the original opts.body when provided as a JS value", async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 201, json: { id: "pi-1" } }));
+    const payload = {
+      processDefinitionId: "def-1",
+      variables: [{ name: "x", value: 1 }],
+    };
+    await api.startProcessInstance(payload);
+
+    expect(API_LOG[0]?.body).toEqual(payload);
+    // Identity preserved — no defensive JSON.parse(JSON.stringify).
+    expect(API_LOG[0]?.body).toBe(payload);
+  });
+
+  it("entry leaves body undefined for GET requests", async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 200,
+        json: { data: [], total: 0, start: 0, size: 0, sort: "", order: "" },
+      }),
+    );
+    await api.listDeployments();
+
+    expect(API_LOG[0]?.body).toBeUndefined();
+  });
+
+  // AC-4 / Story 8.1: ring buffer cap re-asserted here (do not duplicate).
   it("API_LOG ring buffer caps at 60 entries, newest first", async () => {
     // Response body is single-use, so build a fresh Response per call.
     fetchMock.mockImplementation(() =>
@@ -360,14 +399,10 @@ describe("api.* wrappers smoke (P-001 — every call goes through request())", (
     expect(out.data.map((t) => t.id).sort()).toEqual(["alpha", "beta"]);
   });
 
-  it("DMN: listDecisions / listDmnDeployments / executeDecision / getDmnResource", async () => {
+  it("DMN: listDecisions / listDmnDeployments / executeDecision", async () => {
     await api.listDecisions();
     await api.listDmnDeployments();
-    await api.executeDecision({ decisionKey: "k", variables: {} });
-    fetchMock.mockResolvedValueOnce(
-      mockResponse({ status: 200, body: "<dmn/>", contentType: "application/xml" }),
-    );
-    await api.getDmnResource("dep-1", "res-1");
+    await api.executeDecision({ decisionKey: "k", inputVariables: [] });
   });
 
   it("deployBpmn / deployDmn upload via multipart and log the call", async () => {
@@ -375,9 +410,18 @@ describe("api.* wrappers smoke (P-001 — every call goes through request())", (
     await api.deployBpmn("loan.bpmn20.xml", "<bpmn/>");
     expect(API_LOG.length).toBe(before + 1);
     expect(API_LOG[0]?.method).toBe("POST");
+    expect(API_LOG[0]?.path).toBe("/repository/deployments");
+    expect(API_LOG[0]?.url).toBe(`${DEFAULT_BASE}/repository/deployments`);
 
     await api.deployDmn("loan.dmn", "<dmn/>");
     expect(API_LOG[0]?.method).toBe("POST");
+    // DMN deploys land on /dmn-repository/deployments under /dmn-api, not
+    // /repository/deployments under /service. Regression guard: the engine
+    // returns 404 if the dmn-api sub-app is asked for /repository/deployments.
+    expect(API_LOG[0]?.path).toBe("/dmn-repository/deployments");
+    expect(API_LOG[0]?.url).toBe(
+      "http://localhost:8080/flowable-rest/dmn-api/dmn-repository/deployments",
+    );
   });
 
   it("deployBpmn surfaces 4xx engine bodies as FlowableError", async () => {
@@ -407,6 +451,88 @@ describe("api.* wrappers smoke (P-001 — every call goes through request())", (
   });
 });
 
+describe("request() — NFR-8 credential redaction", () => {
+  it("raw Basic-auth credential never appears in API_LOG (success / 4xx / network)", async () => {
+    const credential = btoa("rest-admin:test");
+
+    // (a) success
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, json: { ok: true } }));
+    await api.runRaw("GET", "/probe-ok");
+    expect(JSON.stringify(API_LOG)).not.toContain(credential);
+    expect(JSON.stringify(API_LOG)).toContain('"Authorization":"Basic ***"');
+
+    // (b) 4xx
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 400, body: "bad" }));
+    await expect(api.runRaw("GET", "/probe-bad")).rejects.toBeInstanceOf(FlowableError);
+    expect(JSON.stringify(API_LOG)).not.toContain(credential);
+    expect(JSON.stringify(API_LOG)).toContain('"Authorization":"Basic ***"');
+
+    // (c) network
+    fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
+    await expect(api.runRaw("GET", "/probe-net")).rejects.toBeInstanceOf(TypeError);
+    expect(JSON.stringify(API_LOG)).not.toContain(credential);
+    expect(JSON.stringify(API_LOG)).toContain('"Authorization":"Basic ***"');
+  });
+
+  it("redaction survives setConfig() with new credentials", async () => {
+    api.setConfig({
+      baseUrl: DEFAULT_BASE,
+      username: "alice",
+      password: "s3cret!",
+      tenantId: "",
+    });
+    // Defensive: setConfig does not log, but reset to keep AT-the-test indices unambiguous.
+    API_LOG.length = 0;
+
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, json: { ok: true } }));
+    await api.runRaw("GET", "/probe");
+
+    const newCredential = btoa("alice:s3cret!");
+    expect(JSON.stringify(API_LOG)).not.toContain(newCredential);
+    expect(API_LOG[0]?.headers?.Authorization).toBe("Basic ***");
+    // The username itself MAY appear in url/path/body if the caller intentionally
+    // puts it there — only the *header* value is in scope for redaction.
+  });
+
+  it("uploadDeployment() entries also redact Authorization (success + failure)", async () => {
+    const credential = btoa("rest-admin:test");
+
+    // success
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ status: 201, json: { id: "dep-1", name: "x", deploymentTime: "" } }),
+    );
+    await api.deployBpmn("x.bpmn", "<bpmn/>");
+    expect(API_LOG[0]?.headers?.Authorization).toBe("Basic ***");
+    expect(API_LOG[0]?.headers?.["Content-Type"]).toBeUndefined();
+    expect(JSON.stringify(API_LOG)).not.toContain(credential);
+
+    // failure (4xx body propagates verbatim into entry.error; no header leak)
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 400, body: "bad model" }));
+    await expect(api.deployBpmn("bad.bpmn", "<bpmn/>")).rejects.toBeInstanceOf(FlowableError);
+    expect(API_LOG[0]?.headers?.Authorization).toBe("Basic ***");
+    expect(JSON.stringify(API_LOG)).not.toContain(credential);
+
+    // network failure (status: 0 in log)
+    fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
+    await expect(api.deployBpmn("bad.bpmn", "<bpmn/>")).rejects.toBeInstanceOf(TypeError);
+    expect(API_LOG[0]?.status).toBe(0);
+    expect(API_LOG[0]?.headers?.Authorization).toBe("Basic ***");
+  });
+
+  it("redactor preserves the auth scheme prefix (forward-compat with Bearer)", async () => {
+    // Branch-coverage helper: the redactor must split on the first space and
+    // preserve the scheme. Today only Basic is sent, so we exercise the helper
+    // via a successful Basic call and assert the prefix is preserved.
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, json: { ok: true } }));
+    await api.runRaw("GET", "/probe");
+
+    const auth = API_LOG[0]?.headers?.Authorization ?? "";
+    expect(auth.startsWith("Basic ")).toBe(true);
+    expect(auth.endsWith(" ***")).toBe(true);
+    expect(auth).not.toContain(btoa("rest-admin:test"));
+  });
+});
+
 describe("request() — config + auth", () => {
   it("applies tenantId-less default auth header (Basic of admin:test)", async () => {
     fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, json: {} }));
@@ -431,5 +557,67 @@ describe("request() — config + auth", () => {
     expect(url).toBe("http://example.test/api/probe");
     const expected = `Basic ${btoa("u:p")}`;
     expect((init.headers as Record<string, string>).Authorization).toBe(expected);
+  });
+});
+
+describe("request() — asResponse option (Story 9.6 AC-1a)", () => {
+  it("returns the raw Response object when asResponse is true", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response("xml bytes", { status: 200, headers: { "content-type": "application/xml" } }),
+    );
+    const res = await api.getDeploymentResource("dep-1", "x.bpmn");
+    expect(res).toBeInstanceOf(Response);
+    expect(await res.text()).toBe("xml bytes");
+  });
+
+  it("still logs to API_LOG when asResponse is true", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+    await api.getDeploymentResource("dep-1", "x.bpmn");
+    expect(API_LOG[0]?.status).toBe(200);
+    expect(API_LOG[0]?.headers?.Authorization).toBe("Basic ***");
+    expect(API_LOG[0]?.body).toBeUndefined();
+  });
+
+  it("throws FlowableError on 4xx with asResponse", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("not found", { status: 404 }));
+    await expect(api.getDeploymentResource("dep-x", "missing.bpmn")).rejects.toBeInstanceOf(
+      FlowableError,
+    );
+    expect(API_LOG[0]?.status).toBe(404);
+  });
+
+  it("encodes the resource name in the URL path", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200 }));
+    await api.getDeploymentResource("dep-1", "file with spaces.bpmn");
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain("file%20with%20spaces.bpmn");
+  });
+});
+
+describe("uploadDeployment() — sync-throw pre-network (Story 9.2 AC-7)", () => {
+  /**
+   * Closes the Story 8.1 deferred-work entry. The multipart-setup block
+   * (FormData + Blob + redactAuthHeader) now lives INSIDE the `try`, so a
+   * Blob constructor throw lands an API_LOG entry with status=0 instead of
+   * silently stranding the event.
+   */
+  it("Blob constructor throw still lands an API_LOG entry with status=0", async () => {
+    const RealBlob = globalThis.Blob;
+    const blobSpy = vi.spyOn(globalThis, "Blob").mockImplementation(() => {
+      throw new Error("Blob constructor failed");
+    });
+    try {
+      await expect(api.deployBpmn("x.bpmn", "<bpmn/>")).rejects.toThrow("Blob constructor failed");
+      expect(API_LOG[0]).toBeDefined();
+      expect(API_LOG[0]?.error).toBe("Blob constructor failed");
+      expect(API_LOG[0]?.status).toBe(0);
+      // The throw fires before headers are set; entry.headers undefined is
+      // leak-free by construction (NFR-8 only mandates "never leak").
+      expect(API_LOG[0]?.headers).toBeUndefined();
+    } finally {
+      blobSpy.mockRestore();
+      // Defensive — vi.restoreAllMocks() in afterEach handles this too.
+      globalThis.Blob = RealBlob;
+    }
   });
 });

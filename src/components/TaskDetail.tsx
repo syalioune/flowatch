@@ -11,10 +11,14 @@
  */
 
 import { Link, useNavigate } from "@tanstack/react-router";
-import { api, type FlowableTask } from "../api";
-import { fmtDue, fmtTime, Icon, PageHead } from "../components";
+import React from "react";
+import { api, type FlowableTask, type FlowableTaskForm } from "../api";
+import { fmtDue, fmtTime, Icon, PageHead, toast } from "../components";
+import { DelegateTaskModal } from "../lib/delegate-task-modal";
 import { ErrorBox } from "../lib/error-box";
+import { NAV_INVALIDATE_COUNTS } from "../lib/nav-events";
 import { useApi } from "../lib/useApi";
+import { TaskFormPanel } from "./TaskFormPanel";
 
 interface Props {
   task: FlowableTask;
@@ -29,26 +33,38 @@ type TaskWide = FlowableTask & {
   formKey?: string;
 };
 
-type FormFieldEnumValue = string | { id?: string; name?: string };
-interface FormField {
-  id: string;
-  name?: string;
-  required?: boolean;
-  type: string;
-  value?: string;
-  enumValues?: FormFieldEnumValue[];
-}
-type TaskForm = { formKey?: string; formProperties?: FormField[] } | null;
+// Story 11.3 AC-9: hide the legacy Complete button when a form is present.
+// The panel's Submit button replaces it; submitting a form atomically
+// completes the task via `api.submitTaskForm`. Operators should not be able
+// to bypass form validation by clicking Complete.
+type ParentTaskForm = FlowableTaskForm | null;
 
 export function TaskDetail({ task, reload }: Props) {
   const navigate = useNavigate();
   const t = task as TaskWide;
 
-  const form = useApi<TaskForm>(
-    () => api.getTaskForm(t.id).catch(() => null) as Promise<TaskForm>,
+  const form = useApi<ParentTaskForm>(
+    () => api.getTaskForm(t.id).catch(() => null) as Promise<ParentTaskForm>,
     [t.id],
   );
+  // hasForm gates the legacy Complete button (AC-9). Flowable 7.2 returns a
+  // truthy payload (e.g. `{ formKey: null }`) even for tasks without
+  // declared form properties, so we additionally require non-empty
+  // formProperties before considering the form "real" — otherwise the
+  // operator loses access to the Complete button on no-form tasks.
+  const hasForm = !!form.data?.formProperties && form.data.formProperties.length > 0;
   const variables = useApi(() => api.getTaskVariables(t.id), [t.id]);
+
+  // Story 11.4: Delegate modal + Resolve handler state.
+  const [delegateTarget, setDelegateTarget] = React.useState<FlowableTask | null>(null);
+  const delegateButtonRef = React.useRef<HTMLButtonElement>(null);
+  const [resolveBusy, setResolveBusy] = React.useState(false);
+
+  const cfgUsername = api.config().username?.trim() ?? "";
+  // AC-5: Resolve is visible only when the operator is the delegated assignee
+  // (assignee === cfg.username) AND the task has an owner who isn't the same.
+  const canResolve =
+    !!t.assignee && t.assignee === cfgUsername && !!t.owner && t.owner !== t.assignee;
 
   const claim = async () => {
     const cfg = api.config();
@@ -59,11 +75,26 @@ export function TaskDetail({ task, reload }: Props) {
     await api.taskAction(t.id, "complete");
     navigate({ to: "/tasks" });
   };
-  const delegate = async () => {
-    const assignee = prompt("Delegate to whom?");
-    if (!assignee) return;
-    await api.taskAction(t.id, "delegate", { assignee });
-    reload();
+
+  // Story 11.4 AC-5: Resolve handler — one-shot, no input, toast on settle.
+  const resolve = async () => {
+    setResolveBusy(true);
+    try {
+      await api.taskAction(t.id, "resolve");
+      toast({ kind: "ok", text: `Resolved: ${t.name || t.id}`, ttl: 3000 });
+      window.dispatchEvent(new CustomEvent(NAV_INVALIDATE_COUNTS));
+    } catch (err) {
+      toast({
+        kind: "err",
+        text: "Resolve failed",
+        sub: (err as Error)?.message ?? String(err),
+        ttl: 8000,
+      });
+    } finally {
+      setResolveBusy(false);
+      // Engine is source of truth; reload regardless to converge.
+      reload();
+    }
   };
 
   return (
@@ -82,15 +113,39 @@ export function TaskDetail({ task, reload }: Props) {
                 Claim
               </button>
             )}
+            {/* Story 11.3 AC-9: Complete button is hidden when a form is
+                present — the form panel's Submit replaces it. */}
+            {!hasForm && (
+              <button
+                type="button"
+                className="btn"
+                data-variant={t.assignee ? "primary" : "ghost"}
+                onClick={complete}
+              >
+                Complete
+              </button>
+            )}
+            {/* Story 11.4 AC-5: Resolve appears only when the operator is the
+                delegated assignee and there's a distinct owner. */}
+            {canResolve && (
+              <button
+                type="button"
+                className="btn"
+                data-variant="primary"
+                data-testid="resolve-task"
+                onClick={resolve}
+                disabled={resolveBusy}
+              >
+                {resolveBusy ? "Resolving…" : "Resolve"}
+              </button>
+            )}
             <button
+              ref={delegateButtonRef}
               type="button"
               className="btn"
-              data-variant={t.assignee ? "primary" : "ghost"}
-              onClick={complete}
+              data-variant="ghost"
+              onClick={() => setDelegateTarget(task)}
             >
-              Complete
-            </button>
-            <button type="button" className="btn" data-variant="ghost" onClick={delegate}>
               Delegate…
             </button>
           </>
@@ -157,61 +212,7 @@ export function TaskDetail({ task, reload }: Props) {
         </div>
       </div>
 
-      <div className="panel" style={{ marginTop: 18 }}>
-        <div className="panel-hd">
-          <span className="panel-title">Form</span>
-          <span
-            className="mono mute"
-            style={{ marginLeft: "auto", fontSize: 10, color: "var(--fg-mute)" }}
-          >
-            GET /form/form-data?taskId={t.id}
-          </span>
-        </div>
-        <div className="panel-body">
-          {form.loading && (
-            <div className="empty" style={{ padding: 14 }}>
-              Loading…
-            </div>
-          )}
-          {form.error && <ErrorBox error={form.error} onRetry={form.reload} />}
-          {!form.loading && !form.error && !form.data && (
-            <div className="mute" style={{ padding: "8px 0" }}>
-              No form attached to this task.
-            </div>
-          )}
-          {form.data && (
-            <div style={{ maxWidth: 560 }}>
-              <div className="mono text-xs mute" style={{ marginBottom: 8 }}>
-                formKey: {form.data.formKey || "—"}
-              </div>
-              {(form.data.formProperties || []).map((f) => (
-                <div className="form-row" key={f.id}>
-                  <label htmlFor={`f-${f.id}`}>
-                    {f.name || f.id} {f.required && <span className="req">*</span>}
-                    <span className="mono">{f.type}</span>
-                  </label>
-                  {f.type === "enum" && Array.isArray(f.enumValues) && (
-                    <div className="seg-row">
-                      {f.enumValues.map((v) => {
-                        const key = typeof v === "string" ? v : v.id || v.name || "";
-                        const lbl = typeof v === "string" ? v : v.name || v.id || "";
-                        return (
-                          <button type="button" key={key} className="seg-btn">
-                            {lbl}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {f.type !== "enum" && (
-                    <input id={`f-${f.id}`} className="input" defaultValue={f.value || ""} />
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      <TaskFormPanel taskId={t.id} task={task} onSubmitted={() => navigate({ to: "/tasks" })} />
 
       <div className="panel" style={{ marginTop: 18 }}>
         <div className="panel-hd">
@@ -253,6 +254,15 @@ export function TaskDetail({ task, reload }: Props) {
           )}
         </div>
       </div>
+      <DelegateTaskModal
+        task={delegateTarget}
+        triggerRef={delegateButtonRef}
+        onClose={() => setDelegateTarget(null)}
+        onSubmitted={() => {
+          setDelegateTarget(null);
+          reload();
+        }}
+      />
     </div>
   );
 }

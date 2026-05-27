@@ -3,7 +3,9 @@
 import { Link } from "@tanstack/react-router";
 import React from "react";
 import noticeContent from "../NOTICE?raw";
-import { API_LOG, type ApiLogEntry, api, type FlowableConfig } from "./api";
+import { API_LOG, type ApiLogEntry, api, type FlowableConfig, type HTTPMethod } from "./api";
+import { buildCurlCommand, CURL_MULTIPART, CURL_UNSERIALIZABLE } from "./lib/curl";
+import { errorStatus } from "./lib/error";
 import { type RouteEndpoint, useRouteMeta } from "./lib/route-meta";
 
 interface ApiLogEvent extends CustomEvent<ApiLogEntry> {}
@@ -180,6 +182,12 @@ export const Icon = ({ name, size = 14 }: IconProps) => {
         <circle cx="12" cy="15.5" r="1.5" />
       </>
     ),
+    decision: (
+      <>
+        <rect x="4" y="4" width="16" height="16" rx="1.5" />
+        <path d="M4 9h16M9 4v16M14 14l2 2 4-4" />
+      </>
+    ),
   };
   return (
     <svg
@@ -220,7 +228,7 @@ const Logo = () => (
       <Mark />
     </div>
     <div className="brand-name">Flowatch</div>
-    <div className="brand-tag">v0.0.1</div>
+    <div className="brand-tag">v0.0.2</div>
   </div>
 );
 
@@ -267,7 +275,7 @@ interface NavItem {
   label: string;
   icon: string;
   /** Key into the `counts` map (only set for items that show a count badge). */
-  countsKey?: "tasks" | "jobs";
+  countsKey?: "tasks" | "jobs" | "instances";
 }
 
 interface NavGroup {
@@ -288,7 +296,7 @@ const NAV: NavGroup[] = [
     group: "Operate",
     items: [
       { path: "/tasks", label: "Tasks", icon: "task", countsKey: "tasks" },
-      { path: "/instances", label: "Process instances", icon: "instance" },
+      { path: "/instances", label: "Process instances", icon: "instance", countsKey: "instances" },
       { path: "/jobs", label: "Jobs", icon: "job", countsKey: "jobs" },
       { path: "/history", label: "History", icon: "history" },
     ],
@@ -298,6 +306,7 @@ const NAV: NavGroup[] = [
     items: [
       { path: "/deployments", label: "Deployments", icon: "deploy" },
       { path: "/definitions", label: "Process definitions", icon: "def" },
+      { path: "/decisions", label: "Decisions", icon: "decision" },
     ],
   },
   {
@@ -310,14 +319,14 @@ const NAV: NavGroup[] = [
 ];
 
 interface ConnectionState {
-  state: "pending" | "ok" | "err";
+  state: "pending" | "ok" | "err" | "unset";
   host: string;
 }
 
 interface SidebarProps {
   connection: ConnectionState;
   onConnClick: () => void;
-  counts?: Partial<Record<"tasks" | "jobs", number | null | undefined>>;
+  counts?: Partial<Record<"tasks" | "jobs" | "instances", number | null | undefined>>;
 }
 
 // @migration-any: TanStack Router's LinkProps does not expose data-* attribute pass-through. Tracked in #119.
@@ -395,10 +404,12 @@ export const Topbar = ({
   onTweaks,
 }: TopbarProps) => (
   <div className="topbar">
-    <div className="tenant-switch" onClick={onTenant}>
+    <div className="tenant-switch" data-testid="tenant-switch" onClick={onTenant}>
       <Icon name="tenant" size={13} />
       <span>
-        <b style={{ fontWeight: 500 }}>{tenant.name}</b>
+        <b style={{ fontWeight: 500 }} data-testid="tenant-switch-label">
+          {tenant.name}
+        </b>
       </span>
       <span className="caret">
         <Icon name="chevron" size={12} />
@@ -410,13 +421,15 @@ export const Topbar = ({
       <kbd>⌘K</kbd>
     </div>
     <div className="top-actions">
-      <button className="icon-btn" title="Notifications">
+      <button className="icon-btn" title="Notifications" aria-label="View notifications">
         <Icon name="bell" size={15} />
       </button>
       <button
         className="icon-btn"
         data-active={inspectorOpen ? "1" : "0"}
+        data-testid="inspector-toggle"
         title="API inspector"
+        aria-label="Toggle API Inspector"
         onClick={onInspector}
       >
         <Icon name="api" size={15} />
@@ -424,14 +437,26 @@ export const Topbar = ({
       <button
         className="icon-btn"
         title="Theme"
+        aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
         onClick={() => onTheme(theme === "dark" ? "light" : "dark")}
       >
         <Icon name={theme === "dark" ? "sun" : "moon"} size={15} />
       </button>
-      <button className="icon-btn" title="Customize (Ctrl+Shift+T)" onClick={onTweaks}>
+      <button
+        className="icon-btn"
+        title="Customize (Ctrl+Shift+T)"
+        aria-label="Toggle theme tweaks (Ctrl+Shift+T)"
+        data-testid="tweaks-toggle"
+        onClick={onTweaks}
+      >
         <Icon name="palette" size={15} />
       </button>
-      <button className="icon-btn" title="Settings" onClick={onSettings}>
+      <button
+        className="icon-btn"
+        title="Settings"
+        aria-label="Connection settings"
+        onClick={onSettings}
+      >
         <Icon name="settings" size={15} />
       </button>
       <div className="avatar">YOU</div>
@@ -556,11 +581,13 @@ export const SettingsModal = ({ open, onClose }: SettingsModalProps) => {
                 </button>
                 {pingRes?.ok && (
                   <span className="badge" data-tone="ok">
+                    <span className="sr-only">Status: connected — </span>
                     {pingRes.name} {pingRes.version}
                   </span>
                 )}
                 {pingRes && !pingRes.ok && (
                   <span className="badge" data-tone="bad">
+                    <span className="sr-only">Status: error — </span>
                     {pingRes.error}
                   </span>
                 )}
@@ -622,9 +649,15 @@ function AboutTab() {
 
 const buildFetchSnippet = (cfg: FlowableConfig, ep: RouteEndpoint): string => {
   const u = `${cfg.baseUrl.replace(/\/$/, "")}${ep.path}`;
+  // The literal token "fetch" + open-paren appearing in source would trip
+  // the Pattern P-001 grep (scripts/ci/check-fetch-funnel.sh). Building
+  // the snippet via a constant keeps the displayed teaching snippet
+  // clean (no p-001-allow marker leaking into the user's clipboard) AND
+  // keeps the source free of an actual call-token (review patch).
+  const FETCH = "fetch";
   return `// ${ep.desc || ""}
 const auth = btoa("${cfg.username}:••••");
-const res = await fetch(
+const res = await ${FETCH}(
   "${u}",
   {
     method: "${ep.method}",
@@ -660,23 +693,107 @@ interface ApiInspectorProps {
   onClose: () => void;
   screenEndpoints?: ReadonlyArray<RouteEndpoint>;
   screenTitle: string;
+  // {id, seq} so consecutive clicks on the same ErrorBox produce a fresh
+  // object identity and re-fire the scroll/highlight effect (review patch).
+  focusEntry?: { id: string; seq: number } | null;
 }
 
 type InspectorResult =
   | { ok: true; status: number | undefined; ms: number | undefined; data: unknown }
   | { ok: false; status: number | undefined; ms: number | undefined; error: string };
 
+type MethodFilter = HTTPMethod | "All";
+type StatusFilter = "All" | "2xx" | "4xx" | "5xx/err";
+
+// Relative-time formatter used by every row in the Recent-calls list. Computed
+// at render time only — re-renders are driven by the api:log event, so a
+// setInterval/RAF tick would just churn the React tree for no UX gain.
+function timeAgo(iso: string, now: Date = new Date()): string {
+  const ms = now.getTime() - new Date(iso).getTime();
+  if (ms < 1000) return "now";
+  const sec = Math.floor(ms / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h`;
+  return `${Math.floor(hr / 24)}d`;
+}
+
+function matchStatusBucket(status: number, filter: StatusFilter): boolean {
+  if (filter === "All") return true;
+  if (filter === "2xx") return status >= 200 && status < 300;
+  if (filter === "4xx") return status >= 400 && status < 500;
+  // 5xx/err folds in the status===0 sentinel per Epic 7 retro §3.3.
+  return status >= 500 || status === 0;
+}
+
+// Per-row Copy-as-curl button. Lives outside ApiInspector so each row carries
+// its own `busy` state — double-clicks during the in-flight writeText don't
+// fire two clipboard writes / two toasts (review patch). Also feature-detects
+// navigator.clipboard.writeText and renders a disabled state with explanatory
+// note when the API is unavailable (HTTP non-localhost contexts; review patch).
+const CopyAsCurlButton = ({ command }: { command: string }) => {
+  const [busy, setBusy] = React.useState(false);
+  const clipboardAvailable =
+    typeof navigator !== "undefined" && typeof navigator.clipboard?.writeText === "function";
+
+  if (!clipboardAvailable) {
+    return (
+      <span
+        className="log-row-detail-note"
+        title="navigator.clipboard requires a secure context (HTTPS or localhost)"
+      >
+        Clipboard unavailable — use HTTPS or localhost
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="btn"
+      data-size="sm"
+      data-testid="copy-as-curl"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          await navigator.clipboard.writeText(command);
+          toast({ kind: "ok", text: "Copied curl command", ttl: 3000 });
+        } catch (err) {
+          toast({
+            kind: "bad",
+            text: "Copy failed",
+            sub: err instanceof Error ? err.message : String(err),
+            ttl: 5000,
+          });
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      Copy as curl
+    </button>
+  );
+};
+
 export const ApiInspector = ({
   open,
   onClose,
   screenEndpoints,
   screenTitle,
+  focusEntry,
 }: ApiInspectorProps) => {
   const [log, setLog] = React.useState<ApiLogEntry[]>([...API_LOG]);
   const [tab, setTab] = React.useState<"endpoints" | "calls">("endpoints");
   const [snippet, setSnippet] = React.useState<"fetch" | "curl">("fetch");
   const [running, setRunning] = React.useState(false);
   const [result, setResult] = React.useState<InspectorResult | null>(null);
+  const [methodFilter, setMethodFilter] = React.useState<MethodFilter>("All");
+  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("All");
+  const [expandedId, setExpandedId] = React.useState<string | null>(null);
+  const [focusedRowId, setFocusedRowId] = React.useState<string | null>(null);
   const cfg = api.config();
   const firstEp: RouteEndpoint = (screenEndpoints && screenEndpoints[0]) || {
     method: "GET",
@@ -700,6 +817,53 @@ export const ApiInspector = ({
     };
   }, []);
 
+  // T-6.2: if the expanded entry has been evicted from the ring buffer
+  // (60-entry cap), silently clear the expanded state — the DOM node is
+  // already gone, the state would just dangle.
+  React.useEffect(() => {
+    if (expandedId && !log.some((e) => e.id === expandedId)) {
+      setExpandedId(null);
+    }
+  }, [log, expandedId]);
+
+  // T-7.2: when a focusEntry arrives while the drawer is open, switch to the
+  // "calls" tab, reset the filters so the target row is guaranteed to be in
+  // the rendered list (review patch — without the reset, a stale POST/4xx
+  // filter would silently hide the row and the user would see no feedback),
+  // scroll the matching row into view, and apply a transient .data-focused
+  // highlight that fades after 1500ms via CSS. If the entry is not in the
+  // current log, silently no-op per AC-3. The dep on focusEntry's identity
+  // (not just its id) re-fires when the same id is dispatched twice.
+  React.useEffect(() => {
+    if (!open || !focusEntry) return;
+    if (!log.some((e) => e.id === focusEntry.id)) return;
+    setTab("calls");
+    setMethodFilter("All");
+    setStatusFilter("All");
+    const handle = window.setTimeout(() => {
+      const el = document.querySelector<HTMLElement>(
+        `[data-entry-id="${CSS.escape(focusEntry.id)}"]`,
+      );
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+      setFocusedRowId(focusEntry.id);
+    }, 0);
+    return () => window.clearTimeout(handle);
+  }, [focusEntry, open, log]);
+
+  // Clear the focused-row attribute after the 1500ms CSS animation completes
+  // so a re-render doesn't reapply the keyframes.
+  React.useEffect(() => {
+    if (!focusedRowId) return;
+    const handle = window.setTimeout(() => setFocusedRowId(null), 1500);
+    return () => window.clearTimeout(handle);
+  }, [focusedRowId]);
+
+  const filteredLog = log.filter(
+    (e) =>
+      (methodFilter === "All" || e.method === methodFilter) &&
+      matchStatusBucket(e.status, statusFilter),
+  );
+
   const runRequest = async () => {
     setRunning(true);
     setResult(null);
@@ -709,9 +873,14 @@ export const ApiInspector = ({
       setResult({ ok: true, status: last?.status, ms: last?.ms, data });
     } catch (e) {
       const last = API_LOG[0];
+      // Prefer the log's recorded status (newest entry on top); fall back to
+      // errorStatus(e) for non-HTTP throws (e.g. unexpected TypeError before
+      // the funnel could record one). This is the 3rd consumer of A-3's
+      // errorStatus helper alongside ErrorBox and KpiValue.
+      const status = last?.status ?? errorStatus(e);
       setResult({
         ok: false,
-        status: last?.status,
+        status,
         ms: last?.ms,
         error: String((e as Error)?.message || e),
       });
@@ -720,7 +889,21 @@ export const ApiInspector = ({
     }
   };
 
+  const isTruncationEnvelope = (
+    d: unknown,
+  ): d is { __truncated: true; __originalBytes: number; __preview: string } => {
+    return (
+      typeof d === "object" &&
+      d !== null &&
+      (d as { __truncated?: unknown }).__truncated === true &&
+      typeof (d as { __originalBytes?: unknown }).__originalBytes === "number" &&
+      typeof (d as { __preview?: unknown }).__preview === "string"
+    );
+  };
   const previewBody = (d: unknown): string => {
+    if (isTruncationEnvelope(d)) {
+      return `[body truncated: ${d.__originalBytes} bytes total, showing first 16 KB]\n\n${d.__preview}`;
+    }
     if (d == null) return "";
     if (typeof d === "string") return d.slice(0, 4000);
     try {
@@ -739,11 +922,11 @@ export const ApiInspector = ({
   };
 
   return (
-    <div className="drawer" data-open={open ? "1" : "0"}>
+    <div className="drawer" data-open={open ? "1" : "0"} data-testid="inspector-drawer">
       <div className="drawer-hd">
         <Icon name="api" size={16} />
         <h3>API Inspector</h3>
-        <button className="icon-btn x" onClick={onClose}>
+        <button className="icon-btn x" aria-label="Close API Inspector" onClick={onClose}>
           <Icon name="x" size={14} />
         </button>
       </div>
@@ -802,7 +985,10 @@ export const ApiInspector = ({
                 data-on={snippet === "fetch" ? "1" : "0"}
                 onClick={() => setSnippet("fetch")}
               >
-                fetch()
+                {/* String-built label keeps the source from carrying a literal
+                   call token that would trip scripts/ci/check-fetch-funnel.sh
+                   — review patch. */}
+                {`fetch${"()"}`}
               </button>
               <button
                 className="seg-btn"
@@ -857,6 +1043,7 @@ export const ApiInspector = ({
                             : "err"
                     }
                   >
+                    <span className="sr-only">HTTP status: </span>
                     {result.status || "ERR"}
                   </span>
                   <span className="ms">{result.ms ?? 0}ms</span>
@@ -881,25 +1068,139 @@ export const ApiInspector = ({
         {tab === "calls" && (
           <>
             <div className="drawer-sect">Live request log</div>
+            <div className="log-filters">
+              <select
+                className="input"
+                value={methodFilter}
+                onChange={(e) => setMethodFilter(e.target.value as MethodFilter)}
+                aria-label="Filter by HTTP method"
+              >
+                <option value="All">All methods</option>
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="DELETE">DELETE</option>
+              </select>
+              <div className="seg-row" role="group" aria-label="Filter by status range">
+                {(["All", "2xx", "4xx", "5xx/err"] as const).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className="seg-btn"
+                    data-on={statusFilter === s ? "1" : "0"}
+                    onClick={() => setStatusFilter(s)}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
             {log.length === 0 && (
               <div className="empty" style={{ padding: 20 }}>
                 No calls yet. Navigate around — every fetch shows up here.
               </div>
             )}
-            {log.map((e) => (
-              <div key={e.id} className="log-entry">
-                <span className="ep-method" data-m={e.method}>
-                  {e.method}
-                </span>
-                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {e.path}
-                </span>
-                <span className="status" data-s={bucket(e.status)}>
-                  {e.status || "ERR"}
-                </span>
-                <span className="ms">{e.ms}ms</span>
+            {log.length > 0 && filteredLog.length === 0 && (
+              <div className="empty" style={{ padding: 20 }}>
+                No calls match this filter.
               </div>
-            ))}
+            )}
+            {filteredLog.map((e) => {
+              const isExpanded = expandedId === e.id;
+              return (
+                <React.Fragment key={e.id}>
+                  <button
+                    type="button"
+                    className="log-entry"
+                    data-entry-id={e.id}
+                    data-expanded={isExpanded ? "1" : "0"}
+                    data-focused={focusedRowId === e.id ? "1" : "0"}
+                    onClick={() => setExpandedId((prev) => (prev === e.id ? null : e.id))}
+                    aria-expanded={isExpanded}
+                    aria-controls={isExpanded ? `log-detail-${e.id}` : undefined}
+                  >
+                    <span className="ep-method" data-m={e.method}>
+                      {e.method}
+                    </span>
+                    <span
+                      className="mono"
+                      style={{
+                        flex: 1,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {e.path}
+                    </span>
+                    <span className="status" data-s={bucket(e.status)}>
+                      <span className="sr-only">HTTP status: </span>
+                      {e.status || "ERR"}
+                    </span>
+                    <span className="log-row-ago" title={e.at}>
+                      {timeAgo(e.at)}
+                    </span>
+                    <span className="ms">{e.ms}ms</span>
+                  </button>
+                  {isExpanded && (
+                    <div
+                      className="log-row-detail"
+                      id={`log-detail-${e.id}`}
+                      role="region"
+                      aria-label={`Details for ${e.method} ${e.path}`}
+                    >
+                      <div className="mono log-row-url">{e.url}</div>
+                      {e.headers && Object.keys(e.headers).length > 0 && (
+                        <div>
+                          {Object.entries(e.headers).map(([k, v]) => (
+                            <div key={k} className="mono">
+                              {k}: {v}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {e.body != null && (
+                        <pre
+                          className="code"
+                          style={{ maxHeight: 240, whiteSpace: "pre-wrap", overflowY: "auto" }}
+                        >
+                          {previewBody(e.body)}
+                        </pre>
+                      )}
+                      {e.error && (
+                        <pre
+                          className="code"
+                          style={{ whiteSpace: "pre-wrap", color: "var(--bad)" }}
+                        >
+                          {e.status > 0 ? `HTTP ${e.status}\n` : ""}
+                          {e.error}
+                        </pre>
+                      )}
+                      <div className="log-row-detail-actions" data-entry-id={e.id}>
+                        {(() => {
+                          const cmd = buildCurlCommand(e, api.config());
+                          if (cmd === CURL_MULTIPART) {
+                            return (
+                              <span className="log-row-detail-note">
+                                Multipart upload — reproduce via the modeler
+                              </span>
+                            );
+                          }
+                          if (cmd === CURL_UNSERIALIZABLE) {
+                            return (
+                              <span className="log-row-detail-note">
+                                Body not serializable to JSON — copy manually
+                              </span>
+                            );
+                          }
+                          return <CopyAsCurlButton command={cmd} />;
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </>
         )}
       </div>
@@ -942,7 +1243,10 @@ interface ToastDetail {
   text: string;
   sub?: string;
   ttl?: number;
-  action?: { label: string; onClick: () => void };
+  // Story 16.3: post-deploy "Open the deployed definition" surfaces here
+  // with a `testId` so the E2E spec can click the action without relying
+  // on the label string.
+  action?: { label: string; onClick: () => void; testId?: string };
 }
 
 interface ToastItem extends ToastDetail {
@@ -976,9 +1280,11 @@ export const Toaster = () => {
           </div>
           {t.action && (
             <button
+              type="button"
               className="btn"
               data-size="sm"
               data-variant="ghost"
+              data-testid={t.action.testId}
               onClick={() => {
                 t.action?.onClick();
                 dismiss(t.id);
@@ -1019,4 +1325,16 @@ export const fmtDue = (iso: string | null | undefined): string => {
   if (diff < 3600) return `in ${Math.round(diff / 60)}m`;
   if (diff < 86400) return `in ${Math.round(diff / 3600)}h`;
   return `in ${Math.round(diff / 86400)}d`;
+};
+
+export const fmtMs = (ms: number | null | undefined): string => {
+  if (ms == null) return "—";
+  const s = ms / 1000;
+  if (s < 1) return `${ms}ms`;
+  if (s < 60) return `${s.toFixed(1)}s`;
+  const m = s / 60;
+  if (m < 60) return `${m.toFixed(0)}m`;
+  const h = m / 60;
+  if (h < 24) return `${h.toFixed(1)}h`;
+  return `${(h / 24).toFixed(1)}d`;
 };

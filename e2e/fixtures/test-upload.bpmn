@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://flowable.org/bpmn"
+             id="defs-9-2-test-upload">
+  <process id="story-9-2-test-upload" name="Story 9.2 Upload Test" isExecutable="true">
+    <startEvent id="start"/>
+    <sequenceFlow id="flow1" sourceRef="start" targetRef="end"/>
+    <endEvent id="end"/>
+  </process>
+</definitions>

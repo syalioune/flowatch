@@ -1,224 +1,27 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
-/* Flowatch — base styles + three aesthetic skins
- * Look variants set on <html data-look="editorial|terminal|industrial">
- * Theme on <html data-theme="light|dark">
- * Density on <html data-density="compact|regular|comfy">
+/* Flowatch — component class hooks
+ *
+ * Per ADR-005 / Pattern P-007: every class hook name preserved VERBATIM
+ * from the pre-17.1 src/styles.css. No renames; the JSX consumers depend
+ * on these names byte-for-byte.
+ *
+ * Major sections (top-down in source order):
+ *   - Base resets are NOT here — they live in index.css
+ *   - Layout shell:     .app, .sidebar, .topbar, .main, .brand, .nav, …
+ *   - Top bar:          .search, .top-actions, .icon-btn, .avatar, …
+ *   - Page chrome:      .page, .page-head, .page-title, .page-actions, .btn
+ *   - Inspector chips:  .ep-chip, .ep-chip-row, .ep-method
+ *   - KPIs:             .kpi-grid, .kpi, .kpi-lbl, .kpi-val, .kpi-delta, .kpi-skeleton
+ *   - Tables:           .tbl, .tbl th, .tbl td, .tbl tbody tr, …
+ *   - Panels:           .panel, .split, .empty, .badge, .seg-btn
+ *   - Modeler chrome:   .modeler, .mod-toolbar (reads --row-h / --pad / --gap from data-density)
+ *   - Dark-theme modeler overrides:   [data-theme="dark"] .bpmn-host …, .dmn-host …
+ *   - Toast / Inspector drawer:  .toast, .api-log, …
+ *   - Look-scoped tail overrides:  html[data-look="terminal"] .tbl th, .page-title; html[data-look="industrial"] .kpi
+ *   - Scrollbar:        *::-webkit-scrollbar (component-shape pseudo-elements)
+ *   - @keyframes + @media (prefers-reduced-motion: reduce)
  */
-
-:root {
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  --font-serif: "IBM Plex Serif", "Iowan Old Style", Georgia, serif;
-
-  --r-xs: 3px;
-  --r-sm: 5px;
-  --r-md: 8px;
-  --r-lg: 12px;
-
-  --sidebar-w: 232px;
-  --topbar-h: 52px;
-
-  --t-fast: 120ms cubic-bezier(0.3, 0.7, 0.4, 1);
-
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
-}
-
-/* ── EDITORIAL (default light) ─────────────────────────────────────────── */
-html[data-look="editorial"][data-theme="light"] {
-  --bg: oklch(98.2% 0.005 80);
-  --bg-elev: oklch(99.5% 0.003 80);
-  --bg-sunken: oklch(96% 0.008 80);
-  --bg-hover: oklch(94% 0.01 80);
-  --line: oklch(89% 0.008 80);
-  --line-strong: oklch(80% 0.012 80);
-  --fg: oklch(22% 0.01 60);
-  --fg-soft: oklch(45% 0.015 60);
-  --fg-mute: oklch(62% 0.012 60);
-  --accent: oklch(52% 0.16 32);
-  --accent-soft: oklch(94% 0.04 32);
-  --accent-fg: #fff;
-  --ok: oklch(54% 0.13 145);
-  --warn: oklch(62% 0.15 70);
-  --bad: oklch(55% 0.18 27);
-  --info: oklch(55% 0.12 230);
-
-  --font-display: var(--font-serif);
-  --font-body: var(--font-sans);
-  --tracking-display: -0.01em;
-  --display-weight: 500;
-}
-html[data-look="editorial"][data-theme="dark"] {
-  --bg: oklch(18% 0.005 80);
-  --bg-elev: oklch(21% 0.006 80);
-  --bg-sunken: oklch(15% 0.005 80);
-  --bg-hover: oklch(25% 0.008 80);
-  --line: oklch(28% 0.008 80);
-  --line-strong: oklch(38% 0.012 80);
-  --fg: oklch(95% 0.005 80);
-  --fg-soft: oklch(75% 0.012 60);
-  --fg-mute: oklch(58% 0.012 60);
-  --accent: oklch(72% 0.16 32);
-  --accent-soft: oklch(28% 0.06 32);
-  --accent-fg: oklch(18% 0.02 30);
-  --ok: oklch(72% 0.14 145);
-  --warn: oklch(78% 0.15 70);
-  --bad: oklch(70% 0.17 27);
-  --info: oklch(72% 0.13 230);
-
-  --font-display: var(--font-serif);
-  --font-body: var(--font-sans);
-  --tracking-display: -0.01em;
-  --display-weight: 500;
-}
-
-/* ── TERMINAL (dense, mono-heavy, dark-leaning) ─────────────────────── */
-html[data-look="terminal"][data-theme="light"] {
-  --bg: oklch(98% 0 0);
-  --bg-elev: #fff;
-  --bg-sunken: oklch(96% 0 0);
-  --bg-hover: oklch(94% 0 0);
-  --line: oklch(90% 0 0);
-  --line-strong: oklch(80% 0 0);
-  --fg: oklch(20% 0 0);
-  --fg-soft: oklch(45% 0 0);
-  --fg-mute: oklch(60% 0 0);
-  --accent: oklch(58% 0.21 264);
-  --accent-soft: oklch(94% 0.05 264);
-  --accent-fg: #fff;
-  --ok: oklch(54% 0.18 145);
-  --warn: oklch(68% 0.17 80);
-  --bad: oklch(58% 0.21 27);
-  --info: oklch(58% 0.16 230);
-
-  --font-display: var(--font-mono);
-  --font-body: var(--font-sans);
-  --tracking-display: -0.02em;
-  --display-weight: 600;
-}
-html[data-look="terminal"][data-theme="dark"] {
-  --bg: oklch(13% 0.005 260);
-  --bg-elev: oklch(16% 0.008 260);
-  --bg-sunken: oklch(10% 0.005 260);
-  --bg-hover: oklch(20% 0.01 260);
-  --line: oklch(23% 0.012 260);
-  --line-strong: oklch(35% 0.018 260);
-  --fg: oklch(96% 0.005 260);
-  --fg-soft: oklch(72% 0.015 260);
-  --fg-mute: oklch(55% 0.012 260);
-  --accent: oklch(72% 0.18 264);
-  --accent-soft: oklch(28% 0.08 264);
-  --accent-fg: oklch(14% 0.02 260);
-  --ok: oklch(78% 0.17 145);
-  --warn: oklch(82% 0.16 80);
-  --bad: oklch(72% 0.19 27);
-  --info: oklch(75% 0.15 230);
-
-  --font-display: var(--font-mono);
-  --font-body: var(--font-sans);
-  --tracking-display: -0.02em;
-  --display-weight: 600;
-}
-
-/* ── INDUSTRIAL (cool neutral, dashboard-y) ─────────────────────────── */
-html[data-look="industrial"][data-theme="light"] {
-  --bg: oklch(97% 0.008 240);
-  --bg-elev: #fff;
-  --bg-sunken: oklch(95% 0.01 240);
-  --bg-hover: oklch(93% 0.012 240);
-  --line: oklch(89% 0.013 240);
-  --line-strong: oklch(78% 0.018 240);
-  --fg: oklch(20% 0.02 250);
-  --fg-soft: oklch(44% 0.025 250);
-  --fg-mute: oklch(60% 0.022 250);
-  --accent: oklch(52% 0.17 250);
-  --accent-soft: oklch(94% 0.045 250);
-  --accent-fg: #fff;
-  --ok: oklch(56% 0.14 160);
-  --warn: oklch(66% 0.15 75);
-  --bad: oklch(56% 0.19 22);
-  --info: oklch(58% 0.14 230);
-
-  --font-display: var(--font-sans);
-  --font-body: var(--font-sans);
-  --tracking-display: -0.018em;
-  --display-weight: 600;
-}
-html[data-look="industrial"][data-theme="dark"] {
-  --bg: oklch(16% 0.012 250);
-  --bg-elev: oklch(19% 0.014 250);
-  --bg-sunken: oklch(13% 0.01 250);
-  --bg-hover: oklch(23% 0.018 250);
-  --line: oklch(26% 0.02 250);
-  --line-strong: oklch(38% 0.025 250);
-  --fg: oklch(94% 0.01 250);
-  --fg-soft: oklch(72% 0.018 250);
-  --fg-mute: oklch(56% 0.018 250);
-  --accent: oklch(70% 0.18 250);
-  --accent-soft: oklch(28% 0.08 250);
-  --accent-fg: oklch(15% 0.03 250);
-  --ok: oklch(74% 0.15 160);
-  --warn: oklch(82% 0.16 75);
-  --bad: oklch(72% 0.2 22);
-  --info: oklch(74% 0.15 230);
-
-  --font-display: var(--font-sans);
-  --font-body: var(--font-sans);
-  --tracking-display: -0.018em;
-  --display-weight: 600;
-}
-
-/* ── Density ───────────────────────────────────────────────────────── */
-html[data-density="compact"] {
-  --gap: 8px;
-  --row-h: 30px;
-  --pad: 10px;
-  --fs: 12.5px;
-}
-html[data-density="regular"] {
-  --gap: 12px;
-  --row-h: 36px;
-  --pad: 14px;
-  --fs: 13.5px;
-}
-html[data-density="comfy"] {
-  --gap: 16px;
-  --row-h: 44px;
-  --pad: 18px;
-  --fs: 14.5px;
-}
-
-/* ── Base ─────────────────────────────────────────────────────────── */
-* {
-  box-sizing: border-box;
-}
-html,
-body {
-  margin: 0;
-  padding: 0;
-}
-body {
-  font-family: var(--font-body);
-  font-size: var(--fs);
-  color: var(--fg);
-  background: var(--bg);
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-  font-feature-settings: "ss01", "ss02", "cv02";
-}
-button {
-  font: inherit;
-  color: inherit;
-}
-a {
-  color: inherit;
-  text-decoration: none;
-}
-::selection {
-  background: var(--accent);
-  color: var(--accent-fg);
-}
 
 /* ── Layout shell ──────────────────────────────────────────────────── */
 .app {
@@ -385,11 +188,25 @@ a {
   background: var(--ok);
   flex-shrink: 0;
 }
-.conn-dot[data-state="mock"] {
-  background: var(--warn);
-}
 .conn-dot[data-state="err"] {
   background: var(--bad);
+}
+.conn-dot[data-state="pending"] {
+  background: var(--ok);
+  opacity: 0.6;
+  animation: conn-pulse 1.5s ease-in-out infinite;
+}
+.conn-dot[data-state="unset"] {
+  background: var(--fg-mute);
+}
+@keyframes conn-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 .conn-pill .conn-host {
   overflow: hidden;
@@ -575,6 +392,14 @@ a {
 .btn[data-variant="danger"] {
   color: var(--bad);
 }
+.btn[data-variant="danger-strong"] {
+  background: var(--bad);
+  border-color: var(--bad);
+  color: var(--accent-fg);
+}
+.btn[data-variant="danger-strong"]:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
 .btn[data-size="sm"] {
   height: 26px;
   padding: 0 8px;
@@ -675,6 +500,93 @@ a {
 }
 .kpi-delta[data-up="0"] {
   color: var(--bad);
+}
+.kpi-skeleton {
+  display: inline-block;
+  width: 3ch;
+  height: 1em;
+  background: linear-gradient(90deg, var(--bg-elev) 25%, var(--bg-hover) 50%, var(--bg-elev) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--r-sm);
+}
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kpi-skeleton {
+    animation: none;
+  }
+}
+
+/* TableSkeleton (Story 9.1) — generic shimmer placeholder for list `pendingComponent`
+   slots. Reuses the @keyframes shimmer defined above; uses --bg-elev / --bg-hover
+   tokens only (Pattern P-007). */
+.skeleton-cell {
+  display: block;
+  width: 100%;
+  height: 14px;
+  background: linear-gradient(90deg, var(--bg-elev) 25%, var(--bg-hover) 50%, var(--bg-elev) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--r-sm);
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-cell {
+    animation: none;
+  }
+}
+
+/* RowActionMenu (Story 9.1) — keyboard-accessible `⋮` per-row action menu.
+   Used by Deployments (delete cascade/no-cascade) and copied verbatim by 9.4
+   (suspend/activate), 10.x (cancel), etc. Pattern P-006 a11y + P-007 tokens. */
+.row-action-menu {
+  position: relative;
+  display: inline-block;
+}
+.row-action-menu-trigger {
+  /* The trigger uses .btn styling — extends rather than overrides. */
+  padding: 0 8px;
+  min-width: 24px;
+  font-size: 14px;
+  line-height: 1;
+}
+.row-action-menu-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 50;
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  min-width: 160px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.12);
+}
+.row-action-menu-item {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--fg);
+  cursor: pointer;
+  outline: none;
+}
+.row-action-menu-item:hover,
+.row-action-menu-item:focus {
+  background: var(--bg-hover);
+}
+.row-action-menu-item[data-danger="1"] {
+  color: var(--bad);
+}
+.row-action-menu-item[aria-disabled="true"] {
+  color: var(--fg-mute);
+  cursor: not-allowed;
 }
 
 /* ── Tables ────────────────────────────────────────────────────── */
@@ -857,18 +769,32 @@ a {
 }
 
 /* ── Modeler ────────────────────────────────────────────────── */
+/* Story 16.1 (UX Q-5): the modeler chrome (toolbar row + child controls)
+   reads --row-h / --pad / --gap from data-density so toggling density in
+   TweaksPanel rescales the chrome WITHOUT remounting the bpmn-js / dmn-js
+   canvas. Fallbacks match the comfy preset (44px / 14px) to preserve the
+   pre-16.1 visual when the variables aren't set. */
 .modeler {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr) 320px;
-  grid-template-rows: 44px minmax(0, 1fr);
+  grid-template-rows: var(--row-h, 44px) minmax(0, 1fr);
   height: calc(100vh - var(--topbar-h));
   background: var(--bg);
 }
 .modeler[data-engine="real"] {
   grid-template-columns: minmax(0, 1fr) 340px;
 }
+/* DMN modeler dropped its right-side test-runner panel — test execution is
+   now a top-bar action that opens <ExecuteDecisionModal>. Single column
+   takes the full width. */
+.modeler[data-engine="real"][data-kind="dmn"] {
+  grid-template-columns: minmax(0, 1fr);
+}
 .modeler[data-engine="real"] .mod-toolbar {
   grid-column: 1 / span 2;
+}
+.modeler[data-engine="real"][data-kind="dmn"] .mod-toolbar {
+  grid-column: 1;
 }
 .modeler[data-engine="real"] .mod-palette {
   display: none;
@@ -973,11 +899,34 @@ a {
   grid-column: 1 / span 3;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 14px;
+  gap: var(--gap, 12px);
+  padding: 0 var(--pad, 14px);
+  height: var(--row-h, 44px);
   border-bottom: 1px solid var(--line);
   background: var(--bg-elev);
   font-size: 13px;
+}
+/* Story 16.1 (UX Q-5) + Story 16.2 AC-4: child controls scale with density.
+   The dropdown is a native <select>, so option rows rely on the OS — only
+   the closed-state height + padding can be styled reliably. */
+.mod-toolbar .btn,
+.mod-toolbar .select,
+.mod-toolbar .modeler-dropdown {
+  height: calc(var(--row-h, 44px) - 12px);
+  min-height: 24px;
+}
+.mod-toolbar .modeler-dropdown {
+  padding: 0 10px;
+  line-height: calc(var(--row-h, 44px) - 16px);
+  max-width: 240px;
+  font-size: 12.5px;
+}
+/* Story 16.2 AC-4: native <option> rendering doesn't honor most CSS — line-
+   height is the only reliable lever; if the open-dropdown rendering is
+   operator-feel-poor at Compact density, fall back to a custom <div>-based
+   dropdown in a future polish story. Documented as a known limitation. */
+.mod-toolbar .modeler-dropdown option {
+  line-height: var(--row-h, 44px);
 }
 .mod-toolbar .file-name {
   display: flex;
@@ -990,6 +939,43 @@ a {
 .mod-toolbar .file-name b {
   color: var(--fg);
   font-weight: 500;
+}
+/* PR #168 follow-up: the toolbar filename is editable only when drafting
+   a new BPMN/DMN. The input grows with its content (via the `size` HTML
+   attribute on the element); CSS pins a min-width floor and refuses to
+   shrink so the filename is always fully visible. */
+.mod-toolbar .mod-filename {
+  min-width: 220px;
+  flex-shrink: 0;
+  padding: 4px 6px;
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  outline: none;
+}
+.mod-toolbar .mod-filename:not([readonly]):hover {
+  border-bottom-color: var(--fg-mute);
+}
+.mod-toolbar .mod-filename:focus {
+  border-color: var(--accent);
+  background: var(--bg);
+}
+/* Read-only state (operator is viewing a deployed definition, not drafting
+   a new one) — no edit cues; renders flush as plain text. */
+.mod-toolbar .mod-filename[readonly] {
+  border-bottom-color: transparent;
+  cursor: default;
+  user-select: text;
+}
+.mod-toolbar .mod-filename[readonly]:focus {
+  border-color: transparent;
+  background: transparent;
 }
 .mod-toolbar .sep {
   width: 1px;
@@ -1143,72 +1129,6 @@ a {
   border-color: var(--accent);
 }
 
-/* ── DMN ──────────────────────────────────────────────────────── */
-.dmn-table {
-  font-size: 12.5px;
-}
-.dmn-table th,
-.dmn-table td {
-  border: 1px solid var(--line);
-  padding: 8px 10px;
-  vertical-align: middle;
-}
-.dmn-table thead .group-input {
-  background: color-mix(in oklab, var(--info) 8%, var(--bg-sunken));
-}
-.dmn-table thead .group-output {
-  background: color-mix(in oklab, var(--ok) 8%, var(--bg-sunken));
-}
-.dmn-table thead .group-annot {
-  background: var(--bg-sunken);
-}
-.dmn-table thead tr.group-row th {
-  text-align: center;
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--fg-mute);
-  padding: 5px;
-}
-.dmn-table thead tr.col-row th {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--fg);
-}
-.dmn-table thead tr.col-row th .type {
-  display: block;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--fg-mute);
-  margin-top: 2px;
-}
-.dmn-table td.idx {
-  width: 30px;
-  text-align: center;
-  font-family: var(--font-mono);
-  color: var(--fg-mute);
-  background: var(--bg-sunken);
-}
-.dmn-table td.feel {
-  font-family: var(--font-mono);
-  font-size: 12px;
-}
-.dmn-table tbody tr:hover td:not(.idx) {
-  background: var(--bg-hover);
-}
-.hit-policy {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-sunken);
-  border: 1px solid var(--line);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
-}
-
 /* ── API Inspector Drawer ──────────────────────────────────── */
 .drawer {
   position: fixed;
@@ -1274,6 +1194,16 @@ a {
   line-height: 1.55;
 }
 .log-entry {
+  /* Story 8.2: row is now a real <button> for keyboard accessibility — reset
+     native button chrome first, then re-apply the layout font/size below so
+     the row paints exactly like the previous <div>. The `font: inherit`
+     shorthand MUST precede `font-family` / `font-size` longhands. */
+  font: inherit;
+  background: transparent;
+  border: none;
+  color: inherit;
+  text-align: left;
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1285,6 +1215,9 @@ a {
 }
 .log-entry:hover {
   background: var(--bg-hover);
+}
+.log-entry[data-expanded="1"] {
+  background: var(--bg-sunken);
 }
 .log-entry .status[data-s="2xx"] {
   color: var(--ok);
@@ -1299,9 +1232,97 @@ a {
 .log-entry .status[data-s="mock"] {
   color: var(--warn);
 }
+.log-entry .log-row-ago {
+  color: var(--fg-mute);
+  font-size: 10.5px;
+  margin-left: 4px;
+}
 .log-entry .ms {
   margin-left: auto;
   color: var(--fg-mute);
+}
+
+/* Story 8.2: transient highlight when a focusEntryId scrolls into view.
+   The attribute is set for 1500ms; the keyframes fade the background back
+   to transparent over the same window. Reduced-motion users get the steady
+   tint without the animation. */
+.log-entry[data-focused="1"] {
+  animation: log-focus 1500ms ease-out forwards;
+}
+@keyframes log-focus {
+  0% {
+    background: color-mix(in oklch, var(--accent) 24%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .log-entry[data-focused="1"] {
+    animation: none;
+    background: color-mix(in oklch, var(--accent) 12%, transparent);
+  }
+}
+
+/* Story 8.2: filter row above the call list — method dropdown + status pills. */
+.log-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+/* Story 8.2: expanded row detail (full URL, redacted headers, body, error).
+   The accent stripe on the left ties the detail visually to its parent row;
+   the actions slot is empty until Story 8.3 wires Copy-as-curl. */
+.log-row-detail {
+  border-left: 2px solid var(--accent);
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-soft);
+  margin: 2px 0 6px 12px;
+}
+.log-row-detail > * + * {
+  margin-top: 6px;
+}
+.log-row-detail .log-row-url {
+  word-break: break-all;
+}
+.log-row-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.log-row-detail-note {
+  font-style: italic;
+  color: var(--fg-mute);
+  font-size: 11px;
+}
+
+/* Story 8.2: ErrorBox upgrades the disabled <span> to a real <button>.
+   Text-only chrome — no fill, no border. Matches the previous span's
+   spacing so visual snapshots only churn on the now-clickable affordance. */
+.inspector-link {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 11px;
+  color: var(--fg-mute);
+  cursor: pointer;
+  text-decoration: none;
+}
+.inspector-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.inspector-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 /* ── Empty / loading ────────────────────────────────────────── */
@@ -1432,6 +1453,39 @@ html[data-look="industrial"] .kpi {
 }
 .mute {
   color: var(--fg-mute);
+}
+/* Story 18.2 — WebAIM-canonical sr-only utility. Visible to assistive tech, hidden visually. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+/* Story 18.4 — <kbd> rendering inside the keyboard cheatsheet + future inline shortcut hints. */
+.kbd {
+  display: inline-block;
+  padding: 0 0.4em;
+  border: 1px solid var(--bd);
+  background: var(--bg-elev);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  line-height: 1.5;
+  color: var(--fg);
+}
+.kbd-sep {
+  display: inline-block;
+  margin: 0 4px;
+  color: var(--fg-mute);
+  font-size: 0.85em;
+}
+.cheatsheet-tbl td:first-child {
+  white-space: nowrap;
 }
 .soft {
   color: var(--fg-soft);

@@ -17,18 +17,22 @@ The repo ships a Compose stack at [docker-compose.yml](../docker-compose.yml) th
 | `postgres` | `postgres:16-alpine`             | Persistence for the Flowable engine. DB/user/password all hard-coded to `flowable`.      |
 | `flowable` | `flowable/flowable-rest:7.2.0`   | The BPMN/DMN process engine, exposing the REST API at `/flowable-rest/service` and DMN at `/flowable-rest/dmn-api`. Admin user `rest-admin` / password `test`. |
 | `nginx`    | `nginx:alpine`                   | Listens on host `:8080`, proxies `/flowable-rest/*` to the `flowable` container, and **injects CORS headers** allowing `http://localhost:5173` (the Vite dev server). |
+| `flowatch` *(profile: `flowatch`)* | `syalioune/flowatch:${FLOWATCH_TAG:-latest}` | Optional — the published SPA image, served on host `:${FLOWATCH_PORT:-5173}`. Only started when `--profile flowatch` is passed. Use this to demo or self-host without running `npm` / Vite locally. |
 
 Volume `postgres_data` persists the Flowable database between restarts.
 
 ### Start / stop / inspect
 
 ```bash
-docker compose up -d                 # start everything
+docker compose up -d                 # start everything (default services)
+docker compose --profile flowatch up -d   # also pull & run the SPA image on :5173
 docker compose ps                    # see status
 docker compose logs -f flowable      # tail engine logs
 docker compose down                  # stop (data preserved)
 docker compose down -v               # stop AND wipe Postgres data
 ```
+
+The `flowatch` profile and `make dev` both bind host port `5173` — pick one. Override with `FLOWATCH_PORT=8081 docker compose --profile flowatch up -d` to run both side-by-side; override `FLOWATCH_TAG` (`develop`, `sha-<short>`, or a version) to track a different image stream.
 
 ### Health check
 
