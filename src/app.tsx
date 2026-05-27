@@ -4,8 +4,10 @@ import { Outlet, useNavigate, useRouter } from "@tanstack/react-router";
 import React from "react";
 import { api } from "./api";
 import { ApiInspector, SettingsModal, Sidebar, Toaster, Topbar } from "./components";
+import { KeyboardCheatsheetModal } from "./lib/keyboard-cheatsheet-modal";
 import { NAV_INVALIDATE_COUNTS } from "./lib/nav-events";
 import { useRouteMeta } from "./lib/route-meta";
+import { listShortcutsByCategory } from "./lib/shortcuts";
 import "./lib/window-events";
 import {
   TweakButton,
@@ -68,6 +70,8 @@ function App() {
   const [focusEntry, setFocusEntry] = React.useState<{ id: string; seq: number } | null>(null);
   const focusSeqRef = React.useRef(0);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [cheatsheetOpen, setCheatsheetOpen] = React.useState(false);
+  const navigate = useNavigate();
   const [tenants, setTenants] = React.useState<Tenant[]>([DEFAULT_TENANT]);
   const [tenant, setTenant] = React.useState<Tenant>(DEFAULT_TENANT);
   const [conn, setConn] = React.useState<AppConnectionState>({
@@ -248,6 +252,94 @@ function App() {
     if (!inspectorOpen) setFocusEntry(null);
   }, [inspectorOpen]);
 
+  // Story 18.4 — `?` (Shift+/) opens the cheatsheet from anywhere outside
+  // an editable element. Mirrors the Ctrl+Shift+T short-circuit shape.
+  // Browsers report `e.key === "?"` for Shift+/ on US layouts; for layout
+  // / IME quirks we fall back to `e.shiftKey && e.key === "/"`.
+  React.useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isQuestionMark = e.key === "?" || (e.shiftKey && e.key === "/");
+      if (!isQuestionMark) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
+      e.preventDefault();
+      setCheatsheetOpen(true);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  // Story 18.4 — `g`-prefix chord listener. The first `g` sets a 1500ms
+  // TTL; the next key (within TTL) checks the registry's nav-* targets;
+  // if a target matches, navigate and clear. Esc / blur / editable-focus
+  // cancels the chord.
+  React.useEffect(() => {
+    const navTargets: Record<string, string> = {};
+    const groups = listShortcutsByCategory();
+    for (const entry of groups.navigation) {
+      if (entry.keys.length === 2 && entry.keys[0] === "g" && entry.target) {
+        const second = entry.keys[1];
+        if (second) navTargets[second] = entry.target;
+      }
+    }
+
+    let awaiting: ReturnType<typeof setTimeout> | null = null;
+    const clearAwait = () => {
+      if (awaiting !== null) {
+        clearTimeout(awaiting);
+        awaiting = null;
+      }
+    };
+
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const editable =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target?.isContentEditable;
+      if (editable) {
+        clearAwait();
+        return;
+      }
+      if (e.key === "Escape") {
+        clearAwait();
+        return;
+      }
+      if (awaiting === null) {
+        if (e.key === "g" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          awaiting = setTimeout(() => {
+            awaiting = null;
+          }, 1500);
+        }
+        return;
+      }
+      // Awaiting second key.
+      const dest = navTargets[e.key];
+      clearAwait();
+      if (dest) {
+        e.preventDefault();
+        void navigate({ to: dest });
+      }
+    };
+
+    const onBlur = () => clearAwait();
+    window.addEventListener("keydown", handler);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      clearAwait();
+      window.removeEventListener("keydown", handler);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, [navigate]);
+
   const handleTweaks = () => {
     window.postMessage({ type: "__activate_edit_mode" }, window.origin);
   };
@@ -292,6 +384,8 @@ function App() {
       />
 
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      <KeyboardCheatsheetModal open={cheatsheetOpen} onClose={() => setCheatsheetOpen(false)} />
 
       <Toaster />
 
