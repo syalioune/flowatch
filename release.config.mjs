@@ -151,7 +151,8 @@ const HEADLINES = {
   // with a single entry.
   "0.0.1":
     "Tech foundation — TS + Biome migration, Vitest + Playwright test tiers, TanStack Router, GitHub Actions CI/CD + Pages deploy, Conventional Commits + semantic-release, one-command Docker stack.",
-  // '0.0.2': '🎉 v1 MVP — Flowable 6.x OSS UI parity rebuilt against flowable-rest 7.2.0. Connection probe, API Inspector, BPMN/DMN deployments + definitions + runtime + tasks + jobs + history + identity, vanilla bpmn-js/dmn-js modelers, three-look design system, a11y + snapshot coverage.',
+  "0.0.2":
+    "🎉 v1 MVP — Flowable 6.x OSS UI parity rebuilt against flowable-rest 7.2.0. Connection probe, API Inspector, BPMN/DMN deployments + definitions + runtime + tasks + jobs + history + identity, vanilla bpmn-js/dmn-js modelers, three-look design system, a11y + snapshot coverage.",
   // '0.0.3': '6.x parity gaps — instance variable edit, task edit + attachments, user/group lifecycle, multi-connection switch, batches + event subscriptions, app-definition browse, BPMN token overlay, model versioning.',
   // '1.0.0': 'GA — pluggable auth (Basic/Bearer/OIDC PKCE), form-js designer + standalone forms, Flowable-specific bpmn-js properties panel, engine version compatibility banner, full WCAG AA audit, public release.',
 };
