@@ -34,6 +34,10 @@ _Generated: 2026-05-11 by `bmad-document-project` (deep scan)._
 - [Deployment guide](./deployment-guide.md) — Docker stack, CORS proxy, prod notes
 - [API contracts](./api-contracts.md) — Flowable REST wrappers exported by `api.js`
 
+### Accessibility
+
+- [WCAG 2.1 AA contrast audit — 2026-05](./a11y-audit-2026-05.md) — 32 contrast computations across 8 look × theme combinations. Locked behind [src/__tests__/wcag-contrast.test.ts](../src/__tests__/wcag-contrast.test.ts) (Pattern P-008 — token-contract guard test).
+
 > Data models — _Not applicable._ Flowatch is a frontend-only client and owns no persistent data models. Flowable's Postgres schema is internal to the engine.
 
 ## Existing documentation in the repo

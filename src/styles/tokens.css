@@ -48,7 +48,9 @@ html[data-look="editorial"][data-theme="light"] {
   --line-strong: oklch(80% 0.012 80);
   --fg: oklch(22% 0.01 60);
   --fg-soft: oklch(45% 0.015 60);
-  --fg-mute: oklch(62% 0.012 60);
+  --fg-mute: oklch(
+    52% 0.012 60
+  ); /* Story 17.3 WCAG audit: 62% → 52% lifts on --bg from 3.46:1 to ≥4.5:1 */
   --accent: oklch(52% 0.16 32);
   --accent-soft: oklch(94% 0.04 32);
   --accent-fg: #fff;
@@ -71,7 +73,9 @@ html[data-look="editorial"][data-theme="dark"] {
   --line-strong: oklch(38% 0.012 80);
   --fg: oklch(95% 0.005 80);
   --fg-soft: oklch(75% 0.012 60);
-  --fg-mute: oklch(58% 0.012 60);
+  --fg-mute: oklch(
+    64% 0.012 60
+  ); /* Story 17.3 WCAG audit: 58% → 64% lifts on --bg from 4.40:1 to ≥4.5:1 */
   --accent: oklch(72% 0.16 32);
   --accent-soft: oklch(28% 0.06 32);
   --accent-fg: oklch(18% 0.02 30);
@@ -96,8 +100,12 @@ html[data-look="terminal"][data-theme="light"] {
   --line-strong: oklch(80% 0 0);
   --fg: oklch(20% 0 0);
   --fg-soft: oklch(45% 0 0);
-  --fg-mute: oklch(60% 0 0);
-  --accent: oklch(58% 0.21 264);
+  --fg-mute: oklch(
+    52% 0 0
+  ); /* Story 17.3 WCAG audit: 60% → 52% lifts on --bg from 3.72:1 to ≥4.5:1 */
+  --accent: oklch(
+    56% 0.21 264
+  ); /* Story 17.3 WCAG audit: 58% → 56% lifts white-on-accent from 4.47:1 to ≥4.5:1 */
   --accent-soft: oklch(94% 0.05 264);
   --accent-fg: #fff;
   --ok: oklch(54% 0.18 145);
@@ -119,7 +127,9 @@ html[data-look="terminal"][data-theme="dark"] {
   --line-strong: oklch(35% 0.018 260);
   --fg: oklch(96% 0.005 260);
   --fg-soft: oklch(72% 0.015 260);
-  --fg-mute: oklch(55% 0.012 260);
+  --fg-mute: oklch(
+    64% 0.012 260
+  ); /* Story 17.3 WCAG audit: 55% → 64% lifts on --bg from 4.16:1 to ≥4.5:1 */
   --accent: oklch(72% 0.18 264);
   --accent-soft: oklch(28% 0.08 264);
   --accent-fg: oklch(14% 0.02 260);
@@ -144,7 +154,7 @@ html[data-look="industrial"][data-theme="light"] {
   --line-strong: oklch(78% 0.018 240);
   --fg: oklch(20% 0.02 250);
   --fg-soft: oklch(44% 0.025 250);
-  --fg-mute: oklch(60% 0.022 250);
+  --fg-mute: oklch(52% 0.022 250); /* Story 17.3 WCAG audit: 60% → 52% lifts on --bg to ≥4.5:1 */
   --accent: oklch(52% 0.17 250);
   --accent-soft: oklch(94% 0.045 250);
   --accent-fg: #fff;
@@ -167,7 +177,7 @@ html[data-look="industrial"][data-theme="dark"] {
   --line-strong: oklch(38% 0.025 250);
   --fg: oklch(94% 0.01 250);
   --fg-soft: oklch(72% 0.018 250);
-  --fg-mute: oklch(56% 0.018 250);
+  --fg-mute: oklch(64% 0.018 250); /* Story 17.3 WCAG audit: 56% → 64% lifts on --bg to ≥4.5:1 */
   --accent: oklch(70% 0.18 250);
   --accent-soft: oklch(28% 0.08 250);
   --accent-fg: oklch(15% 0.03 250);
