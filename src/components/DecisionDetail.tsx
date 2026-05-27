@@ -11,6 +11,7 @@ import React from "react";
 import { api, type FlowableDecision } from "../api";
 import { Icon, PageHead } from "../components";
 import { parseDmnDecision } from "../lib/dmn-parser";
+import { EmptyState, getEmptyState } from "../lib/empty-states";
 import { ErrorBox } from "../lib/error-box";
 import { ExecuteDecisionModal } from "../lib/execute-decision-modal";
 import { useApi } from "../lib/useApi";
@@ -216,7 +217,7 @@ export const DecisionDetail: React.FC<DecisionDetailProps> = ({ decision }) => {
           )}
           {xml.error && <ErrorBox error={xml.error} onRetry={xml.reload} />}
           {xml.data !== null && xml.data === "" && (
-            <div className="empty">No DMN resource found in deployment.</div>
+            <EmptyState entry={getEmptyState("decisionResource")} />
           )}
           {xml.data && (
             <pre

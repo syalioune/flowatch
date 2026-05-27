@@ -28,7 +28,7 @@
 
 import { api, FlowableError, type FlowableHistoricActivity } from "../api";
 import { fmtTime, Icon } from "../components";
-import { EmptyState, emptyStates } from "../lib/empty-states";
+import { EmptyState, getEmptyState } from "../lib/empty-states";
 import { ErrorBox } from "../lib/error-box";
 import { TableSkeleton } from "../lib/table-skeleton";
 import { useApi } from "../lib/useApi";
@@ -101,9 +101,7 @@ export function InstanceActiveActivitiesPanel({ instanceId }: Props) {
         {activities.loading && <TableSkeleton columns={4} rows={2} />}
         {activities.error && <ErrorBox error={activities.error} onRetry={activities.reload} />}
         {!activities.loading && !activities.error && list.length === 0 && (
-          <EmptyState
-            entry={emptyStates.activeActivities as NonNullable<typeof emptyStates.activeActivities>}
-          />
+          <EmptyState entry={getEmptyState("activeActivities")} />
         )}
         {!activities.loading && !activities.error && list.length > 0 && (
           <table className="tbl">

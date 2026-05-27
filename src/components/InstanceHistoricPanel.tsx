@@ -18,7 +18,7 @@
 import { Link } from "@tanstack/react-router";
 import { api, FlowableError, type FlowableHistoricProcessInstance } from "../api";
 import { fmtMs, fmtTime, Icon } from "../components";
-import { EmptyState, emptyStates } from "../lib/empty-states";
+import { EmptyState, getEmptyState } from "../lib/empty-states";
 import { ErrorBox } from "../lib/error-box";
 import { TableSkeleton } from "../lib/table-skeleton";
 import { useApi } from "../lib/useApi";
@@ -87,9 +87,7 @@ export function InstanceHistoricPanel({ instanceId }: Props) {
         {historic.loading && <TableSkeleton columns={2} rows={4} />}
         {historic.error && <ErrorBox error={historic.error} onRetry={historic.reload} />}
         {!historic.loading && !historic.error && historic.data === null && (
-          <EmptyState
-            entry={emptyStates.historicNoRecord as NonNullable<typeof emptyStates.historicNoRecord>}
-          />
+          <EmptyState entry={getEmptyState("historicNoRecord")} />
         )}
         {!historic.loading && !historic.error && h && (
           <div style={{ overflow: "auto" }}>

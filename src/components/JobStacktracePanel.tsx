@@ -21,7 +21,7 @@
 
 import { api, FlowableError } from "../api";
 import { Icon, toast } from "../components";
-import { EmptyState, emptyStates } from "../lib/empty-states";
+import { EmptyState, getEmptyState } from "../lib/empty-states";
 import { ErrorBox } from "../lib/error-box";
 import { useApi } from "../lib/useApi";
 
@@ -122,9 +122,7 @@ export function JobStacktracePanel({ jobId, jobType = "executable", onClose }: P
         )}
         {stack.error && <ErrorBox error={stack.error} onRetry={stack.reload} />}
         {!stack.loading && !stack.error && (stack.data === null || stack.data === "") && (
-          <EmptyState
-            entry={emptyStates.stacktrace as NonNullable<typeof emptyStates.stacktrace>}
-          />
+          <EmptyState entry={getEmptyState("stacktrace")} />
         )}
         {!stack.loading && !stack.error && stack.data && (
           <pre

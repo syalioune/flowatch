@@ -23,7 +23,7 @@ import React from "react";
 import { api, type FlowablePage, type FlowableUser } from "../api";
 import { Icon, toast } from "../components";
 import { AddMembershipModal } from "../lib/add-membership-modal";
-import { EmptyState, emptyStates } from "../lib/empty-states";
+import { EmptyState, getEmptyState } from "../lib/empty-states";
 import { ErrorBox } from "../lib/error-box";
 import { TableSkeleton } from "../lib/table-skeleton";
 import { useApi } from "../lib/useApi";
@@ -131,9 +131,7 @@ export function GroupMembersPanel({ groupId }: Props) {
         )}
         {members.error && <ErrorBox error={members.error} onRetry={members.reload} />}
         {!members.loading && !members.error && list.length === 0 && (
-          <EmptyState
-            entry={emptyStates.groupMembers as NonNullable<typeof emptyStates.groupMembers>}
-          />
+          <EmptyState entry={getEmptyState("groupMembers")} />
         )}
         {!members.loading && !members.error && list.length > 0 && (
           <table className="tbl" style={{ border: 0, borderRadius: 0 }}>

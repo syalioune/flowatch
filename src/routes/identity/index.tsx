@@ -22,7 +22,7 @@ import type React from "react";
 import { z } from "zod";
 import { api, type FlowableGroup, type FlowablePage, type FlowableUser } from "../../api";
 import { Icon, PageHead } from "../../components";
-import { EmptyState, emptyStates } from "../../lib/empty-states";
+import { EmptyState, getEmptyState } from "../../lib/empty-states";
 import { ErrorBox } from "../../lib/error-box";
 import { TableSkeleton } from "../../lib/table-skeleton";
 
@@ -169,7 +169,7 @@ function UsersList({ page }: UsersListProps) {
   const navigate = useNavigate();
   const users = page.data;
   if (users.length === 0) {
-    return <EmptyState entry={emptyStates.users as NonNullable<typeof emptyStates.users>} />;
+    return <EmptyState entry={getEmptyState("users")} />;
   }
   const openUser = (id: string) => navigate({ to: "/identity/users/$id", params: { id } });
   return (
@@ -237,7 +237,7 @@ function GroupsList({ page }: GroupsListProps) {
   const navigate = useNavigate();
   const groups = page.data;
   if (groups.length === 0) {
-    return <EmptyState entry={emptyStates.groups as NonNullable<typeof emptyStates.groups>} />;
+    return <EmptyState entry={getEmptyState("groups")} />;
   }
   const openGroup = (id: string) => navigate({ to: "/identity/groups/$id", params: { id } });
   return (
