@@ -427,6 +427,7 @@ export const Topbar = ({
       <button
         className="icon-btn"
         data-active={inspectorOpen ? "1" : "0"}
+        data-testid="inspector-toggle"
         title="API inspector"
         onClick={onInspector}
       >
@@ -912,7 +913,7 @@ export const ApiInspector = ({
   };
 
   return (
-    <div className="drawer" data-open={open ? "1" : "0"}>
+    <div className="drawer" data-open={open ? "1" : "0"} data-testid="inspector-drawer">
       <div className="drawer-hd">
         <Icon name="api" size={16} />
         <h3>API Inspector</h3>
