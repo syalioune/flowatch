@@ -58,5 +58,19 @@ services:
       flowable:
         condition: service_healthy
 
+  # Served only when the `flowatch` profile is activated:
+  #   docker compose --profile flowatch up -d
+  # The default stack (postgres + flowable + nginx) keeps starting as-is when
+  # no profile is passed. Override the tag with FLOWATCH_TAG (defaults to
+  # :latest; common alternates are :develop and :sha-<short>).
+  flowatch:
+    profiles: ["flowatch"]
+    image: syalioune/flowatch:${FLOWATCH_TAG:-latest}
+    ports:
+      - "${FLOWATCH_PORT:-5173}:8080"
+    depends_on:
+      nginx:
+        condition: service_started
+
 volumes:
   postgres_data:

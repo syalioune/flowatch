@@ -18,6 +18,7 @@ The [Makefile](Makefile) is the canonical entry point — `make help` lists ever
 | `make build`         | `npm run build`                                                          |
 | `make preview`       | `npm run preview`                                                        |
 | `make engine-up`     | `docker compose up -d`                                                   |
+| `make engine-up-flowatch` | `docker compose --profile flowatch up -d` (engine + published SPA image on `:5173`) |
 | `make engine-down`   | `docker compose down`                                                    |
 | `make engine-logs`   | `docker compose logs -f`                                                 |
 | `make engine-health` | `curl -fsS -u rest-admin:test http://localhost:8080/flowable-rest/service/management/engine` |
