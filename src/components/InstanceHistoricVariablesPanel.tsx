@@ -104,6 +104,7 @@ export function InstanceHistoricVariablesPanel({ instanceId }: Props) {
         <span className="panel-title">Historic variables</span>
         {variables.data && list.length > 0 && (
           <span className="badge" data-tone="mute" style={{ marginLeft: 8 }}>
+            <span className="sr-only">Count: </span>
             {list.length}
           </span>
         )}
@@ -135,10 +136,10 @@ export function InstanceHistoricVariablesPanel({ instanceId }: Props) {
           <table className="tbl">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Scope</th>
-                <th>Value</th>
+                <th scope="col">Name</th>
+                <th scope="col">Type</th>
+                <th scope="col">Scope</th>
+                <th scope="col">Value</th>
               </tr>
             </thead>
             <tbody>
@@ -151,11 +152,13 @@ export function InstanceHistoricVariablesPanel({ instanceId }: Props) {
                     </td>
                     <td>
                       <span className="badge" data-tone={typeTone(inner?.type)}>
+                        <span className="sr-only">Variable type: </span>
                         {inner?.type ?? "—"}
                       </span>
                     </td>
                     <td>
                       <span className="badge" data-tone="mute">
+                        <span className="sr-only">Scope: </span>
                         {inner?.scope ?? "global"}
                       </span>
                     </td>

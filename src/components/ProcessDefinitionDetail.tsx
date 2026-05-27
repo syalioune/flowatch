@@ -67,6 +67,7 @@ export function ProcessDefinitionDetail({ definition, reload }: Props) {
             style={{ marginLeft: "auto" }}
           >
             <span className="dot" />
+            <span className="sr-only">Status: </span>
             {d.suspended ? "suspended" : "active"}
           </span>
         </div>

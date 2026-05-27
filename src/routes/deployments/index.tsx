@@ -252,12 +252,12 @@ function DeploymentsRoute() {
         <table className="tbl">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Kind</th>
-              <th>ID</th>
-              <th>Tenant</th>
-              <th>Deployed</th>
-              <th></th>
+              <th scope="col">Name</th>
+              <th scope="col">Kind</th>
+              <th scope="col">ID</th>
+              <th scope="col">Tenant</th>
+              <th scope="col">Deployed</th>
+              <th scope="col"></th>
             </tr>
           </thead>
           <tbody>

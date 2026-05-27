@@ -195,11 +195,13 @@ export function UserDetail({ user }: Props) {
                 </Link>
                 {optimistic && (
                   <span className="badge" data-tone={optimistic === "added" ? "ok" : "mute"}>
+                    <span className="sr-only">Status: </span>
                     {optimistic}
                   </span>
                 )}
                 {g.type && (
                   <span className="badge" data-tone={g.type === "security" ? "warn" : "neutral"}>
+                    <span className="sr-only">Group type: </span>
                     {g.type}
                   </span>
                 )}

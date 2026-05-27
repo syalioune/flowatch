@@ -92,6 +92,7 @@ export function InstanceHistoricActivitiesPanel({ instanceId }: Props) {
         <span className="panel-title">Activity audit trail</span>
         {activities.data && list.length > 0 && (
           <span className="badge" data-tone="mute" style={{ marginLeft: 8 }}>
+            <span className="sr-only">Count: </span>
             {list.length}
           </span>
         )}

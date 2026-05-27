@@ -76,6 +76,7 @@ export function InstanceActiveActivitiesPanel({ instanceId }: Props) {
         <span className="panel-title">Active activities</span>
         {activities.data && list.length > 0 && (
           <span className="badge" data-tone="ok" style={{ marginLeft: 8 }}>
+            <span className="sr-only">Active activities: </span>
             {list.length}
           </span>
         )}
@@ -107,10 +108,10 @@ export function InstanceActiveActivitiesPanel({ instanceId }: Props) {
           <table className="tbl">
             <thead>
               <tr>
-                <th>Activity</th>
-                <th>Type</th>
-                <th>Assignee</th>
-                <th>Started</th>
+                <th scope="col">Activity</th>
+                <th scope="col">Type</th>
+                <th scope="col">Assignee</th>
+                <th scope="col">Started</th>
               </tr>
             </thead>
             <tbody>
@@ -121,6 +122,7 @@ export function InstanceActiveActivitiesPanel({ instanceId }: Props) {
                     <td>{a.activityName || a.activityId}</td>
                     <td className="mono">
                       <span className="badge" data-tone="mute">
+                        <span className="sr-only">Activity type: </span>
                         {a.activityType}
                       </span>
                     </td>

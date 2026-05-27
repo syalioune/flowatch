@@ -1454,6 +1454,18 @@ html[data-look="industrial"] .kpi {
 .mute {
   color: var(--fg-mute);
 }
+/* Story 18.2 — WebAIM-canonical sr-only utility. Visible to assistive tech, hidden visually. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 .soft {
   color: var(--fg-soft);
 }

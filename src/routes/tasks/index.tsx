@@ -335,12 +335,12 @@ function TasksRoute() {
       <table className="tbl">
         <thead>
           <tr>
-            <th>Task name</th>
-            <th>Assignee</th>
-            <th>Process instance</th>
-            <th>Due date</th>
-            <th>Priority</th>
-            <th></th>
+            <th scope="col">Task name</th>
+            <th scope="col">Assignee</th>
+            <th scope="col">Process instance</th>
+            <th scope="col">Due date</th>
+            <th scope="col">Priority</th>
+            <th scope="col"></th>
           </tr>
         </thead>
         <tbody>
@@ -417,6 +417,7 @@ function TasksRoute() {
                   {t.dueDate ? (
                     <span className="badge" data-tone={dueTone(t.dueDate)}>
                       <span className="dot" />
+                      <span className="sr-only">Due: </span>
                       {fmtDue(t.dueDate)}
                     </span>
                   ) : (
@@ -425,6 +426,7 @@ function TasksRoute() {
                 </td>
                 <td className="mono">
                   <span className="badge" data-tone={priTone(t.priority)}>
+                    <span className="sr-only">Priority: </span>
                     {t.priority ?? 50}
                   </span>
                 </td>

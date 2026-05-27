@@ -62,6 +62,7 @@ export function InstanceHistoricPanel({ instanceId }: Props) {
         <span className="panel-title">Historic record</span>
         {h && (
           <span className="badge" data-tone={badgeTone} style={{ marginLeft: 8 }}>
+            <span className="sr-only">Status: </span>
             {badgeText}
           </span>
         )}

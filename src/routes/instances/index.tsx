@@ -188,13 +188,13 @@ function ProcessInstancesRoute() {
       <table className="tbl">
         <thead>
           <tr>
-            <th>Business key</th>
-            <th>Definition</th>
-            <th>Activity</th>
-            <th>Started by</th>
-            <th>Started</th>
-            <th>State</th>
-            <th></th>
+            <th scope="col">Business key</th>
+            <th scope="col">Definition</th>
+            <th scope="col">Activity</th>
+            <th scope="col">Started by</th>
+            <th scope="col">Started</th>
+            <th scope="col">State</th>
+            <th scope="col"></th>
           </tr>
         </thead>
         <tbody>
@@ -236,6 +236,7 @@ function ProcessInstancesRoute() {
                 <td>
                   <span className="badge" data-tone={state === "active" ? "ok" : "warn"}>
                     <span className="dot" />
+                    <span className="sr-only">Status: </span>
                     {state}
                   </span>
                 </td>

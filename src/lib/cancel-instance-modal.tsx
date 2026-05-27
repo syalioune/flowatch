@@ -126,9 +126,16 @@ export const CancelInstanceModal: React.FC<CancelInstanceModalProps> = ({
     >
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation only — no interactive role on the panel itself */}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: panel only intercepts the backdrop click; child buttons own interactivity */}
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 480 }}>
+      <div
+        className="modal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="cancel-instance-title"
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: 480 }}
+      >
         <div className="modal-hd">
-          <h3>Cancel process instance</h3>
+          <h3 id="cancel-instance-title">Cancel process instance</h3>
           <button
             type="button"
             className="icon-btn"

@@ -299,12 +299,12 @@ function DecisionsList({ page, onTestExecute, executeTriggerRef }: DecisionsList
     <table className="tbl">
       <thead>
         <tr>
-          <th>Decision</th>
-          <th>Key</th>
-          <th>Version</th>
-          <th>Category</th>
-          <th>Tenant</th>
-          <th />
+          <th scope="col">Decision</th>
+          <th scope="col">Key</th>
+          <th scope="col">Version</th>
+          <th scope="col">Category</th>
+          <th scope="col">Tenant</th>
+          <th scope="col" />
         </tr>
       </thead>
       <tbody>
@@ -377,11 +377,11 @@ function DmnDeploymentsList({ page, onDeleteClick, deleteTriggerRef }: DmnDeploy
     <table className="tbl">
       <thead>
         <tr>
-          <th>Deployment</th>
-          <th>ID</th>
-          <th>Deployed</th>
-          <th>Tenant</th>
-          <th />
+          <th scope="col">Deployment</th>
+          <th scope="col">ID</th>
+          <th scope="col">Deployed</th>
+          <th scope="col">Tenant</th>
+          <th scope="col" />
         </tr>
       </thead>
       <tbody>
@@ -472,12 +472,12 @@ export function DmnExecutionsList({ page }: DmnExecutionsListProps) {
     <table className="tbl">
       <thead>
         <tr>
-          <th>Decision</th>
-          <th>Process instance</th>
-          <th>Started</th>
-          <th>Duration</th>
-          <th>Status</th>
-          <th />
+          <th scope="col">Decision</th>
+          <th scope="col">Process instance</th>
+          <th scope="col">Started</th>
+          <th scope="col">Duration</th>
+          <th scope="col">Status</th>
+          <th scope="col" />
         </tr>
       </thead>
       <tbody>
@@ -519,6 +519,7 @@ export function DmnExecutionsList({ page }: DmnExecutionsListProps) {
                 <td className="mono">{fmtMs(durationMs)}</td>
                 <td>
                   <span className="badge" data-tone={e.failed ? "bad" : "ok"}>
+                    <span className="sr-only">Status: </span>
                     {e.failed ? "failed" : "ok"}
                   </span>
                 </td>
@@ -591,6 +592,7 @@ function DmnExecutionAuditPanel({ executionId }: { executionId: string }) {
               Hit policy:
             </span>
             <span className="badge" data-tone={hitPolicyTone(a.hitPolicy)}>
+              <span className="sr-only">Hit policy: </span>
               {a.hitPolicy}
             </span>
           </span>
@@ -621,6 +623,7 @@ function DmnExecutionAuditPanel({ executionId }: { executionId: string }) {
         )}
         {a.failed && (
           <span className="badge" data-tone="bad">
+            <span className="sr-only">Status: </span>
             failed
           </span>
         )}
@@ -639,9 +642,9 @@ function DmnExecutionAuditPanel({ executionId }: { executionId: string }) {
           <table className="tbl">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Value</th>
+                <th scope="col">Name</th>
+                <th scope="col">Type</th>
+                <th scope="col">Value</th>
               </tr>
             </thead>
             <tbody>
@@ -650,6 +653,7 @@ function DmnExecutionAuditPanel({ executionId }: { executionId: string }) {
                   <td className="mono">{name}</td>
                   <td>
                     <span className="badge" data-tone="neutral">
+                      <span className="sr-only">Variable type: </span>
                       {inputTypes[name] ?? "—"}
                     </span>
                   </td>
@@ -675,10 +679,10 @@ function DmnExecutionAuditPanel({ executionId }: { executionId: string }) {
           <table className="tbl">
             <thead>
               <tr>
-                {decisionResultRows.length > 1 && <th>Row</th>}
-                <th>Name</th>
-                <th>Type</th>
-                <th>Value</th>
+                {decisionResultRows.length > 1 && <th scope="col">Row</th>}
+                <th scope="col">Name</th>
+                <th scope="col">Type</th>
+                <th scope="col">Value</th>
               </tr>
             </thead>
             <tbody>
@@ -690,6 +694,7 @@ function DmnExecutionAuditPanel({ executionId }: { executionId: string }) {
                     <td className="mono">{name}</td>
                     <td>
                       <span className="badge" data-tone="neutral">
+                        <span className="sr-only">Result type: </span>
                         {resultTypes[name] ?? "—"}
                       </span>
                     </td>
@@ -735,6 +740,7 @@ function DmnExecutionAuditPanel({ executionId }: { executionId: string }) {
                     <b className="mono">#{ruleNum}</b>
                   </span>
                   <span className="badge" data-tone={rule.valid ? "ok" : "mute"}>
+                    <span className="sr-only">Status: </span>
                     {rule.valid ? "matched" : "skipped"}
                   </span>
                 </div>

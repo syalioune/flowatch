@@ -379,11 +379,14 @@ export const ExecuteDecisionModal: React.FC<ExecuteDecisionModalProps> = ({
       {/* biome-ignore lint/a11y/noStaticElementInteractions: panel only intercepts the backdrop click */}
       <div
         className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="execute-decision-title"
         onClick={(e) => e.stopPropagation()}
         style={{ width: 640, maxHeight: "85vh", display: "flex", flexDirection: "column" }}
       >
         <div className="modal-hd">
-          <h3>
+          <h3 id="execute-decision-title">
             Test execute · {decision.name || decision.key}{" "}
             <span className="mute mono" style={{ fontSize: 12 }}>
               (v{decision.version})
@@ -556,9 +559,9 @@ export const ExecuteDecisionModal: React.FC<ExecuteDecisionModalProps> = ({
                   <table className="tbl">
                     <thead>
                       <tr>
-                        <th>Name</th>
-                        <th>Type</th>
-                        <th>Value</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Type</th>
+                        <th scope="col">Value</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -568,6 +571,7 @@ export const ExecuteDecisionModal: React.FC<ExecuteDecisionModalProps> = ({
                           <td className="mono">{v.name}</td>
                           <td>
                             <span className="badge" data-tone="neutral">
+                              <span className="sr-only">Type: </span>
                               {v.type}
                             </span>
                           </td>

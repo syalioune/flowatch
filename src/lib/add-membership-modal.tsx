@@ -165,11 +165,12 @@ export const AddMembershipModal: React.FC<AddMembershipModalProps> = ({
         className="modal"
         role="dialog"
         aria-modal="true"
+        aria-labelledby="add-membership-title"
         onClick={(e) => e.stopPropagation()}
         style={{ width: 460 }}
       >
         <div className="modal-hd">
-          <h3>{title}</h3>
+          <h3 id="add-membership-title">{title}</h3>
           <button
             type="button"
             className="icon-btn"

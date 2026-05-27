@@ -90,6 +90,7 @@ export function GroupMembersPanel({ groupId }: Props) {
         <span className="panel-title">Members</span>
         {members.data && list.length > 0 && (
           <span className="badge" data-tone="mute" style={{ marginLeft: 8 }}>
+            <span className="sr-only">Members: </span>
             {members.data.total}
           </span>
         )}
@@ -137,10 +138,10 @@ export function GroupMembersPanel({ groupId }: Props) {
           <table className="tbl" style={{ border: 0, borderRadius: 0 }}>
             <thead>
               <tr>
-                <th>User</th>
-                <th>ID</th>
-                <th>Email</th>
-                <th style={{ width: 80 }} />
+                <th scope="col">User</th>
+                <th scope="col">ID</th>
+                <th scope="col">Email</th>
+                <th scope="col" style={{ width: 80 }} />
               </tr>
             </thead>
             <tbody>
@@ -163,6 +164,7 @@ export function GroupMembersPanel({ groupId }: Props) {
                             className="badge"
                             data-tone={optimistic === "added" ? "ok" : "mute"}
                           >
+                            <span className="sr-only">Status: </span>
                             {optimistic}
                           </span>
                         )}

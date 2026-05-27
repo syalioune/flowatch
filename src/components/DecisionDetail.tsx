@@ -130,9 +130,9 @@ export const DecisionDetail: React.FC<DecisionDetailProps> = ({ decision }) => {
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Label</th>
-                  <th>Type</th>
+                  <th scope="col">Name</th>
+                  <th scope="col">Label</th>
+                  <th scope="col">Type</th>
                 </tr>
               </thead>
               <tbody>
@@ -156,6 +156,7 @@ export const DecisionDetail: React.FC<DecisionDetailProps> = ({ decision }) => {
                     <td>{input.label || <span className="mute">—</span>}</td>
                     <td>
                       <span className="badge" data-tone="neutral">
+                        <span className="sr-only">Type: </span>
                         {input.type}
                       </span>
                     </td>
@@ -177,9 +178,9 @@ export const DecisionDetail: React.FC<DecisionDetailProps> = ({ decision }) => {
           <table className="tbl">
             <thead>
               <tr>
-                <th>Kind</th>
-                <th>Reference</th>
-                <th>Label</th>
+                <th scope="col">Kind</th>
+                <th scope="col">Reference</th>
+                <th scope="col">Label</th>
               </tr>
             </thead>
             <tbody>
@@ -187,6 +188,7 @@ export const DecisionDetail: React.FC<DecisionDetailProps> = ({ decision }) => {
                 <tr key={`${req.kind}-${req.ref}`} data-testid={`decision-requirement-${req.ref}`}>
                   <td>
                     <span className="badge" data-tone="neutral">
+                      <span className="sr-only">Kind: </span>
                       {req.kind}
                     </span>
                   </td>

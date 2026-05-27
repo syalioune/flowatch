@@ -421,7 +421,7 @@ export const Topbar = ({
       <kbd>⌘K</kbd>
     </div>
     <div className="top-actions">
-      <button className="icon-btn" title="Notifications">
+      <button className="icon-btn" title="Notifications" aria-label="View notifications">
         <Icon name="bell" size={15} />
       </button>
       <button
@@ -429,6 +429,7 @@ export const Topbar = ({
         data-active={inspectorOpen ? "1" : "0"}
         data-testid="inspector-toggle"
         title="API inspector"
+        aria-label="Toggle API Inspector"
         onClick={onInspector}
       >
         <Icon name="api" size={15} />
@@ -436,6 +437,7 @@ export const Topbar = ({
       <button
         className="icon-btn"
         title="Theme"
+        aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
         onClick={() => onTheme(theme === "dark" ? "light" : "dark")}
       >
         <Icon name={theme === "dark" ? "sun" : "moon"} size={15} />
@@ -449,7 +451,12 @@ export const Topbar = ({
       >
         <Icon name="palette" size={15} />
       </button>
-      <button className="icon-btn" title="Settings" onClick={onSettings}>
+      <button
+        className="icon-btn"
+        title="Settings"
+        aria-label="Connection settings"
+        onClick={onSettings}
+      >
         <Icon name="settings" size={15} />
       </button>
       <div className="avatar">YOU</div>
@@ -574,11 +581,13 @@ export const SettingsModal = ({ open, onClose }: SettingsModalProps) => {
                 </button>
                 {pingRes?.ok && (
                   <span className="badge" data-tone="ok">
+                    <span className="sr-only">Status: connected — </span>
                     {pingRes.name} {pingRes.version}
                   </span>
                 )}
                 {pingRes && !pingRes.ok && (
                   <span className="badge" data-tone="bad">
+                    <span className="sr-only">Status: error — </span>
                     {pingRes.error}
                   </span>
                 )}
@@ -917,7 +926,7 @@ export const ApiInspector = ({
       <div className="drawer-hd">
         <Icon name="api" size={16} />
         <h3>API Inspector</h3>
-        <button className="icon-btn x" onClick={onClose}>
+        <button className="icon-btn x" aria-label="Close API Inspector" onClick={onClose}>
           <Icon name="x" size={14} />
         </button>
       </div>
@@ -1034,6 +1043,7 @@ export const ApiInspector = ({
                             : "err"
                     }
                   >
+                    <span className="sr-only">HTTP status: </span>
                     {result.status || "ERR"}
                   </span>
                   <span className="ms">{result.ms ?? 0}ms</span>
@@ -1124,6 +1134,7 @@ export const ApiInspector = ({
                       {e.path}
                     </span>
                     <span className="status" data-s={bucket(e.status)}>
+                      <span className="sr-only">HTTP status: </span>
                       {e.status || "ERR"}
                     </span>
                     <span className="log-row-ago" title={e.at}>

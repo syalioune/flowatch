@@ -111,6 +111,7 @@ export function InstanceRuntimePanel({ instanceId }: Props) {
             style={{ marginLeft: 8 }}
           >
             <span className="dot" />
+            <span className="sr-only">Status: </span>
             {p.suspended ? "suspended" : p.ended ? "ended" : "active"}
           </span>
         )}

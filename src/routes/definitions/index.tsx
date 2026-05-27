@@ -148,12 +148,12 @@ function DefinitionsRoute() {
       <table className="tbl">
         <thead>
           <tr>
-            <th>Definition</th>
-            <th>Key</th>
-            <th>Version</th>
-            <th>Status</th>
-            <th>Tenant</th>
-            <th></th>
+            <th scope="col">Definition</th>
+            <th scope="col">Key</th>
+            <th scope="col">Version</th>
+            <th scope="col">Status</th>
+            <th scope="col">Tenant</th>
+            <th scope="col"></th>
           </tr>
         </thead>
         <tbody>
@@ -182,6 +182,7 @@ function DefinitionsRoute() {
                 <td>
                   <span className="badge" data-tone={isSuspended ? "warn" : "ok"}>
                     <span className="dot" />
+                    <span className="sr-only">Status: </span>
                     {isSuspended ? "suspended" : "active"}
                   </span>
                 </td>
