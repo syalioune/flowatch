@@ -191,7 +191,18 @@ for (const look of LOOKS) {
         // 6. Visual snapshot — small tolerance to absorb font-rendering
         //    subpixel jitter. See the file header for the AC-7 deviation
         //    rationale.
-        await expect(page).toHaveScreenshot({ maxDiffPixels: 100 });
+        //
+        //    `.build-info` is masked because it renders `build {__BUILD_SHA__}`
+        //    from `git rev-parse --short HEAD` baked in at vite dev-server
+        //    start (vite.config.ts getBuildSha). The 7-char SHA moves on
+        //    every commit and invalidates baselines whose only "regression"
+        //    is the commit hash. The mask paints a solid colour over the
+        //    region in BOTH the actual and the baseline, so the diff is
+        //    always zero pixels there regardless of the underlying SHA.
+        await expect(page).toHaveScreenshot({
+          maxDiffPixels: 100,
+          mask: [page.locator(".build-info")],
+        });
       });
     }
   }
