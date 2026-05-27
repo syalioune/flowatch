@@ -201,10 +201,27 @@ function App() {
 
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key === "T") {
-        e.preventDefault();
-        window.postMessage({ type: "__activate_edit_mode" }, window.origin);
+      if (!(e.ctrlKey && e.shiftKey)) return;
+      // Case-insensitive: Shift normally produces uppercase T but layout /
+      // lock-state quirks can yield lowercase. Accept both.
+      if (e.key !== "T" && e.key !== "t") return;
+      // Story 17.2: suppress when typing inside an editable element so the
+      // global search (and any future <input>/<textarea>/<select>/
+      // [contenteditable]) doesn't lose its Shift+T keystroke + accidentally
+      // toggle the panel. Browser-default Ctrl+Shift+T (re-open closed tab)
+      // is intentionally overridden in the app's focus context — operator
+      // convention; matches the VSCode-style precedent.
+      const target = e.target as HTMLElement | null;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target?.isContentEditable
+      ) {
+        return;
       }
+      e.preventDefault();
+      window.postMessage({ type: "__activate_edit_mode" }, window.origin);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);

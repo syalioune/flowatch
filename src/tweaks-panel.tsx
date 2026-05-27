@@ -126,15 +126,52 @@ type SetTweakFn<T> = {
   (edits: Partial<T>): void;
 };
 
+// Story 17.2: persist tweak values across reloads under the project's
+// `flowatch.<surface>.v1` convention. Pattern P-007 (theming hooks) is only
+// complete when the operator's chosen Look / Theme / Density / Accent
+// survives a reload — pre-17.2 they reset to defaults on every mount.
+const TWEAKS_STORAGE_KEY = "flowatch.tweaks.v1";
+
+function readStoredTweaks<T extends Record<string, unknown>>(defaults: T): T {
+  try {
+    const raw = localStorage.getItem(TWEAKS_STORAGE_KEY);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw) as unknown;
+    if (parsed === null || typeof parsed !== "object") return defaults;
+    // Merge stored over defaults so (a) unknown stored keys (deprecated
+    // tweaks) are dropped, (b) newly-added default keys take effect on
+    // first load after upgrade. Only known keys carry over.
+    const merged = { ...defaults };
+    for (const key of Object.keys(defaults) as Array<keyof T>) {
+      const v = (parsed as Record<string, unknown>)[key as string];
+      if (v !== undefined) (merged as Record<string, unknown>)[key as string] = v;
+    }
+    return merged;
+  } catch {
+    return defaults;
+  }
+}
+
 export function useTweaks<T extends Record<string, unknown>>(defaults: T): [T, SetTweakFn<T>] {
-  const [values, setValues] = React.useState<T>(defaults);
+  // Lazy-init: read once on mount. Subsequent reloads pick up the latest
+  // persisted value; localStorage is the source of truth between sessions.
+  const [values, setValues] = React.useState<T>(() => readStoredTweaks(defaults));
   const setTweak = React.useCallback<SetTweakFn<T>>(
     ((keyOrEdits: keyof T | Partial<T>, val?: T[keyof T]) => {
       const edits: Partial<T> =
         typeof keyOrEdits === "object" && keyOrEdits !== null
           ? (keyOrEdits as Partial<T>)
           : ({ [keyOrEdits as keyof T]: val } as Partial<T>);
-      setValues((prev) => ({ ...prev, ...edits }));
+      setValues((prev) => {
+        const next = { ...prev, ...edits };
+        try {
+          localStorage.setItem(TWEAKS_STORAGE_KEY, JSON.stringify(next));
+        } catch {
+          // localStorage may throw (private mode, quota exceeded) — swallow;
+          // the in-memory state still reflects the change for the session.
+        }
+        return next;
+      });
       window.parent.postMessage(
         { type: "__edit_mode_set_keys", edits } satisfies TweaksMessage,
         "*",
@@ -230,7 +267,10 @@ export function TweaksPanel({
       // CodeQL js/missing-origin-check enforced.
       if (e.origin !== window.location.origin) return;
       const t = (e?.data as { type?: string } | undefined)?.type;
-      if (t === "__activate_edit_mode") setOpen(true);
+      // Story 17.2: extend `__activate_edit_mode` to TOGGLE so Ctrl+Shift+T
+      // closes the panel on second press. `__deactivate_edit_mode` keeps
+      // its deterministic-close semantics for the `dismiss()` button.
+      if (t === "__activate_edit_mode") setOpen((prev) => !prev);
       else if (t === "__deactivate_edit_mode") setOpen(false);
     };
     window.addEventListener("message", onMsg);
@@ -273,6 +313,7 @@ export function TweaksPanel({
       <div
         ref={dragRef}
         className="twk-panel"
+        data-testid="tweaks-panel"
         data-noncommentable=""
         style={{ right: offsetRef.current.x, bottom: offsetRef.current.y }}
       >

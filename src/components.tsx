@@ -439,7 +439,13 @@ export const Topbar = ({
       >
         <Icon name={theme === "dark" ? "sun" : "moon"} size={15} />
       </button>
-      <button className="icon-btn" title="Customize (Ctrl+Shift+T)" onClick={onTweaks}>
+      <button
+        className="icon-btn"
+        title="Customize (Ctrl+Shift+T)"
+        aria-label="Toggle theme tweaks (Ctrl+Shift+T)"
+        data-testid="tweaks-toggle"
+        onClick={onTweaks}
+      >
         <Icon name="palette" size={15} />
       </button>
       <button className="icon-btn" title="Settings" onClick={onSettings}>
