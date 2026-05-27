@@ -26,7 +26,7 @@
 
 import { api, FlowableError, type FlowableHistoricVariable } from "../api";
 import { Icon } from "../components";
-import { EmptyState, emptyStates } from "../lib/empty-states";
+import { EmptyState, getEmptyState } from "../lib/empty-states";
 import { ErrorBox } from "../lib/error-box";
 import { TableSkeleton } from "../lib/table-skeleton";
 import { useApi } from "../lib/useApi";
@@ -129,13 +129,7 @@ export function InstanceHistoricVariablesPanel({ instanceId }: Props) {
         {variables.loading && <TableSkeleton columns={4} rows={3} />}
         {variables.error && <ErrorBox error={variables.error} onRetry={variables.reload} />}
         {!variables.loading && !variables.error && list.length === 0 && (
-          <EmptyState
-            entry={
-              emptyStates.historicInstanceVariables as NonNullable<
-                typeof emptyStates.historicInstanceVariables
-              >
-            }
-          />
+          <EmptyState entry={getEmptyState("historicInstanceVariables")} />
         )}
         {!variables.loading && !variables.error && list.length > 0 && (
           <table className="tbl">

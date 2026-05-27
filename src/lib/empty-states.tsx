@@ -1,23 +1,35 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * Empty-state copy registry — bootstrap-and-extend.
+ * Empty-state copy registry — design-system citizen (UX §13).
  *
- * Story 9.1 BOOTSTRAPS this file with the single `deployments` entry. The
- * bootstrap-and-extend contract (Epic 8 retro §8 item 1 decision (b)) is:
+ * Story 9.1 bootstrapped this file with the single `deployments` entry.
+ * Story 17.5 canonicalised the registry:
+ *   - Added `ScreenKey` union as the type-checked source of truth for keys.
+ *   - Replaced `Record<string, EmptyStateEntry>` with
+ *     `satisfies Record<ScreenKey, EmptyStateEntry>` so adding a key without
+ *     an entry (or an entry without a key) is a tsc-time compile error.
+ *   - Added the `getEmptyState(key)` typed accessor — replaces the
+ *     `as NonNullable<typeof emptyStates.X>` cast pattern that worked around
+ *     `noUncheckedIndexedAccess: true` in tsconfig.app.json.
  *
- *   - Each downstream list-screen story (9.4, 10.1, 11.1, 12.1, 13.1, 14.1,
- *     15.1, …) APPENDS its own entry to `emptyStates` in its own commit. The
- *     existing entries are NEVER mutated by a sibling story.
- *   - Story 17.5 may LATER canonicalise the registry — likely widening
- *     `EmptyStateEntry` with optional `icon`, `actions`, `layout`. That
- *     widening MUST stay back-compatible with the `title` + `body` fields
- *     so this story's entries (and every sibling story's entries) keep
- *     rendering without modification.
+ * Append discipline (preserved from bootstrap-and-extend, Epic 8 retro §8):
+ *   - New screens add (a) a key to `ScreenKey` AND (b) the entry to
+ *     `emptyStates`. `tsc` enforces both halves at compile time.
+ *   - Existing entries are NEVER mutated by a sibling story (copy edits
+ *     are explicit registry changes; the registry is the diff).
+ *   - The `<EmptyState>` component's render shape (title + body + optional
+ *     cta) is NOT widened by 17.5 — future widening (icon, actions, layout)
+ *     remains a deliberate design decision; back-compat is the contract.
  *
- * The `EmptyState` component is the renderer; routes import the component
- * + look up the entry by key (`entry={emptyStates.deployments}`). This keeps
- * the copy in one place even though seven screens consume it.
+ * The `<EmptyState>` component is the renderer; routes import it +
+ * call `getEmptyState("X")` for the entry. This keeps the copy in one
+ * place even though 18+ screens / panels consume it.
+ *
+ * Naming note: the epic AC names some keys in kebab-case
+ * (identity-users, dmn-decisions); the shipped registry uses bare
+ * camelCase. Story 17.5 keeps the shipped names — renaming would touch
+ * every consumer for no operator value.
  */
 
 import type React from "react";
@@ -33,10 +45,40 @@ export interface EmptyStateEntry {
   cta?: EmptyStateCTA;
 }
 
-export const emptyStates: Record<string, EmptyStateEntry> = {
+export type ScreenKey =
+  | "activeActivities"
+  | "decisions"
+  | "decisionResource"
+  | "definitions"
+  | "deployments"
+  | "deploymentResources"
+  | "dmnDeployments"
+  | "dmnExecutions"
+  | "groupMembers"
+  | "groups"
+  | "historicActivities"
+  | "historicInstances"
+  | "historicInstanceVariables"
+  | "historicNoRecord"
+  | "historicTasks"
+  | "historicVariables"
+  | "instances"
+  | "instanceVariables"
+  | "jobs"
+  | "runtimeEnded"
+  | "stacktrace"
+  | "tasks"
+  | "tenants"
+  | "users";
+
+export const emptyStates = {
   decisions: {
     title: "No DMN decisions yet.",
     body: "Deploy a .dmn file via the Deployments tab (Story 15.2) or use the DMN modeler at /dmn to author and deploy a decision table.",
+  },
+  decisionResource: {
+    title: "No DMN resource found in deployment.",
+    body: "The decision's parent deployment did not bundle a DMN file matching this decision's key. This is unusual — re-deploy the decision via the DMN modeler or the Deployments tab to recover the XML.",
   },
   definitions: {
     title: "No process definitions yet.",
@@ -126,7 +168,29 @@ export const emptyStates: Record<string, EmptyStateEntry> = {
     title: "No users yet.",
     body: "Users appear here when the engine has identity records. The Flowable Modeler 'Identity' tab can seed users + groups; the IDM REST API also accepts POST /identity/users.",
   },
-};
+} satisfies Record<ScreenKey, EmptyStateEntry>;
+
+/**
+ * Typed accessor for the empty-state registry. The `satisfies` declaration
+ * above guarantees every ScreenKey has an entry, so the non-null assertion
+ * inside is sound — it cannot fail at runtime unless the registry is mutated
+ * (which the const-export shape forbids).
+ *
+ * Consumers that previously wrote
+ *
+ *   <EmptyState entry={emptyStates.X as NonNullable<typeof emptyStates.X>} />
+ *
+ * MAY migrate to
+ *
+ *   <EmptyState entry={getEmptyState("X")} />
+ *
+ * to drop the cast. Either shape compiles; the helper is the operator-cheaper
+ * path for new code.
+ */
+export function getEmptyState(key: ScreenKey): EmptyStateEntry {
+  // biome-ignore lint/style/noNonNullAssertion: satisfies clause above guarantees presence
+  return emptyStates[key]!;
+}
 
 export interface EmptyStateProps {
   entry: EmptyStateEntry;
@@ -134,9 +198,9 @@ export interface EmptyStateProps {
 
 /**
  * Renders an empty-state block inside the page's existing `.empty` wrapper
- * (centered-mute styling from src/styles.css). `<a className="btn">` is used
- * for the CTA so it inherits the button styling without taking a dependency
- * on TanStack Router's <Link/> (entries may point at external docs).
+ * (centered-mute styling from src/styles/components.css). `<a className="btn">`
+ * is used for the CTA so it inherits the button styling without taking a
+ * dependency on TanStack Router's <Link/> (entries may point at external docs).
  */
 export const EmptyState: React.FC<EmptyStateProps> = ({ entry }) => (
   <div className="empty" data-testid="empty-state">

@@ -14,7 +14,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { api, type FlowableTenant } from "../api";
 import { Icon, PageHead } from "../components";
-import { EmptyState, emptyStates } from "../lib/empty-states";
+import { EmptyState, getEmptyState } from "../lib/empty-states";
 import { ErrorBox } from "../lib/error-box";
 import { TableSkeleton } from "../lib/table-skeleton";
 
@@ -69,7 +69,7 @@ function TenantsList({ tenants }: TenantsListProps) {
         subtitle="Logical isolation boundaries derived from deployment tenantIds (Flowable REST 7.2 has no /identity/tenants endpoint)."
       />
       {tenants.length === 0 ? (
-        <EmptyState entry={emptyStates.tenants as NonNullable<typeof emptyStates.tenants>} />
+        <EmptyState entry={getEmptyState("tenants")} />
       ) : (
         <div className="kpi-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
           {tenants.map((t) => (

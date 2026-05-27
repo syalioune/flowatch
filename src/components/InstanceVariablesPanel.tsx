@@ -21,7 +21,7 @@
 
 import { api, type FlowableVariable } from "../api";
 import { Icon } from "../components";
-import { EmptyState, emptyStates } from "../lib/empty-states";
+import { EmptyState, getEmptyState } from "../lib/empty-states";
 import { ErrorBox } from "../lib/error-box";
 import { TableSkeleton } from "../lib/table-skeleton";
 import { useApi } from "../lib/useApi";
@@ -132,11 +132,7 @@ export function InstanceVariablesPanel({ instance }: Props) {
         {variables.loading && <TableSkeleton columns={5} rows={3} />}
         {variables.error && <ErrorBox error={variables.error} onRetry={variables.reload} />}
         {!variables.loading && !variables.error && list.length === 0 && (
-          <EmptyState
-            entry={
-              emptyStates.instanceVariables as NonNullable<typeof emptyStates.instanceVariables>
-            }
-          />
+          <EmptyState entry={getEmptyState("instanceVariables")} />
         )}
         {!variables.loading && !variables.error && list.length > 0 && (
           <table className="tbl">

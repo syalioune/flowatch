@@ -24,7 +24,7 @@ import {
 } from "../api";
 import { fmtTime, Icon } from "../components";
 import { CancelInstanceModal } from "../lib/cancel-instance-modal";
-import { EmptyState, emptyStates } from "../lib/empty-states";
+import { EmptyState, getEmptyState } from "../lib/empty-states";
 import { ErrorBox } from "../lib/error-box";
 import { TableSkeleton } from "../lib/table-skeleton";
 import { useApi } from "../lib/useApi";
@@ -150,9 +150,7 @@ export function InstanceRuntimePanel({ instanceId }: Props) {
         {runtime.loading && <TableSkeleton columns={2} rows={5} />}
         {runtime.error && <ErrorBox error={runtime.error} onRetry={runtime.reload} />}
         {!runtime.loading && !runtime.error && runtime.data === null && (
-          <EmptyState
-            entry={emptyStates.runtimeEnded as NonNullable<typeof emptyStates.runtimeEnded>}
-          />
+          <EmptyState entry={getEmptyState("runtimeEnded")} />
         )}
         {!runtime.loading && !runtime.error && p && (
           <div style={{ overflow: "auto" }}>
