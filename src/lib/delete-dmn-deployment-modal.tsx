@@ -97,9 +97,16 @@ export const DeleteDmnDeploymentModal: React.FC<DeleteDmnDeploymentModalProps> =
     >
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation only */}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: panel only intercepts the backdrop click */}
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 480 }}>
+      <div
+        className="modal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="delete-dmn-deployment-title"
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: 480 }}
+      >
         <div className="modal-hd">
-          <h3>Delete DMN deployment</h3>
+          <h3 id="delete-dmn-deployment-title">Delete DMN deployment</h3>
           <button
             type="button"
             className="icon-btn"

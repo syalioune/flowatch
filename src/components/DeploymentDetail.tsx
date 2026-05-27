@@ -180,9 +180,9 @@ function BpmnResourcesPanel({ deploymentId }: { deploymentId: string }) {
           <table className="tbl" data-testid="deployment-resources-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th></th>
+                <th scope="col">Name</th>
+                <th scope="col">Type</th>
+                <th scope="col"></th>
               </tr>
             </thead>
             <tbody>
@@ -191,6 +191,7 @@ function BpmnResourcesPanel({ deploymentId }: { deploymentId: string }) {
                   <td className="mono">{r.id}</td>
                   <td>
                     <span className="badge" data-tone="neutral">
+                      <span className="sr-only">Resource type: </span>
                       {r.mediaType}
                     </span>
                   </td>
@@ -279,11 +280,11 @@ function DmnDecisionsPanel({ deploymentId }: { deploymentId: string }) {
           <table className="tbl" data-testid="deployment-decisions-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Key</th>
-                <th>Version</th>
-                <th>File</th>
-                <th></th>
+                <th scope="col">Name</th>
+                <th scope="col">Key</th>
+                <th scope="col">Version</th>
+                <th scope="col">File</th>
+                <th scope="col"></th>
               </tr>
             </thead>
             <tbody>

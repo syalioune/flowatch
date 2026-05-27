@@ -233,11 +233,11 @@ function HistoryRoute() {
         <table className="tbl">
           <thead>
             <tr>
-              <th>Business key</th>
-              <th>Definition</th>
-              <th>Duration</th>
-              <th>Started</th>
-              <th>Ended</th>
+              <th scope="col">Business key</th>
+              <th scope="col">Definition</th>
+              <th scope="col">Duration</th>
+              <th scope="col">Started</th>
+              <th scope="col">Ended</th>
             </tr>
           </thead>
           <tbody>
@@ -275,11 +275,11 @@ function HistoryRoute() {
         <table className="tbl">
           <thead>
             <tr>
-              <th>Variable</th>
-              <th>Type</th>
-              <th>Value</th>
-              <th>Instance</th>
-              <th>Task</th>
+              <th scope="col">Variable</th>
+              <th scope="col">Type</th>
+              <th scope="col">Value</th>
+              <th scope="col">Instance</th>
+              <th scope="col">Task</th>
             </tr>
           </thead>
           <tbody>
@@ -292,6 +292,7 @@ function HistoryRoute() {
                   </td>
                   <td>
                     <span className="badge" data-tone={typeTone(inner?.type)}>
+                      <span className="sr-only">Variable type: </span>
                       {inner?.type ?? "—"}
                     </span>
                   </td>
@@ -329,11 +330,11 @@ function HistoryRoute() {
       <table className="tbl">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Assignee</th>
-            <th>Instance</th>
-            <th>Started</th>
-            <th>Ended</th>
+            <th scope="col">Name</th>
+            <th scope="col">Assignee</th>
+            <th scope="col">Instance</th>
+            <th scope="col">Started</th>
+            <th scope="col">Ended</th>
           </tr>
         </thead>
         <tbody>

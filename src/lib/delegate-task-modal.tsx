@@ -126,9 +126,16 @@ export const DelegateTaskModal: React.FC<DelegateTaskModalProps> = ({
     >
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation only — no interactive role on the panel itself */}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: panel only intercepts the backdrop click; child buttons own interactivity */}
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 440 }}>
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delegate-task-title"
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: 440 }}
+      >
         <div className="modal-hd">
-          <h3>Delegate task</h3>
+          <h3 id="delegate-task-title">Delegate task</h3>
           <button
             type="button"
             className="icon-btn"

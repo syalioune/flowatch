@@ -34,7 +34,7 @@ export const TableSkeleton: React.FC<TableSkeletonProps> = ({ columns = 4, rows 
         <tr>
           {Array.from({ length: cols }, (_unused, c) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: skeleton cells have no identity beyond their position
-            <th key={`h-${c}`}>
+            <th scope="col" key={`h-${c}`}>
               <span aria-hidden="true">&nbsp;</span>
             </th>
           ))}

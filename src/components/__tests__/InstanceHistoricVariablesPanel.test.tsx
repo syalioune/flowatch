@@ -152,7 +152,9 @@ describe("<InstanceHistoricVariablesPanel>", () => {
     const { container } = render(<InstanceHistoricVariablesPanel instanceId="pi-1" />);
     await waitFor(() => expect(screen.getByText("initiator")).toBeInTheDocument());
     const badge = container.querySelector(".panel-hd .badge");
-    expect(badge?.textContent).toBe("2");
+    // Strip the Story 18.2 sr-only prefix ("Count: ") from textContent.
+    const visibleText = badge?.textContent?.replace(/^Count:\s*/, "").trim();
+    expect(visibleText).toBe("2");
   });
 
   it("Refresh button triggers a second fetch and is disabled while loading", async () => {

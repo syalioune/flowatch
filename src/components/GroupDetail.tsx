@@ -41,6 +41,7 @@ export function GroupDetail({ group }: Props) {
               data-tone={g.type === "security" ? "warn" : "neutral"}
               style={{ marginLeft: "auto" }}
             >
+              <span className="sr-only">Group type: </span>
               {g.type}
             </span>
           )}

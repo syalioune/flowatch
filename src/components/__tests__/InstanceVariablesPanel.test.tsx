@@ -188,6 +188,8 @@ describe("<InstanceVariablesPanel>", () => {
     // The row-count badge is the first `.badge[data-tone="mute"]` in the
     // panel header (before the table body's scope badges).
     const badge = container.querySelector(".panel-hd .badge");
-    expect(badge?.textContent).toBe("2");
+    // Strip the Story 18.2 sr-only prefix ("Count: ") from textContent.
+    const visibleText = badge?.textContent?.replace(/^Count:\s*/, "").trim();
+    expect(visibleText).toBe("2");
   });
 });

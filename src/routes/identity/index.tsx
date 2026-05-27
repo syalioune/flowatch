@@ -177,10 +177,10 @@ function UsersList({ page }: UsersListProps) {
       <table className="tbl">
         <thead>
           <tr>
-            <th>User</th>
-            <th>ID</th>
-            <th>Email</th>
-            <th>Tenant</th>
+            <th scope="col">User</th>
+            <th scope="col">ID</th>
+            <th scope="col">Email</th>
+            <th scope="col">Tenant</th>
           </tr>
         </thead>
         <tbody>
@@ -245,9 +245,9 @@ function GroupsList({ page }: GroupsListProps) {
       <table className="tbl">
         <thead>
           <tr>
-            <th>Group</th>
-            <th>ID</th>
-            <th>Type</th>
+            <th scope="col">Group</th>
+            <th scope="col">ID</th>
+            <th scope="col">Type</th>
           </tr>
         </thead>
         <tbody>
@@ -269,6 +269,7 @@ function GroupsList({ page }: GroupsListProps) {
               <td>
                 {g.type ? (
                   <span className="badge" data-tone={g.type === "security" ? "warn" : "neutral"}>
+                    <span className="sr-only">Group type: </span>
                     {g.type}
                   </span>
                 ) : (

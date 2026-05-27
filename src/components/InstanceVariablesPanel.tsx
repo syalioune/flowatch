@@ -107,6 +107,7 @@ export function InstanceVariablesPanel({ instance }: Props) {
         <span className="panel-title">Variables</span>
         {variables.data && (
           <span className="badge" data-tone="mute" style={{ marginLeft: 8 }}>
+            <span className="sr-only">Count: </span>
             {variables.data.length}
           </span>
         )}
@@ -138,11 +139,11 @@ export function InstanceVariablesPanel({ instance }: Props) {
           <table className="tbl">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Scope</th>
-                <th>Value</th>
-                <th></th>
+                <th scope="col">Name</th>
+                <th scope="col">Type</th>
+                <th scope="col">Scope</th>
+                <th scope="col">Value</th>
+                <th scope="col"></th>
               </tr>
             </thead>
             <tbody>
@@ -153,11 +154,13 @@ export function InstanceVariablesPanel({ instance }: Props) {
                   </td>
                   <td>
                     <span className="badge" data-tone={typeTone(v.type)}>
+                      <span className="sr-only">Variable type: </span>
                       {v.type ?? "—"}
                     </span>
                   </td>
                   <td>
                     <span className="badge" data-tone="mute">
+                      <span className="sr-only">Scope: </span>
                       {v.scope ?? "global"}
                     </span>
                   </td>

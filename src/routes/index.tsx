@@ -130,6 +130,7 @@ function KpiValue({ result }: { result: TileResult | null }) {
         title={message}
         style={{ fontSize: 11, alignSelf: "center" }}
       >
+        <span className="sr-only">HTTP status: </span>
         {status > 0 ? `HTTP ${status}` : "Error"}
       </span>
     </span>

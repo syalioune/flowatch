@@ -273,13 +273,13 @@ function JobsRoute() {
       <table className="tbl">
         <thead>
           <tr>
-            <th>Job</th>
-            <th>Element</th>
-            <th>Process instance</th>
-            <th>Due</th>
-            <th>Retries</th>
-            <th>Exception</th>
-            <th></th>
+            <th scope="col">Job</th>
+            <th scope="col">Element</th>
+            <th scope="col">Process instance</th>
+            <th scope="col">Due</th>
+            <th scope="col">Retries</th>
+            <th scope="col">Exception</th>
+            <th scope="col"></th>
           </tr>
         </thead>
         <tbody>
@@ -340,6 +340,7 @@ function JobsRoute() {
                       className="badge"
                       data-tone={j.retries === 0 ? "bad" : j.retries === 1 ? "warn" : "ok"}
                     >
+                      <span className="sr-only">Retries remaining: </span>
                       {j.retries}
                     </span>
                   </td>
@@ -355,6 +356,7 @@ function JobsRoute() {
                         }}
                         title={j.exceptionMessage}
                       >
+                        <span className="sr-only">Error: </span>
                         {j.exceptionMessage}
                       </span>
                     ) : (

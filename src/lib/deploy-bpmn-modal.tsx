@@ -136,9 +136,16 @@ export const DeployBpmnModal: React.FC<DeployBpmnModalProps> = ({
     >
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation only */}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: panel only intercepts the backdrop click */}
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 520 }}>
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="deploy-bpmn-title"
+        onClick={(e) => e.stopPropagation()}
+        style={{ width: 520 }}
+      >
         <div className="modal-hd">
-          <h3>Deploy BPMN</h3>
+          <h3 id="deploy-bpmn-title">Deploy BPMN</h3>
           <button
             type="button"
             className="icon-btn"
