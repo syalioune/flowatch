@@ -105,35 +105,63 @@ describe("<InstanceVariablesPanel>", () => {
     expect(screen.getByText("Boom")).toBeInTheDocument();
   });
 
-  it("renders the populated table with Name / Type / Scope / Value / Edit columns", async () => {
+  it("renders the populated table with Name / Type / Scope / Value / Actions columns", async () => {
     getSpy.mockResolvedValue([
       { name: "amount", value: 1000, type: "integer" },
       { name: "currency", value: "EUR", type: "string", scope: "local" },
     ]);
     render(<InstanceVariablesPanel instance={{ id: "pi-1" }} />);
     await waitFor(() => expect(screen.getByText("amount")).toBeInTheDocument());
-    // Type badge + scope badge
     expect(screen.getByText("integer")).toBeInTheDocument();
     expect(screen.getByText("local")).toBeInTheDocument();
-    // Value rendering: integer = "1000", string = quoted
     expect(screen.getByText("1000")).toBeInTheDocument();
     expect(screen.getByText('"EUR"')).toBeInTheDocument();
-    // Story 19.1: Edit buttons are ENABLED + carry per-row data-testid.
-    expect(screen.getByTestId("variable-edit-amount")).toBeEnabled();
-    expect(screen.getByTestId("variable-edit-currency")).toBeEnabled();
+    // Story 19.2: each row has a RowActionMenu trigger (the ⋮ button).
+    expect(screen.getAllByTestId("row-action-trigger")).toHaveLength(2);
+    // Add-variable button is in the panel header (Story 19.2).
+    expect(screen.getByTestId("add-variable")).toBeEnabled();
   });
 
-  it("Story 19.1: clicking Edit opens the EditVariableModal with the row's variable", async () => {
+  it("Story 19.2: opening the row menu reveals Edit + Delete items", async () => {
     const user = userEvent.setup();
     getSpy.mockResolvedValue([{ name: "amount", value: 42, type: "integer" }]);
     render(<InstanceVariablesPanel instance={{ id: "pi-1" }} />);
-    const editBtn = await screen.findByTestId("variable-edit-amount");
-    await user.click(editBtn);
+    const trigger = await screen.findByTestId("row-action-trigger");
+    await user.click(trigger);
+    expect(await screen.findByTestId("variable-edit-amount")).toBeInTheDocument();
+    expect(screen.getByTestId("variable-delete-amount")).toBeInTheDocument();
+  });
+
+  it("Story 19.2: clicking Edit on the row menu opens the EditVariableModal", async () => {
+    const user = userEvent.setup();
+    getSpy.mockResolvedValue([{ name: "amount", value: 42, type: "integer" }]);
+    render(<InstanceVariablesPanel instance={{ id: "pi-1" }} />);
+    await user.click(await screen.findByTestId("row-action-trigger"));
+    await user.click(await screen.findByTestId("variable-edit-amount"));
     expect(await screen.findByTestId("edit-variable-modal")).toBeInTheDocument();
-    // Modal carries the Epic 18.2 ARIA convention from day one.
     const dialog = screen.getByRole("dialog", { name: "Edit variable" });
     expect(dialog).toHaveAttribute("aria-modal", "true");
-    expect(dialog).toHaveAttribute("aria-labelledby", "edit-variable-title");
+  });
+
+  it("Story 19.2: clicking Delete on the row menu opens the DeleteVariableModal (alertdialog)", async () => {
+    const user = userEvent.setup();
+    getSpy.mockResolvedValue([{ name: "amount", value: 42, type: "integer" }]);
+    render(<InstanceVariablesPanel instance={{ id: "pi-1" }} />);
+    await user.click(await screen.findByTestId("row-action-trigger"));
+    await user.click(await screen.findByTestId("variable-delete-amount"));
+    expect(await screen.findByTestId("delete-variable-modal")).toBeInTheDocument();
+    const dialog = screen.getByRole("alertdialog", { name: "Delete variable?" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+  });
+
+  it("Story 19.2: clicking Add variable opens the AddVariableModal", async () => {
+    const user = userEvent.setup();
+    getSpy.mockResolvedValue([]);
+    render(<InstanceVariablesPanel instance={{ id: "pi-1" }} />);
+    await user.click(await screen.findByTestId("add-variable"));
+    expect(await screen.findByTestId("add-variable-modal")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: "Add variable" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
   });
 
   it("renders json variable values pretty-printed inside <pre>", async () => {

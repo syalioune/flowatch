@@ -404,6 +404,57 @@ describe("api.* wrappers smoke (P-001 — every call goes through request())", (
     expect(API_LOG[0]?.status).toBe(201);
   });
 
+  it("Story 19.2: deleteInstanceVariable sends DELETE to /variables/{name}", async () => {
+    fetchMock.mockReset();
+    // 204 No Content per Flowable contract; Response constructor disallows a
+    // body on 204, so we hand-build the Response here.
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await api.deleteInstanceVariable("pi-1", "amount");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${DEFAULT_BASE}/runtime/process-instances/pi-1/variables/amount`);
+    expect(init.method).toBe("DELETE");
+    expect((init.headers as Record<string, string>).Authorization).toMatch(/^Basic /);
+    expect(API_LOG[0]?.method).toBe("DELETE");
+    expect(API_LOG[0]?.path).toBe("/runtime/process-instances/pi-1/variables/amount");
+    expect(API_LOG[0]?.status).toBe(204);
+  });
+
+  it("Story 19.2: deleteInstanceVariable URL-encodes variable names with special chars", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+    // Dots are valid URL chars but don't need encoding; spaces, +, &, unicode all do.
+    await api.deleteInstanceVariable("pi-1", "my.nested.key");
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      `${DEFAULT_BASE}/runtime/process-instances/pi-1/variables/my.nested.key`,
+    );
+    await api.deleteInstanceVariable("pi-1", "with spaces");
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      `${DEFAULT_BASE}/runtime/process-instances/pi-1/variables/with%20spaces`,
+    );
+    await api.deleteInstanceVariable("pi-1", "a&b=c");
+    expect(fetchMock.mock.calls[2]?.[0]).toBe(
+      `${DEFAULT_BASE}/runtime/process-instances/pi-1/variables/a%26b%3Dc`,
+    );
+    await api.deleteInstanceVariable("pi-1", "unicode-üñî");
+    expect(fetchMock.mock.calls[3]?.[0]).toBe(
+      `${DEFAULT_BASE}/runtime/process-instances/pi-1/variables/unicode-%C3%BC%C3%B1%C3%AE`,
+    );
+  });
+
+  it("Story 19.2: deleteInstanceVariable surfaces 404 (variable doesn't exist) as FlowableError", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue(
+      mockResponse({
+        status: 404,
+        body: '{"message":"Not found","exception":"variable does not exist"}',
+      }),
+    );
+    await expect(api.deleteInstanceVariable("pi-1", "ghost")).rejects.toMatchObject({
+      status: 404,
+    });
+    expect(API_LOG[0]?.status).toBe(404);
+  });
+
   it("tasks: list / action / variables / form", async () => {
     await api.listTasks({ size: 5 });
     await api.taskAction("task-1", "claim", { assignee: "u" });

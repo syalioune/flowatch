@@ -644,6 +644,26 @@ const updateInstanceVariables = (instanceId: string, vars: FlowableVariableInput
   });
   return request<void>("PUT", `/runtime/process-instances/${instanceId}/variables`, { body });
 };
+/**
+ * Story 19.2: delete a single runtime variable by name from a running
+ * process instance.
+ *
+ * Funnels `DELETE /runtime/process-instances/{id}/variables/{name}` through
+ * `request()`. The variable name is `encodeURIComponent`-wrapped — variable
+ * names may contain periods, slashes, spaces, or unicode characters (e.g.
+ * `my.nested.key`, `with spaces`); without encoding, `foo/bar` would route
+ * to a different endpoint. Verified live on flowable-rest 7.2.0 per
+ * docs/compat.md FR-19 (the raw probe at line 150 deleted a variable named
+ * `probe` and reverted cleanly).
+ *
+ * Engine response on success: `204 No Content`. 4xx (e.g. variable doesn't
+ * exist) propagates verbatim through `<ErrorBox>` per Pattern P-003.
+ */
+const deleteInstanceVariable = (instanceId: string, name: string) =>
+  request<void>(
+    "DELETE",
+    `/runtime/process-instances/${instanceId}/variables/${encodeURIComponent(name)}`,
+  );
 const listTasks = (params?: QueryParams) =>
   request<FlowablePage<FlowableTask>>("GET", "/runtime/tasks", { params });
 const getTask = (id: string) => request<FlowableTask>("GET", `/runtime/tasks/${id}`);
@@ -1025,6 +1045,7 @@ export const api = {
   deleteProcessInstance,
   getProcessInstanceVariables,
   updateInstanceVariables,
+  deleteInstanceVariable,
   listTasks,
   getTask,
   taskAction,

@@ -418,6 +418,12 @@ $ curl -X PUT $BASE/runtime/process-instances/$PIID/variables \
 
 **Surfaced by:** Story 19.1 live-engine probe (2026-05-28) — the spec assumed `request<void>` resolves cleanly on 201 (it does) and that 4xx error bodies are plain text (they're not — JSON). Both assumptions hold downstream because (a) `request<void>` ignores the response body and (b) `<ErrorBox>` renders `error.message` verbatim regardless of shape. Documented for future stories that touch `/runtime/*/variables` PUT (Story 19.2 Add path) and any future story that programmatically interprets a PUT echo.
 
+**Extended by Story 19.2 live-engine probe (2026-05-28):**
+- `PUT /runtime/process-instances/{id}/variables` returns `201 Created` for BOTH insert (new name) AND update (existing name overwritten). The engine does NOT use `200 OK` to distinguish upsert insert vs update — always `201`. Operator-feel implication: the modal can't tell if the operator just created a new variable or overwrote an existing one from the HTTP status alone; the client-side duplicate-name warning (Add modal AC-3) carries the disambiguation.
+- `DELETE /runtime/process-instances/{id}/variables/{name}` on a non-existent name returns `404 Not Found` with JSON body `{"message":"Not found","exception":"Execution '<id>' does not have a variable '<name>' in scope local"}`. The exception message mentions `"in scope local"` even when the path has no scope — same scope-echo shape as the PUT response above. The verbatim message is operator-friendly enough.
+- DELETE is NOT idempotent: re-deleting an already-deleted name returns 404 (not 204). The one-shot destructive `<DeleteVariableModal>` toast surfaces this verbatim — operator-feel-adequate.
+- Variable names containing dots (`my.nested.key`) and UTF-8 unicode (`unicode-üñî`) round-trip cleanly via PUT (JSON body) and DELETE (URL-encoded path segment). `encodeURIComponent` is non-negotiable on the path; the spec's AC-1 wrapper bakes it in.
+
 ---
 
 ## How to extend this file
