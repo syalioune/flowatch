@@ -178,6 +178,16 @@ export interface FlowableVariable {
   scope?: string;
 }
 
+// Story 19.1: PUT-side input DTO for /runtime/process-instances/{id}/variables.
+// Distinct from the GET-side FlowableVariable to avoid round-tripping computed
+// engine-side fields (e.g. valueUrl on binary types) back through PUT.
+export interface FlowableVariableInput {
+  name: string;
+  value: unknown;
+  type?: string;
+  scope?: "global" | "local";
+}
+
 export interface FlowableResource {
   // Per the live flowable-rest 7.2 response: `id` is the filename
   // (e.g. "Helpdesk.bpmn20.xml") and there is NO `name` field. Earlier DTO
@@ -607,6 +617,33 @@ const deleteProcessInstance = (id: string, reason?: string) =>
   );
 const getProcessInstanceVariables = (id: string) =>
   request<FlowableVariable[]>("GET", `/runtime/process-instances/${id}/variables`);
+/**
+ * Story 19.1: edit/add runtime variables on a running process instance.
+ *
+ * PUT body is ALWAYS an array — even single-variable edits pass
+ * `[{name, value, type, scope}]`. The engine returns 201 Created with a
+ * JSON-array body echoing each variable (see docs/runtime-caveats.md RC-15
+ * — every entry carries `scope: "local"` regardless of input; the GET-side
+ * read shows the actual persisted scope). The wrapper ignores the response
+ * body via `request<void>`; callers read state via the GET endpoint.
+ * 4xx errors come back as JSON `{"message":"Bad request","exception":"..."}`
+ * and are surfaced verbatim through ErrorBox per Pattern P-003. Verified
+ * live on flowable-rest 7.2.0 per docs/compat.md FR-19.
+ *
+ * The wrapper drops `scope: "global"` from the body — the engine treats an
+ * absent scope as global; only an explicit `scope: "local"` targets the
+ * current execution. Sending it both ways works (idempotent on global) but
+ * the minimum-wire convention matches Flowable's documented contract.
+ */
+const updateInstanceVariables = (instanceId: string, vars: FlowableVariableInput[]) => {
+  const body = vars.map((v) => {
+    const out: FlowableVariableInput = { name: v.name, value: v.value };
+    if (v.type !== undefined) out.type = v.type;
+    if (v.scope === "local") out.scope = "local";
+    return out;
+  });
+  return request<void>("PUT", `/runtime/process-instances/${instanceId}/variables`, { body });
+};
 const listTasks = (params?: QueryParams) =>
   request<FlowablePage<FlowableTask>>("GET", "/runtime/tasks", { params });
 const getTask = (id: string) => request<FlowableTask>("GET", `/runtime/tasks/${id}`);
@@ -987,6 +1024,7 @@ export const api = {
   startProcessInstance,
   deleteProcessInstance,
   getProcessInstanceVariables,
+  updateInstanceVariables,
   listTasks,
   getTask,
   taskAction,

@@ -347,6 +347,63 @@ describe("api.* wrappers smoke (P-001 — every call goes through request())", (
     await api.getProcessInstanceVariables("pi-1");
   });
 
+  it("Story 19.1: updateInstanceVariables sends a PUT with array body", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 201, body: "" }));
+    await api.updateInstanceVariables("pi-1", [{ name: "amount", value: 100, type: "integer" }]);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${DEFAULT_BASE}/runtime/process-instances/pi-1/variables`);
+    expect(init.method).toBe("PUT");
+    expect(init.body).toBe(JSON.stringify([{ name: "amount", value: 100, type: "integer" }]));
+    expect((init.headers as Record<string, string>).Authorization).toMatch(/^Basic /);
+    expect(API_LOG[0]?.method).toBe("PUT");
+    expect(API_LOG[0]?.path).toBe("/runtime/process-instances/pi-1/variables");
+    expect(API_LOG[0]?.body).toEqual([{ name: "amount", value: 100, type: "integer" }]);
+  });
+
+  it("Story 19.1: updateInstanceVariables drops scope when global, keeps it when local", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 201, body: "" }));
+    await api.updateInstanceVariables("pi-2", [
+      { name: "g", value: 1, type: "integer", scope: "global" },
+      { name: "l", value: "x", type: "string", scope: "local" },
+    ]);
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(init.body).toBe(
+      JSON.stringify([
+        { name: "g", value: 1, type: "integer" },
+        { name: "l", value: "x", type: "string", scope: "local" },
+      ]),
+    );
+  });
+
+  it("Story 19.1: updateInstanceVariables surfaces 4xx engine bodies (JSON shape per RC-15) as FlowableError", async () => {
+    // Per docs/runtime-caveats.md RC-15: the engine returns 4xx as JSON
+    // `{"message":"Bad request","exception":"..."}`, not plain text. The
+    // wrapper surfaces the body verbatim — no parsing, no rewrite.
+    const engineBody =
+      '{"message":"Bad request","exception":"Converter can only convert integers"}';
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue(mockResponse({ status: 400, body: engineBody }));
+    await expect(
+      api.updateInstanceVariables("pi-1", [{ name: "amount", value: "abc", type: "integer" }]),
+    ).rejects.toMatchObject({
+      status: 400,
+      message: engineBody,
+    });
+    expect(API_LOG[0]?.status).toBe(400);
+    expect(API_LOG[0]?.error).toBe(engineBody);
+  });
+
+  it("Story 19.1: updateInstanceVariables succeeds on 201 with empty body", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 201, body: "" }));
+    await expect(
+      api.updateInstanceVariables("pi-1", [{ name: "amount", value: 100, type: "integer" }]),
+    ).resolves.not.toThrow();
+    expect(API_LOG[0]?.status).toBe(201);
+  });
+
   it("tasks: list / action / variables / form", async () => {
     await api.listTasks({ size: 5 });
     await api.taskAction("task-1", "claim", { assignee: "u" });
