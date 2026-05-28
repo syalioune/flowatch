@@ -118,13 +118,22 @@ describe("<InstanceVariablesPanel>", () => {
     // Value rendering: integer = "1000", string = quoted
     expect(screen.getByText("1000")).toBeInTheDocument();
     expect(screen.getByText('"EUR"')).toBeInTheDocument();
-    // Two Edit placeholders, both disabled
-    const editButtons = screen.getAllByTestId("variable-edit-placeholder");
-    expect(editButtons).toHaveLength(2);
-    for (const btn of editButtons) {
-      expect(btn).toBeDisabled();
-      expect(btn).toHaveAttribute("title", "Available in 0.0.3 (Story 19.1)");
-    }
+    // Story 19.1: Edit buttons are ENABLED + carry per-row data-testid.
+    expect(screen.getByTestId("variable-edit-amount")).toBeEnabled();
+    expect(screen.getByTestId("variable-edit-currency")).toBeEnabled();
+  });
+
+  it("Story 19.1: clicking Edit opens the EditVariableModal with the row's variable", async () => {
+    const user = userEvent.setup();
+    getSpy.mockResolvedValue([{ name: "amount", value: 42, type: "integer" }]);
+    render(<InstanceVariablesPanel instance={{ id: "pi-1" }} />);
+    const editBtn = await screen.findByTestId("variable-edit-amount");
+    await user.click(editBtn);
+    expect(await screen.findByTestId("edit-variable-modal")).toBeInTheDocument();
+    // Modal carries the Epic 18.2 ARIA convention from day one.
+    const dialog = screen.getByRole("dialog", { name: "Edit variable" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toHaveAttribute("aria-labelledby", "edit-variable-title");
   });
 
   it("renders json variable values pretty-printed inside <pre>", async () => {

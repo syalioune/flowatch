@@ -386,6 +386,40 @@ When the source is a TypeScript template literal (e.g. [src/modeler/starters.ts]
 
 ---
 
+## RC-15 — `PUT /runtime/process-instances/{id}/variables` echoes `scope:"local"` regardless of input; 4xx body is JSON, not plain text
+
+**Naive intuition:** the engine's PUT response for `/runtime/process-instances/{id}/variables` either returns `204 No Content` (typical REST PUT convention) or echoes the array exactly as sent — including a missing `scope` field when none was sent. A 4xx error body is plain text matching the engine's `RuntimeException.getMessage()`.
+
+**Actual behaviour:** flowable-rest 7.2.0 returns:
+
+1. **`201 Created` on success** (NOT 204), with a JSON body — an array echoing each variable. Every entry carries `"scope":"local"` even when no scope was sent in the request. The variable's actual stored scope (read back via `GET /runtime/process-instances/{id}/variables/{name}`) is `null` (= global). The PUT-response `scope` is a wire-level echo from the engine's pre-persist normalisation; it does NOT reflect what was persisted.
+
+2. **4xx errors are JSON objects** with the shape `{"message":"Bad request","exception":"<engine exception class + summary>"}`. Probed verbatim:
+
+```bash
+# success (note: input has NO scope; response echoes scope:"local")
+$ curl -X PUT $BASE/runtime/process-instances/$PIID/variables \
+  -d '[{"name":"amount","value":2500,"type":"integer"}]'
+# HTTP 201
+[{"name":"amount","type":"integer","value":2500,"scope":"local"}]
+
+$ curl $BASE/runtime/process-instances/$PIID/variables/amount
+# HTTP 200
+{"name":"amount","type":"integer","value":2500,"scope":null}
+
+# failure (type-coercion mismatch)
+$ curl -X PUT $BASE/runtime/process-instances/$PIID/variables \
+  -d '[{"name":"amount","value":"not-a-number","type":"integer"}]'
+# HTTP 400
+{"message":"Bad request","exception":"Converter can only convert integers"}
+```
+
+**Workaround:** ignore the PUT response body (the wrapper uses `request<void>`); read variable state via the GET endpoint when the operator needs to see what persisted. Treat 4xx JSON as opaque — `<ErrorBox>` renders the raw bytes per Pattern P-003 (the operator sees `{"message":"Bad request","exception":"Converter can only convert integers"}` verbatim, which is more useful than any rewritten copy). Do NOT introduce a parser for the engine's JSON error shape; the verbatim message IS the diagnostic.
+
+**Surfaced by:** Story 19.1 live-engine probe (2026-05-28) — the spec assumed `request<void>` resolves cleanly on 201 (it does) and that 4xx error bodies are plain text (they're not — JSON). Both assumptions hold downstream because (a) `request<void>` ignores the response body and (b) `<ErrorBox>` renders `error.message` verbatim regardless of shape. Documented for future stories that touch `/runtime/*/variables` PUT (Story 19.2 Add path) and any future story that programmatically interprets a PUT echo.
+
+---
+
 ## How to extend this file
 
 When a review surfaces a runtime quirk that meets all three of:

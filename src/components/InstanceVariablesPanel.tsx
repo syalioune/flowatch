@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * Instance Variables panel (Story 10.4).
+ * Instance Variables panel (Story 10.4 + Story 19.1).
  *
  * Replaces the inline two-column-grid panel that lived in the legacy
  * ProcessInstanceDetail component (since Story 13.1 the runtime panel is
@@ -9,9 +9,9 @@
  * contract (loading skeleton → ErrorBox → EmptyState → table) — same
  * shape Story 9.6 used for the Resources panel.
  *
- * Per Story 19.1 forward-reference: the per-row `Edit` button is a
- * disabled placeholder with `data-testid="variable-edit-placeholder"`
- * which 19.1 (milestone 0.0.3) swaps for a real edit modal.
+ * Story 19.1: per-row Edit button opens `<EditVariableModal>` and reloads
+ * the panel on success. Closes the Story 10.4 placeholder-then-real swap
+ * (CLAUDE.md "Cross-story sequencing" + Epic 10 retro §3.5).
  *
  * Render-side truncation: variable values are bounded to 4 KB at render
  * time so a 100 KB JSON blob in `value` doesn't lock the main thread.
@@ -19,8 +19,10 @@
  * — see src/api.ts.
  */
 
+import { useRef, useState } from "react";
 import { api, type FlowableVariable } from "../api";
 import { Icon } from "../components";
+import { EditVariableModal } from "../lib/edit-variable-modal";
 import { EmptyState, getEmptyState } from "../lib/empty-states";
 import { ErrorBox } from "../lib/error-box";
 import { TableSkeleton } from "../lib/table-skeleton";
@@ -100,6 +102,11 @@ interface Props {
 export function InstanceVariablesPanel({ instance }: Props) {
   const variables = useApi(() => api.getProcessInstanceVariables(instance.id), [instance.id]);
   const list = variables.data ?? [];
+  const [editing, setEditing] = useState<FlowableVariable | null>(null);
+  // Single shared ref reassigned on Edit click — only one modal is open at
+  // a time (CLAUDE.md "Modal focus-restore via triggerRef"), so a Map keyed
+  // on variable name is unnecessary indirection.
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
 
   return (
     <div className="panel" style={{ marginTop: 18 }}>
@@ -170,9 +177,11 @@ export function InstanceVariablesPanel({ instance }: Props) {
                       type="button"
                       className="btn"
                       data-size="sm"
-                      data-testid="variable-edit-placeholder"
-                      title="Available in 0.0.3 (Story 19.1)"
-                      disabled
+                      data-testid={`variable-edit-${v.name}`}
+                      onClick={(e) => {
+                        triggerRef.current = e.currentTarget;
+                        setEditing(v);
+                      }}
                     >
                       Edit
                     </button>
@@ -183,6 +192,13 @@ export function InstanceVariablesPanel({ instance }: Props) {
           </table>
         )}
       </div>
+      <EditVariableModal
+        variable={editing}
+        instanceId={instance.id}
+        onClose={() => setEditing(null)}
+        onSuccess={() => variables.reload()}
+        triggerRef={triggerRef}
+      />
     </div>
   );
 }
