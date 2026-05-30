@@ -40,6 +40,8 @@ Every call — success or failure — pushes an entry into `API_LOG` and fires a
 | `taskAction(taskId, action, body)`         | POST   | `/runtime/tasks/{taskId}`                             | Body: `{ action, ...extra }`. Actions: `claim`, `complete`, `delegate`, `resolve`, `unclaim` |
 | `updateTask(id, fields)`                   | PUT    | `/runtime/tasks/{id}`                                 | Body `Partial<{priority, dueDate, owner, assignee}>` (FR-44). Same URL as `taskAction` — engine discriminates by HTTP method (POST action-verbs vs PUT field-patches). Returns the echoed FlowableTask. Throws if `fields` is empty. |
 | `getTaskVariables(taskId)`                 | GET    | `/runtime/tasks/{taskId}/variables`                   |                                             |
+| `listTaskAttachments(taskId)`              | GET    | `/runtime/tasks/{taskId}/attachments`                 | Bare array response (NOT envelope). (FR-45). |
+| `addTaskAttachment(taskId, payload)`       | POST   | `/runtime/tasks/{taskId}/attachments`                 | Body discriminated: `kind="url"` → JSON `{name, description?, type?, externalUrl}`; `kind="file"` → multipart FormData with `name` / `description?` / `type?` / `content`. Mirrors `uploadDeployment`'s multipart envelope inside src/api.ts (Pattern P-001 preserved). Returns FlowableAttachment. (FR-45). |
 
 ## Form
 

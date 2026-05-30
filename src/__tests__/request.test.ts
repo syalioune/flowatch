@@ -528,6 +528,102 @@ describe("api.* wrappers smoke (P-001 — every call goes through request())", (
     expect(API_LOG[0]?.error).toBe(engineBody);
   });
 
+  it("Story 21.2: listTaskAttachments GETs the bare-array endpoint", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 200,
+        json: [{ id: "att-1", name: "design.pdf", taskId: "task-1" }],
+      }),
+    );
+    const out = await api.listTaskAttachments("task-1");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${DEFAULT_BASE}/runtime/tasks/task-1/attachments`);
+    expect(init.method).toBe("GET");
+    expect(out).toEqual([{ id: "att-1", name: "design.pdf", taskId: "task-1" }]);
+  });
+
+  it("Story 21.2: listTaskAttachments surfaces 4xx engine bodies as FlowableError", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue(mockResponse({ status: 404, body: "task missing" }));
+    await expect(api.listTaskAttachments("ghost")).rejects.toMatchObject({
+      status: 404,
+      message: "task missing",
+    });
+  });
+
+  it("Story 21.2: addTaskAttachment URL-mode POSTs JSON body via request()", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 201,
+        json: { id: "att-1", name: "n", externalUrl: "https://x" },
+      }),
+    );
+    const out = await api.addTaskAttachment("task-1", {
+      kind: "url",
+      name: "n",
+      externalUrl: "https://x",
+    });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${DEFAULT_BASE}/runtime/tasks/task-1/attachments`);
+    expect(init.method).toBe("POST");
+    // body should be JSON; description/type undefined and stringify-stripped.
+    expect(init.body).toBe(JSON.stringify({ name: "n", externalUrl: "https://x" }));
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+    expect(API_LOG[0]?.method).toBe("POST");
+    expect(API_LOG[0]?.path).toBe("/runtime/tasks/task-1/attachments");
+    expect(out).toMatchObject({ id: "att-1" });
+  });
+
+  it("Story 21.2: addTaskAttachment File-mode POSTs multipart, logs envelope, redacts Authorization", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 201,
+        json: { id: "att-2", name: "x.txt" },
+      }),
+    );
+    const file = new File(["hi"], "x.txt", { type: "text/plain" });
+    const out = await api.addTaskAttachment("task-1", {
+      kind: "file",
+      name: "x.txt",
+      file,
+    });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${DEFAULT_BASE}/runtime/tasks/task-1/attachments`);
+    expect(init.method).toBe("POST");
+    // multipart body is FormData, NOT a stringified JSON payload.
+    expect(init.body).toBeInstanceOf(FormData);
+    const headers = init.headers as Record<string, string>;
+    expect(headers["Content-Type"]).toBeUndefined();
+    expect(headers.Authorization).toMatch(/^Basic /);
+    // Captured log entry redacts the auth header.
+    expect(API_LOG[0]?.method).toBe("POST");
+    expect(API_LOG[0]?.headers?.Authorization).toBe("Basic ***");
+    expect(API_LOG[0]?.body).toBeUndefined();
+    expect(out).toMatchObject({ id: "att-2" });
+  });
+
+  it("Story 21.2: addTaskAttachment File-mode surfaces 4xx engine bodies as FlowableError", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue(mockResponse({ status: 400, body: "Bad upload" }));
+    const file = new File(["hi"], "x.txt", { type: "text/plain" });
+    await expect(
+      api.addTaskAttachment("task-1", { kind: "file", name: "x.txt", file }),
+    ).rejects.toMatchObject({ status: 400, message: "Bad upload" });
+    expect(API_LOG[0]?.status).toBe(400);
+    expect(API_LOG[0]?.error).toBe("Bad upload");
+  });
+
+  it("Story 21.2: addTaskAttachment URL-mode surfaces 4xx engine bodies as FlowableError", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue(mockResponse({ status: 400, body: "malformed url" }));
+    await expect(
+      api.addTaskAttachment("task-1", { kind: "url", name: "n", externalUrl: "::bad::" }),
+    ).rejects.toMatchObject({ status: 400, message: "malformed url" });
+  });
+
   it("instances: list / start / delete / variables", async () => {
     await api.listProcessInstances({ size: 5 });
     await api.startProcessInstance({ processDefinitionId: "def-1" });

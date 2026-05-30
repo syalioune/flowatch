@@ -47,6 +47,7 @@ export interface EmptyStateEntry {
 
 export type ScreenKey =
   | "activeActivities"
+  | "attachments"
   | "decisions"
   | "decisionResource"
   | "definitions"
@@ -101,6 +102,10 @@ export const emptyStates = {
   activeActivities: {
     title: "No active activities right now.",
     body: "This instance is idle (awaiting a timer, a message, or a parallel branch to converge) — or all branches have completed.",
+  },
+  attachments: {
+    title: "No attachments on this task.",
+    body: "Attach a file (PDF, screenshot, log dump) or paste a link to external evidence. The engine stores file content; URL attachments are declarative pointers.",
   },
   deploymentResources: {
     title: "No resources.",

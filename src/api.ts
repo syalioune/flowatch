@@ -126,6 +126,32 @@ export interface FlowableTask {
   tenantId?: string;
 }
 
+// Story 21.2: task attachment DTO. Optional fields per the Flowable REST
+// task-attachments spec — the engine derives `id` / `time` / `userId` and
+// echoes the operator-supplied `name` / `description` / `type` / `externalUrl`.
+// `url` is the engine-side content URL for file attachments (e.g.
+// /runtime/tasks/{id}/attachments/{aid}/content).
+export interface FlowableAttachment {
+  id: string;
+  name?: string;
+  description?: string;
+  type?: string;
+  taskId?: string;
+  processInstanceId?: string;
+  externalUrl?: string;
+  url?: string;
+  time?: string;
+  userId?: string;
+}
+
+// Story 21.2: discriminated-union payload for api.addTaskAttachment. The
+// wrapper branches at runtime: kind="url" → JSON body; kind="file" →
+// multipart FormData body (mirrors the uploadDeployment envelope shape
+// inside src/api.ts; Pattern P-001 preserved).
+export type AddAttachmentPayload =
+  | { kind: "url"; name: string; type?: string; description?: string; externalUrl: string }
+  | { kind: "file"; name: string; type?: string; description?: string; file: File };
+
 // Story 11.3 (closes the Story 1.1 deferred-work entry for FlowableTaskForm).
 // Per the Flowable FormProperty contract, `type` is a curated union; the
 // trailing `string` keeps unknown engine-extension types type-checking so
@@ -775,6 +801,90 @@ const updateTask = (
 const getTaskVariables = (taskId: string) =>
   request<FlowableVariable[]>("GET", `/runtime/tasks/${taskId}/variables`);
 
+/**
+ * Story 21.2: list a runtime task's attachments.
+ *
+ * Funnels `GET /runtime/tasks/{taskId}/attachments` through `request()`.
+ * Response shape: a BARE ARRAY of FlowableAttachment (NOT a paged envelope).
+ * Verified live on flowable-rest 7.2.0 per docs/compat.md FR-45.
+ */
+const listTaskAttachments = (taskId: string) =>
+  request<FlowableAttachment[]>("GET", `/runtime/tasks/${taskId}/attachments`);
+
+/**
+ * Story 21.2: add an attachment to a runtime task.
+ *
+ * Discriminated-union payload. The wrapper branches:
+ *   - `kind: "url"` → JSON POST through `request()` with body
+ *     `{name, description?, type?, externalUrl}`.
+ *   - `kind: "file"` → multipart POST that bypasses `request()` (FormData
+ *     body) but logs via the same envelope as `uploadDeployment`. Pattern
+ *     P-001 is preserved — the manual fetch() is intra-file.
+ *
+ * Multipart field names per Flowable's documented contract:
+ *   `name` / `description` (optional) / `type` (optional MIME) / `content`
+ *   (binary). The engine derives `id` / `time` / `userId` server-side.
+ *
+ * Engine response: `201 Created` (URL path) / `200 OK` (file path —
+ * varies per engine version; the wrapper accepts both via res.ok) with
+ * the echoed FlowableAttachment body. Verified live on flowable-rest 7.2.0
+ * per docs/compat.md FR-45.
+ */
+const addTaskAttachment = async (
+  taskId: string,
+  payload: AddAttachmentPayload,
+): Promise<FlowableAttachment> => {
+  if (payload.kind === "url") {
+    return request<FlowableAttachment>("POST", `/runtime/tasks/${taskId}/attachments`, {
+      body: {
+        name: payload.name,
+        description: payload.description,
+        type: payload.type,
+        externalUrl: payload.externalUrl,
+      },
+    });
+  }
+  const path = `/runtime/tasks/${taskId}/attachments`;
+  const url = cfg.baseUrl.replace(/\/$/, "") + path;
+  const t0 = performance.now();
+  const entry: ApiLogEntry = {
+    id: Math.random().toString(36).slice(2, 9),
+    method: "POST",
+    path,
+    url,
+    status: 0,
+    ms: 0,
+    at: new Date().toISOString(),
+  };
+  try {
+    const fd = new FormData();
+    fd.append("name", payload.name);
+    if (payload.description) fd.append("description", payload.description);
+    if (payload.type) fd.append("type", payload.type);
+    fd.append("content", payload.file, payload.name);
+    const uploadHeaders: Record<string, string> = { Authorization: basicAuth() };
+    entry.headers = redactAuthHeader(uploadHeaders);
+    const res = await fetch(url, { method: "POST", headers: uploadHeaders, body: fd });
+    entry.status = res.status;
+    entry.ms = Math.round(performance.now() - t0);
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      entry.error = text || `HTTP ${res.status}`;
+      logCall(entry);
+      throw new FlowableError(entry.error, res.status);
+    }
+    logCall(entry);
+    return (await res.json()) as FlowableAttachment;
+  } catch (err) {
+    if (entry.status === 0) {
+      entry.error = err instanceof Error ? err.message : String(err);
+      entry.ms = Math.round(performance.now() - t0);
+      logCall(entry);
+    }
+    throw err;
+  }
+};
+
 // ── Form ──────────────────────────────────────────────────────────────────
 const getTaskForm = (taskId: string) =>
   request<FlowableTaskForm>("GET", "/form/form-data", { params: { taskId } });
@@ -1156,6 +1266,8 @@ export const api = {
   taskAction,
   updateTask,
   getTaskVariables,
+  listTaskAttachments,
+  addTaskAttachment,
   // Form
   getTaskForm,
   submitTaskForm,
