@@ -113,6 +113,19 @@ if [ ${#staged_stories[@]} -gt 0 ]; then
       exit 1
     fi
   fi
+  # Closure-gate-probe discipline (Epic 26 retro AI-1 — 4th enforcement layer):
+  # refuse to commit any story file at Status: review|done that has unchecked
+  # probe paths without explicit [N/A — <reason>] deferral markers. Catches
+  # the substantive-content gap that the DAR-block hook (artifact-presence)
+  # cannot — Story 26.2 closed with the block populated but 3 of 5 probe
+  # paths deferred to "follow-up work" that immediately leaked into polish
+  # fix commits.
+  if [ -x "$REPO_ROOT/scripts/ci/check-closure-gate-probes.sh" ]; then
+    if ! bash "$REPO_ROOT/scripts/ci/check-closure-gate-probes.sh" "${staged_stories[@]}"; then
+      echo "✗ Refusing to commit — fix the violations above (CLAUDE.md / Epic 26 retro AI-1)." >&2
+      exit 1
+    fi
+  fi
 fi
 
 if git -C "$PRIVATE_REPO" diff --cached --quiet; then

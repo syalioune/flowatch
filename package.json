@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome lint .",
     "format": "biome format --write .",
-    "check": "biome check .",
+    "check": "biome ci .",
     "check:p-001": "bash scripts/ci/check-fetch-funnel.sh",
     "check:p-001:test": "bash scripts/ci/__tests__/check-fetch-funnel.test.sh",
     "test": "vitest run",
