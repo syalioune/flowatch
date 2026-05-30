@@ -113,63 +113,71 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
             className="icon-btn"
             onClick={closeWithFocus}
             disabled={busy}
+            aria-disabled={busy}
             aria-label="Close edit category modal"
             style={{ marginLeft: "auto" }}
           >
             <Icon name="x" size={14} />
           </button>
         </div>
-        <div className="modal-bd">
-          {error && (
-            <div style={{ marginBottom: 12 }}>
-              <ErrorBox error={error} />
-            </div>
-          )}
-          <p className="mute" style={{ margin: "0 0 12px", fontSize: 12 }}>
-            Editing <span className="mono">{definition.name || definition.key}</span> (key:{" "}
-            <span className="mono">{definition.key}</span>)
-          </p>
-          <label
-            htmlFor="edit-category-input"
-            style={{ display: "block", marginBottom: 4, fontSize: 12 }}
-          >
-            Category
-          </label>
-          <input
-            ref={inputRef}
-            id="edit-category-input"
-            data-testid="edit-category-input"
-            type="text"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            disabled={busy}
-            style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: 12 }}
-          />
-          <p className="mute" style={{ margin: "6px 0 0", fontSize: 11 }}>
-            Leave empty to clear the category — the engine reverts to default.
-          </p>
-        </div>
-        <div className="modal-ft">
-          <button
-            type="button"
-            className="btn"
-            data-testid="edit-category-cancel"
-            onClick={closeWithFocus}
-            disabled={busy}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn"
-            data-variant="primary"
-            data-testid="edit-category-submit"
-            onClick={submit}
-            disabled={busy}
-          >
-            {busy ? "Saving…" : "Save"}
-          </button>
-        </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!busy) submit();
+          }}
+        >
+          <div className="modal-bd">
+            {error && (
+              <div style={{ marginBottom: 12 }}>
+                <ErrorBox error={error} />
+              </div>
+            )}
+            <p className="mute" style={{ margin: "0 0 12px", fontSize: 12 }}>
+              Editing <span className="mono">{definition.name || definition.key}</span> (key:{" "}
+              <span className="mono">{definition.key}</span>)
+            </p>
+            <label
+              htmlFor="edit-category-input"
+              style={{ display: "block", marginBottom: 4, fontSize: 12 }}
+            >
+              Category
+            </label>
+            <input
+              ref={inputRef}
+              id="edit-category-input"
+              data-testid="edit-category-input"
+              type="text"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              disabled={busy}
+              maxLength={255}
+              style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: 12 }}
+            />
+            <p className="mute" style={{ margin: "6px 0 0", fontSize: 11 }}>
+              Leave empty to clear the category — the engine reverts to default.
+            </p>
+          </div>
+          <div className="modal-ft">
+            <button
+              type="button"
+              className="btn"
+              data-testid="edit-category-cancel"
+              onClick={closeWithFocus}
+              disabled={busy}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn"
+              data-variant="primary"
+              data-testid="edit-category-submit"
+              disabled={busy}
+            >
+              {busy ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

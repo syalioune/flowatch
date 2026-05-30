@@ -34,14 +34,20 @@ async function deleteAllFixtureDeployments() {
     `${FLOWABLE}/repository/process-definitions?key=${FIXTURE_KEY}&size=200`,
     { headers: { Authorization: BASIC } },
   );
-  if (!res.ok) return;
+  if (!res.ok) {
+    console.warn(`Cleanup: failed to list fixture deployments (${res.status})`);
+    return;
+  }
   const body = (await res.json()) as { data: Array<{ deploymentId: string }> };
   const ids = [...new Set(body.data.map((d) => d.deploymentId))];
   for (const id of ids) {
-    await fetch(`${FLOWABLE}/repository/deployments/${id}?cascade=true`, {
+    const delRes = await fetch(`${FLOWABLE}/repository/deployments/${id}?cascade=true`, {
       method: "DELETE",
       headers: { Authorization: BASIC },
     });
+    if (!delRes.ok) {
+      console.warn(`Cleanup: failed to delete deployment ${id} (${delRes.status})`);
+    }
   }
 }
 
@@ -93,12 +99,14 @@ test.describe("/definitions Edit category (Story 20.1)", () => {
     // Modal closes on success.
     await expect(modal).toBeHidden();
 
-    // Detail Properties panel reflects the new category. The Category cell
-    // wraps the value-span + Edit button together, so target the value-span
-    // directly via getByText (exact text match on the inner <span>). The
-    // route loader uses api.getProcessDefinitionFresh (RC-16) so the post-PUT
-    // value surfaces here despite the engine's single-GET BPMN-cache quirk.
-    await expect(page.getByText("e2e-test-category", { exact: true })).toBeVisible({
+    // Detail Properties panel reflects the new category. Scope the text match
+    // to the Properties panel — the API Inspector drawer, toasts, or any
+    // chrome that echoes the JSON body would otherwise satisfy a page-wide
+    // getByText. The route loader uses api.getProcessDefinitionFresh (RC-16)
+    // so the post-PUT value surfaces here despite the engine's single-GET
+    // BPMN-cache quirk.
+    const propertiesPanel = page.locator(".panel").filter({ hasText: "Properties" }).first();
+    await expect(propertiesPanel.getByText("e2e-test-category", { exact: true })).toBeVisible({
       timeout: 10_000,
     });
 

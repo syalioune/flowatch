@@ -84,9 +84,25 @@ describe("<ProcessDefinitionDetail> — Story 20.1 Edit-category surface", () =>
     const { category: _omit, ...rest } = DEF;
     const def: FlowableProcessDefinition = rest;
     render(<ProcessDefinitionDetail definition={def} reload={() => undefined} />);
-    await screen.findByTestId("edit-category-button");
-    // The mute em-dash fallback still renders alongside the Edit affordance.
-    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    // Target the Category cell specifically — the Tenant row also renders an
+    // em-dash for un-tenanted definitions, so a global getAllByText("—") is
+    // satisfied regardless of what the Category cell contains.
+    const button = await screen.findByTestId("edit-category-button");
+    const categoryCell = button.closest("td");
+    expect(categoryCell).not.toBeNull();
+    expect(categoryCell).toHaveTextContent("—");
+    expect(categoryCell).toHaveTextContent("Edit");
+  });
+
+  it("disables the Edit button when the definition is suspended", async () => {
+    // Engine acceptance of PUT {category} on a suspended definition is
+    // unverified; gate the affordance to avoid an avoidable engine round-trip.
+    const suspendedDef: FlowableProcessDefinition = { ...DEF, suspended: true };
+    render(<ProcessDefinitionDetail definition={suspendedDef} reload={() => undefined} />);
+    const btn = await screen.findByTestId("edit-category-button");
+    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute("aria-disabled", "true");
+    expect(btn).toHaveAttribute("title", "Reactivate the definition to edit its category");
   });
 
   it("clicking the Edit button opens <EditCategoryModal> (AC-4)", async () => {

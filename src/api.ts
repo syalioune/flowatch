@@ -651,10 +651,14 @@ const suspendProcessDefinition = (id: string, suspend: boolean) =>
  * Engine response: `200 OK` with the full FlowableProcessDefinition body
  * echoed back (confirmed in T-10 live probe per spec AC-13).
  */
-const updateProcessDefinition = (id: string, fields: Partial<{ category: string }>) =>
-  request<FlowableProcessDefinition>("PUT", `/repository/process-definitions/${id}`, {
+const updateProcessDefinition = (id: string, fields: Partial<{ category: string }>) => {
+  // Empty body collides with the suspend/activate body discriminator on the same URL.
+  if (Object.keys(fields).length === 0)
+    throw new Error("updateProcessDefinition requires at least one field");
+  return request<FlowableProcessDefinition>("PUT", `/repository/process-definitions/${id}`, {
     body: fields,
   });
+};
 const getProcessDefinitionResource = (id: string): Promise<string> =>
   request<string>("GET", `/repository/process-definitions/${id}/resourcedata`, { raw: true });
 

@@ -117,6 +117,10 @@ describe("<EditCategoryModal>", () => {
       "audit-probe",
     );
     expect(screen.getByTestId("edit-category-modal")).toBeInTheDocument();
+    // ErrorBox ships the Story 8.2 open-inspector wiring (inherited via the
+    // shared <ErrorBox> component); assert presence so a future ErrorBox
+    // refactor doesn't silently break this AC-6 contract for the modal.
+    expect(screen.getByTestId("open-inspector")).toBeInTheDocument();
   });
 
   it("Cancel closes the modal without submitting + restores focus to triggerRef", async () => {
