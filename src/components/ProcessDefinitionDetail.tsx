@@ -124,6 +124,11 @@ export function ProcessDefinitionDetail({ definition, reload }: Props) {
                       data-variant="ghost"
                       data-testid="edit-category-button"
                       onClick={() => setEditing(d)}
+                      disabled={d.suspended}
+                      aria-disabled={d.suspended}
+                      title={
+                        d.suspended ? "Reactivate the definition to edit its category" : undefined
+                      }
                     >
                       Edit
                     </button>
