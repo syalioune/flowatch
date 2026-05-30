@@ -20,10 +20,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   api,
   FlowableError,
+  type FlowableHistoricActivity,
   type FlowableHistoricProcessInstance,
+  type FlowablePage,
   type FlowableProcessInstance,
 } from "../../api";
 import {
+  fetchActivitiesForOverlayOrNull,
   fetchProcessDefinitionXmlOrNull,
   fetchProcessInstanceOrHistoric,
   InstanceDiagramPanel,
@@ -33,18 +36,42 @@ import {
 // vi.mock is hoisted to the top of the file ABOVE any `const` declarations,
 // so the factory cannot close over module-scoped consts. vi.hoisted is the
 // canonical escape hatch — the mocks are created at hoist time and shared
-// with the test body via destructuring.
-const { importXMLMock, zoomMock, destroyMock, canvasGetMock, viewerCtor } = vi.hoisted(() => {
+// with the test body via destructuring. Story 26.2 adds addMarker /
+// removeMarker to the mocked canvas so the marker-overlay effect can be
+// asserted at the bpmn-js boundary.
+const {
+  importXMLMock,
+  zoomMock,
+  addMarkerMock,
+  removeMarkerMock,
+  destroyMock,
+  canvasGetMock,
+  viewerCtor,
+} = vi.hoisted(() => {
   const importXMLMock = vi.fn().mockResolvedValue({ warnings: [] });
   const zoomMock = vi.fn();
+  const addMarkerMock = vi.fn();
+  const removeMarkerMock = vi.fn();
   const destroyMock = vi.fn();
-  const canvasGetMock = vi.fn().mockReturnValue({ zoom: zoomMock });
+  const canvasGetMock = vi.fn().mockReturnValue({
+    zoom: zoomMock,
+    addMarker: addMarkerMock,
+    removeMarker: removeMarkerMock,
+  });
   const viewerCtor = vi.fn().mockImplementation(() => ({
     importXML: importXMLMock,
     get: canvasGetMock,
     destroy: destroyMock,
   }));
-  return { importXMLMock, zoomMock, destroyMock, canvasGetMock, viewerCtor };
+  return {
+    importXMLMock,
+    zoomMock,
+    addMarkerMock,
+    removeMarkerMock,
+    destroyMock,
+    canvasGetMock,
+    viewerCtor,
+  };
 });
 
 vi.mock("bpmn-js/lib/NavigatedViewer", () => ({
@@ -59,29 +86,41 @@ vi.mock("bpmn-js/lib/NavigatedViewer", () => ({
 type GetProcFn = typeof api.getProcessInstance;
 type GetHistFn = typeof api.getHistoricProcessInstance;
 type GetXmlFn = typeof api.getProcessDefinitionResource;
+type ListActsFn = typeof api.listHistoricActivities;
 type Host = {
   getProcessInstance: GetProcFn;
   getHistoricProcessInstance: GetHistFn;
   getProcessDefinitionResource: GetXmlFn;
+  listHistoricActivities: ListActsFn;
 };
 
 const realProc = api.getProcessInstance;
 const realHist = api.getHistoricProcessInstance;
 const realXml = api.getProcessDefinitionResource;
+const realActs = api.listHistoricActivities;
 
 let procSpy: ReturnType<typeof vi.fn>;
 let histSpy: ReturnType<typeof vi.fn>;
 let xmlSpy: ReturnType<typeof vi.fn>;
+let actsSpy: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   procSpy = vi.fn();
   histSpy = vi.fn();
   xmlSpy = vi.fn();
+  actsSpy = vi.fn();
+  // Sensible default — Story 26.1 contract tests don't care about activities,
+  // so resolve empty so the marker effect is a no-op. Story 26.2 tests
+  // override per-test.
+  actsSpy.mockResolvedValue(activitiesPage([]));
   (api as unknown as Host).getProcessInstance = procSpy as unknown as GetProcFn;
   (api as unknown as Host).getHistoricProcessInstance = histSpy as unknown as GetHistFn;
   (api as unknown as Host).getProcessDefinitionResource = xmlSpy as unknown as GetXmlFn;
+  (api as unknown as Host).listHistoricActivities = actsSpy as unknown as ListActsFn;
   importXMLMock.mockClear();
   zoomMock.mockClear();
+  addMarkerMock.mockClear();
+  removeMarkerMock.mockClear();
   destroyMock.mockClear();
   canvasGetMock.mockClear();
   viewerCtor.mockClear();
@@ -91,6 +130,7 @@ afterEach(() => {
   (api as unknown as Host).getProcessInstance = realProc;
   (api as unknown as Host).getHistoricProcessInstance = realHist;
   (api as unknown as Host).getProcessDefinitionResource = realXml;
+  (api as unknown as Host).listHistoricActivities = realActs;
   cleanup();
 });
 
@@ -111,6 +151,36 @@ const histInstance = (defId: string): FlowableHistoricProcessInstance =>
 
 const SAMPLE_XML =
   '<?xml version="1.0"?><bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"/>';
+
+// Story 26.2 — helpers for the activities page envelope.
+const activitiesPage = (
+  data: FlowableHistoricActivity[],
+): FlowablePage<FlowableHistoricActivity> => ({
+  data,
+  total: data.length,
+  start: 0,
+  size: 200,
+  sort: "startTime",
+  order: "asc",
+});
+
+const completedActivity = (id: string, activityId: string): FlowableHistoricActivity => ({
+  id,
+  activityId,
+  activityType: "userTask",
+  processInstanceId: "pi-1",
+  startTime: "2026-05-30T10:00:00.000Z",
+  endTime: "2026-05-30T10:05:00.000Z",
+  durationInMillis: 300_000,
+});
+
+const currentActivity = (id: string, activityId: string): FlowableHistoricActivity => ({
+  id,
+  activityId,
+  activityType: "userTask",
+  processInstanceId: "pi-1",
+  startTime: "2026-05-30T10:00:00.000Z",
+});
 
 // ─── Probe-helper unit tests ────────────────────────────────────────
 
@@ -269,5 +339,153 @@ describe("<InstanceDiagramPanel>", () => {
     render(<InstanceDiagramPanel instanceId="pi-1" />);
     await waitFor(() => expect(screen.getByTestId("instance-diagram-panel")).toBeInTheDocument());
     expect(screen.getByTestId("instance-diagram-canvas")).toBeInTheDocument();
+  });
+});
+
+// ─── Story 26.2 — fetchActivitiesForOverlayOrNull helper ────────────
+
+describe("fetchActivitiesForOverlayOrNull", () => {
+  it("returns the data array on success", async () => {
+    actsSpy.mockResolvedValue(
+      activitiesPage([completedActivity("a1", "Task_1"), currentActivity("a2", "Task_2")]),
+    );
+    const out = await fetchActivitiesForOverlayOrNull("pi-1");
+    expect(out).toHaveLength(2);
+    expect(actsSpy).toHaveBeenCalledWith({
+      processInstanceId: "pi-1",
+      size: 200,
+      sort: "startTime",
+    });
+  });
+
+  it("returns null on a 404", async () => {
+    actsSpy.mockRejectedValue(new FlowableError("Not found", 404));
+    const out = await fetchActivitiesForOverlayOrNull("pi-1");
+    expect(out).toBeNull();
+  });
+
+  it("propagates non-404 errors", async () => {
+    actsSpy.mockRejectedValue(new FlowableError("Boom", 500));
+    await expect(fetchActivitiesForOverlayOrNull("pi-1")).rejects.toThrow("Boom");
+  });
+});
+
+// ─── Story 26.2 — marker overlay + legend ──────────────────────────
+
+describe("<InstanceDiagramPanel> — activity overlay (Story 26.2)", () => {
+  it("applies activity-current marker for activities with no endTime", async () => {
+    procSpy.mockResolvedValue(procInstance("loan:1:abc"));
+    xmlSpy.mockResolvedValue(SAMPLE_XML);
+    actsSpy.mockResolvedValue(activitiesPage([currentActivity("a1", "Task_1")]));
+    render(<InstanceDiagramPanel instanceId="pi-1" />);
+    await waitFor(() => expect(addMarkerMock).toHaveBeenCalledWith("Task_1", "activity-current"));
+  });
+
+  it("applies activity-completed marker for activities with an endTime", async () => {
+    procSpy.mockResolvedValue(procInstance("loan:1:abc"));
+    xmlSpy.mockResolvedValue(SAMPLE_XML);
+    actsSpy.mockResolvedValue(activitiesPage([completedActivity("a1", "Task_2")]));
+    render(<InstanceDiagramPanel instanceId="pi-1" />);
+    await waitFor(() => expect(addMarkerMock).toHaveBeenCalledWith("Task_2", "activity-completed"));
+  });
+
+  it("applies the correct class for a mixed page (current + completed)", async () => {
+    procSpy.mockResolvedValue(procInstance("loan:1:abc"));
+    xmlSpy.mockResolvedValue(SAMPLE_XML);
+    actsSpy.mockResolvedValue(
+      activitiesPage([
+        completedActivity("a1", "Task_1"),
+        currentActivity("a2", "Task_2"),
+        completedActivity("a3", "Task_3"),
+      ]),
+    );
+    render(<InstanceDiagramPanel instanceId="pi-1" />);
+    await waitFor(() => expect(addMarkerMock).toHaveBeenCalledTimes(3));
+    expect(addMarkerMock).toHaveBeenCalledWith("Task_1", "activity-completed");
+    expect(addMarkerMock).toHaveBeenCalledWith("Task_2", "activity-current");
+    expect(addMarkerMock).toHaveBeenCalledWith("Task_3", "activity-completed");
+  });
+
+  it("removes previously-applied markers before applying fresh ones on reload", async () => {
+    procSpy.mockResolvedValue(procInstance("loan:1:abc"));
+    xmlSpy.mockResolvedValue(SAMPLE_XML);
+    actsSpy.mockResolvedValue(activitiesPage([currentActivity("a1", "Task_1")]));
+    render(<InstanceDiagramPanel instanceId="pi-1" />);
+    await waitFor(() => expect(addMarkerMock).toHaveBeenCalledWith("Task_1", "activity-current"));
+    // Reload activities with a different shape — the Task_1 marker should be
+    // removed before the new Task_2 marker is applied.
+    actsSpy.mockResolvedValue(activitiesPage([completedActivity("a2", "Task_2")]));
+    fireEvent.click(screen.getByTestId("instance-diagram-refresh"));
+    await waitFor(() => expect(addMarkerMock).toHaveBeenCalledWith("Task_2", "activity-completed"));
+    expect(removeMarkerMock).toHaveBeenCalledWith("Task_1", "activity-current");
+  });
+
+  it("warns once per missing activity id even across reloads", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      addMarkerMock.mockImplementation((id: string) => {
+        if (id === "Task_missing") throw new Error("element not found");
+      });
+      procSpy.mockResolvedValue(procInstance("loan:1:abc"));
+      xmlSpy.mockResolvedValue(SAMPLE_XML);
+      // mockImplementation (not mockResolvedValue) so each call returns a
+      // FRESH array reference — otherwise React.useEffect's dep comparison
+      // sees identical activities.data and skips the second marker apply.
+      actsSpy.mockImplementation(() =>
+        Promise.resolve(activitiesPage([currentActivity("a1", "Task_missing")])),
+      );
+      render(<InstanceDiagramPanel instanceId="pi-1" />);
+      await waitFor(() =>
+        expect(addMarkerMock).toHaveBeenCalledWith("Task_missing", "activity-current"),
+      );
+      await waitFor(() => expect(warnSpy).toHaveBeenCalledTimes(1));
+      // Reload with the same missing id — should NOT log a second warning.
+      fireEvent.click(screen.getByTestId("instance-diagram-refresh"));
+      await waitFor(() =>
+        expect(addMarkerMock.mock.calls.filter(([id]) => id === "Task_missing").length).toBe(2),
+      );
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      warnSpy.mockRestore();
+      addMarkerMock.mockReset();
+    }
+  });
+
+  it("renders the legend with correct completed + current counts", async () => {
+    procSpy.mockResolvedValue(procInstance("loan:1:abc"));
+    xmlSpy.mockResolvedValue(SAMPLE_XML);
+    actsSpy.mockResolvedValue(
+      activitiesPage([
+        completedActivity("a1", "Task_1"),
+        completedActivity("a2", "Task_2"),
+        currentActivity("a3", "Task_3"),
+      ]),
+    );
+    render(<InstanceDiagramPanel instanceId="pi-1" />);
+    await waitFor(() => expect(screen.getByTestId("instance-diagram-legend")).toBeInTheDocument());
+    expect(screen.getByTestId("legend-completed")).toHaveTextContent("Completed (2)");
+    expect(screen.getByTestId("legend-current")).toHaveTextContent("Current (1)");
+  });
+
+  it("hides the 'Current' swatch when only completed activities exist", async () => {
+    procSpy.mockResolvedValue(procInstance("loan:1:abc"));
+    xmlSpy.mockResolvedValue(SAMPLE_XML);
+    actsSpy.mockResolvedValue(activitiesPage([completedActivity("a1", "Task_1")]));
+    render(<InstanceDiagramPanel instanceId="pi-1" />);
+    await waitFor(() => expect(screen.getByTestId("instance-diagram-legend")).toBeInTheDocument());
+    expect(screen.getByTestId("legend-completed")).not.toHaveAttribute("hidden");
+    expect(screen.getByTestId("legend-current")).toHaveAttribute("hidden");
+  });
+
+  it("refresh re-fetches activities (plus probe + XML)", async () => {
+    procSpy.mockResolvedValue(procInstance("loan:1:abc"));
+    xmlSpy.mockResolvedValue(SAMPLE_XML);
+    actsSpy.mockResolvedValue(activitiesPage([completedActivity("a1", "Task_1")]));
+    render(<InstanceDiagramPanel instanceId="pi-1" />);
+    const btn = await screen.findByTestId("instance-diagram-refresh");
+    await waitFor(() => expect(btn).toBeEnabled());
+    fireEvent.click(btn);
+    await waitFor(() => expect(actsSpy).toHaveBeenCalledTimes(2));
+    expect(procSpy).toHaveBeenCalledTimes(2);
   });
 });

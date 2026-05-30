@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * Instance Diagram panel (Story 26.1) — ninth panel-as-sibling consumer
- * after 10.4 / 11.3 / 12.4 / 13.1-runtime / 13.1-historic / 13.2 /
+ * Instance Diagram panel (Stories 26.1 + 26.2) — ninth panel-as-sibling
+ * consumer after 10.4 / 11.3 / 12.4 / 13.1-runtime / 13.1-historic / 13.2 /
  * 13.1-historic-variables / 13.1-runtime-activities. Project decision
  * (Epic 12 retro R-2 + Epic 14 retro N=4 codification): never extract.
  *
@@ -13,30 +13,45 @@
  * strictly-read-only `bpmn-js/lib/Viewer` is the wrong fit; operators
  * need pan + zoom on real-world process diagrams.
  *
- * Sequential fetches folded into ONE useApi call (probe → historic
- * fallback for `processDefinitionId` → XML). The folded shape avoids a
- * chained-deps race that surfaced under heavy vitest parallel-worker
- * load when two useApi calls were wired with `[definitionId]` deps. All
- * fetches still funnel through `request()` per Pattern P-001 — the
- * Inspector shows two or three entries (probe + optional historic
- * fallback + XML).
+ * Sequential probe + XML fetches folded into ONE useApi call. The folded
+ * shape avoids a chained-deps race that surfaced under heavy vitest
+ * parallel-worker load when two useApi calls were wired with
+ * `[definitionId]` deps. All fetches still funnel through `request()`
+ * per Pattern P-001 — the Inspector shows two-or-three entries (probe +
+ * optional historic fallback + XML).
+ *
+ * Story 26.2 adds a SECOND useApi for activities
+ * (`api.listHistoricActivities`) — fired in parallel with the
+ * probe+XML chain, NOT chained on it. Markers are applied via
+ * `canvas.addMarker(activityId, "activity-current"|"activity-completed")`
+ * after BOTH the viewer has mounted (importXML resolved) AND activities
+ * have resolved. Classification follows the runtime-via-historic recipe
+ * (RC-13/RC-14): `endTime == null` → current, else completed. The
+ * duplicate activities call with `<InstanceHistoricActivitiesPanel>`
+ * (the 3rd sibling) is by design — CLAUDE.md "Parent-level state-gating
+ * fetches are an acceptable duplication"; threading state up would
+ * break the single-stable-identifier panel contract.
  *
  * Operator-feel decisions:
  *   - Fit-to-viewport after import + on container resize (ResizeObserver).
- *   - Refresh affordance reloads both probe + XML. Useful for
- *     redeploy-then-want-fresh-diagram scenarios — diagrams rarely
- *     change but the panel-as-sibling contract demands the affordance.
- *   - No row-count badge (diagrams aren't row-bearing) and no URL
- *     state (nothing to deep-link to).
+ *   - Refresh affordance reloads probe+XML AND activities.
+ *   - No row-count badge (diagrams aren't row-bearing) and no URL state.
+ *   - Activity overlay: thicker stroke + accent color for "current",
+ *     thinner stroke + ok-green for "completed". Stroke-width is the
+ *     constant cue across the 8 look × theme combinations; color
+ *     reinforces but doesn't carry the discrimination alone.
  *   - The panel renders whether the instance is alive OR ended — the
  *     historic-fallback probe handles the time-spanning detail-page
  *     contract (CLAUDE.md "Time-spanning detail pages use a single
  *     route + dual fetches").
+ *   - Missing-element warnings deduplicated to one console.warn per
+ *     (activityId × panel-lifetime); typical when a definition was
+ *     redeployed mid-instance and old activity ids no longer exist.
  */
 
 import NavigatedViewer from "bpmn-js/lib/NavigatedViewer";
 import React from "react";
-import { api, FlowableError } from "../api";
+import { api, type FlowableHistoricActivity, FlowableError } from "../api";
 import { Icon } from "../components";
 import { EmptyState, getEmptyState } from "../lib/empty-states";
 import { ErrorBox } from "../lib/error-box";
@@ -108,6 +123,36 @@ export const fetchInstanceDiagram = async (instanceId: string): Promise<DiagramF
   return { definitionId: probe.processDefinitionId, xml };
 };
 
+const ACTIVITIES_PAGE_SIZE = 200;
+
+/**
+ * Fetch activities for marker overlay (Story 26.2). 404 → null → skip overlay;
+ * other errors propagate (caller swallows or surfaces). Mirrors the shape of
+ * `fetchActivitiesOrNull` in `<InstanceHistoricActivitiesPanel>` per the spec's
+ * "duplicate inline rather than extract" decision (CLAUDE.md "Never extract").
+ */
+export const fetchActivitiesForOverlayOrNull = async (
+  instanceId: string,
+): Promise<FlowableHistoricActivity[] | null> => {
+  try {
+    const page = await api.listHistoricActivities({
+      processInstanceId: instanceId,
+      size: ACTIVITIES_PAGE_SIZE,
+      sort: "startTime",
+    });
+    return page.data ?? [];
+  } catch (err) {
+    if (err instanceof FlowableError && err.status === 404) return null;
+    throw err;
+  }
+};
+
+/** Classify per RC-13/RC-14 — endTime == null → current, else completed. */
+const classifyActivity = (
+  activity: FlowableHistoricActivity,
+): "activity-current" | "activity-completed" =>
+  activity.endTime == null ? "activity-current" : "activity-completed";
+
 interface Props {
   instanceId: string;
 }
@@ -117,9 +162,28 @@ export function InstanceDiagramPanel({ instanceId }: Props) {
   const definitionId = fetched.data?.definitionId ?? null;
   const xmlData = fetched.data?.xml ?? null;
 
+  // Story 26.2 — activities fetch fired in parallel with the probe+XML chain.
+  // The duplicate call with <InstanceHistoricActivitiesPanel> is by design
+  // per CLAUDE.md "Parent-level state-gating fetches are an acceptable
+  // duplication." The Inspector shows two entries against the same endpoint.
+  const activities = useApi<FlowableHistoricActivity[] | null>(
+    () => fetchActivitiesForOverlayOrNull(instanceId),
+    [instanceId],
+  );
+
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const viewerRef = React.useRef<AnyViewer | null>(null);
   const [importError, setImportError] = React.useState<Error | null>(null);
+  // Story 26.2 — track viewer-ready state so the marker effect knows when
+  // the viewer is mounted. Set after importXML resolves; cleared on
+  // viewer-effect cleanup or on XML re-fetch.
+  const [viewerReady, setViewerReady] = React.useState(false);
+  // Story 26.2 — track applied (activityId, className) pairs for cleanup
+  // on activities reload. canvas.removeMarker requires the explicit pair.
+  const appliedMarkersRef = React.useRef<Set<string>>(new Set());
+  // Story 26.2 — dedupe missing-element warnings (one per activityId per
+  // panel lifetime).
+  const warnedActivitiesRef = React.useRef<Set<string>>(new Set());
 
   // Mount the NavigatedViewer when XML resolves to a string. The effect
   // re-runs whenever the XML changes (refresh / instance switch). Cleanup
@@ -144,6 +208,7 @@ export function InstanceDiagramPanel({ instanceId }: Props) {
           /* canvas not ready — non-fatal */
         }
         setImportError(null);
+        setViewerReady(true);
         // ResizeObserver re-fits the diagram on container width changes
         // (density toggle / browser resize). Disconnected in cleanup.
         if (typeof ResizeObserver !== "undefined") {
@@ -170,13 +235,65 @@ export function InstanceDiagramPanel({ instanceId }: Props) {
         /* bpmn-js can throw on already-disposed instances under strict-mode double-mount */
       }
       viewerRef.current = null;
+      setViewerReady(false);
+      // The viewer's destroy() teardown wipes the SVG; no need to
+      // canvas.removeMarker each one. Reset bookkeeping for the next mount.
+      appliedMarkersRef.current.clear();
     };
   }, [xmlData]);
+
+  // Story 26.2 — marker overlay effect. Runs after viewer is mounted AND
+  // whenever activities resolve / re-resolve. Removes any previously-applied
+  // markers (tracked via the ref Set so we can pair-by-pair removeMarker) and
+  // applies fresh markers from activities.data. Missing-element catches are
+  // warn-once-per-(activityId, panel-lifetime).
+  React.useEffect(() => {
+    if (!viewerReady) return;
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    let canvas: AnyViewer;
+    try {
+      canvas = viewer.get("canvas");
+    } catch {
+      return;
+    }
+    // Remove previously-applied markers.
+    for (const pair of appliedMarkersRef.current) {
+      const sep = pair.indexOf("::");
+      if (sep < 0) continue;
+      const activityId = pair.slice(0, sep);
+      const className = pair.slice(sep + 2);
+      try {
+        canvas.removeMarker(activityId, className);
+      } catch {
+        /* element may have been disposed; safe to ignore */
+      }
+    }
+    appliedMarkersRef.current.clear();
+    // Apply fresh markers.
+    const list = activities.data ?? [];
+    for (const activity of list) {
+      const className = classifyActivity(activity);
+      try {
+        canvas.addMarker(activity.activityId, className);
+        appliedMarkersRef.current.add(`${activity.activityId}::${className}`);
+      } catch {
+        if (!warnedActivitiesRef.current.has(activity.activityId)) {
+          warnedActivitiesRef.current.add(activity.activityId);
+          // biome-ignore lint/suspicious/noConsole: warn-once for missing diagram element (AC-6)
+          console.warn(
+            `[InstanceDiagramPanel] activity ${activity.activityId} not found in current diagram XML — older version?`,
+          );
+        }
+      }
+    }
+  }, [viewerReady, activities.data]);
 
   const reload = React.useCallback(() => {
     setImportError(null);
     fetched.reload();
-  }, [fetched.reload]);
+    activities.reload();
+  }, [fetched.reload, activities.reload]);
 
   const loading = fetched.loading;
   const error = fetched.error ?? importError;
@@ -188,6 +305,13 @@ export function InstanceDiagramPanel({ instanceId }: Props) {
   const emptyNoXml =
     !loading && !error && fetched.data?.definitionId != null && fetched.data?.xml === null;
   const hasData = !loading && !error && !emptyNoDefinition && !emptyNoXml && xmlData != null;
+
+  // Story 26.2 — legend counts. Computed from activities.data which fetches
+  // in parallel with probe+XML, so may be null when the diagram is otherwise
+  // ready — that's fine; legend hides until activities lands.
+  const activityList = activities.data ?? [];
+  const completedCount = activityList.filter((a) => a.endTime != null).length;
+  const currentCount = activityList.filter((a) => a.endTime == null).length;
 
   return (
     <div className="panel" data-testid="instance-diagram-panel" style={{ marginTop: 18 }}>
@@ -247,6 +371,27 @@ export function InstanceDiagramPanel({ instanceId }: Props) {
           data-testid="instance-diagram-canvas"
           style={hasData ? undefined : { display: "none" }}
         />
+        {/* Story 26.2 — legend below the canvas. Rendered in the data
+            state. Each swatch carries a sr-only "Legend:" prefix per
+            Story 18.2 codification; visual swatches hidden when their
+            count is zero but the landmark survives for AT users. */}
+        {hasData && (
+          <div className="instance-diagram-legend" data-testid="instance-diagram-legend">
+            <span className="sr-only">Legend: </span>
+            <span
+              data-testid="legend-completed"
+              hidden={completedCount === 0}
+              style={{ marginRight: 12 }}
+            >
+              <span className="legend-swatch legend-completed" aria-hidden="true" />
+              <span style={{ fontSize: 11 }}>Completed ({completedCount})</span>
+            </span>
+            <span data-testid="legend-current" hidden={currentCount === 0}>
+              <span className="legend-swatch legend-current" aria-hidden="true" />
+              <span style={{ fontSize: 11 }}>Current ({currentCount})</span>
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

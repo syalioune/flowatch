@@ -186,6 +186,51 @@ test.describe("/instances/$id dual-fetch sibling pattern (Story 13.1)", () => {
     await expect(canvas.locator(".djs-container")).toBeAttached({ timeout: 15_000 });
   });
 
+  test("diagram overlay paints activity-current + activity-completed markers (Story 26.2)", async ({
+    page,
+  }) => {
+    const fresh = await startInstance(`${BUSINESS_KEY}-26-2-overlay`);
+    try {
+      await page.goto(`/instances/${fresh.id}`);
+      const canvas = page.getByTestId("instance-diagram-canvas");
+      await expect(canvas).toBeVisible({ timeout: 15_000 });
+      // loan-approval's startEvent fires + completes immediately; the userTask
+      // is the in-flight current activity awaiting approval. Both classes
+      // should be applied to the bpmn-js SVG groups.
+      await expect(canvas.locator(".djs-element.activity-completed").first()).toBeAttached({
+        timeout: 15_000,
+      });
+      await expect(canvas.locator(".djs-element.activity-current").first()).toBeAttached({
+        timeout: 15_000,
+      });
+      // Legend mirrors the overlay state: at least the Current swatch is visible.
+      const legend = page.getByTestId("instance-diagram-legend");
+      await expect(legend).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByTestId("legend-current")).toContainText(/Current \(\d+\)/);
+    } finally {
+      await cancelInstance(fresh.id);
+    }
+  });
+
+  test("diagram overlay paints completed-only on an ENDED instance (Story 26.2)", async ({
+    page,
+  }) => {
+    const fresh = await startInstance(`${BUSINESS_KEY}-26-2-ended-overlay`);
+    await cancelInstance(fresh.id);
+    const endedId = await getEndedId(`${BUSINESS_KEY}-26-2-ended-overlay`);
+    await page.goto(`/instances/${endedId}`);
+    const canvas = page.getByTestId("instance-diagram-canvas");
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect(canvas.locator(".djs-element.activity-completed").first()).toBeAttached({
+      timeout: 15_000,
+    });
+    // Cancelled instances have no current activities; the legend's Current
+    // swatch is hidden via the `hidden` attribute.
+    const legend = page.getByTestId("instance-diagram-legend");
+    await expect(legend).toBeVisible();
+    await expect(page.getByTestId("legend-current")).toBeHidden();
+  });
+
   test("activities Refresh button fires a second fetch (Story 13.2)", async ({ page }) => {
     const fresh = await startInstance(`${BUSINESS_KEY}-13-2-refresh`);
     try {
