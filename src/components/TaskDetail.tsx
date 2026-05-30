@@ -19,6 +19,7 @@ import { EditTaskModal } from "../lib/edit-task-modal";
 import { ErrorBox } from "../lib/error-box";
 import { NAV_INVALIDATE_COUNTS } from "../lib/nav-events";
 import { useApi } from "../lib/useApi";
+import { TaskAttachmentsPanel } from "./TaskAttachmentsPanel";
 import { TaskFormPanel } from "./TaskFormPanel";
 
 interface Props {
@@ -279,6 +280,7 @@ export function TaskDetail({ task, reload }: Props) {
           )}
         </div>
       </div>
+      <TaskAttachmentsPanel taskId={t.id} />
       <DelegateTaskModal
         task={delegateTarget}
         triggerRef={delegateButtonRef}
