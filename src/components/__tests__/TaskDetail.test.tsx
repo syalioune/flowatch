@@ -208,4 +208,49 @@ describe("<TaskDetail> — Story 11.4 surface", () => {
       }
     });
   });
+
+  describe("Story 21.1 — Edit task surface", () => {
+    it("renders the Edit task button with the documented testid", () => {
+      render(<TaskDetail task={baseTask} reload={reload} />);
+      expect(screen.getByTestId("edit-task")).toBeInTheDocument();
+    });
+
+    it("clicking Edit task opens the modal", async () => {
+      const user = userEvent.setup();
+      render(<TaskDetail task={baseTask} reload={reload} />);
+      await user.click(screen.getByTestId("edit-task"));
+      await waitFor(() => expect(screen.getByTestId("edit-task-modal")).toBeInTheDocument());
+    });
+
+    it("renders Owner row with task.owner", () => {
+      render(<TaskDetail task={{ ...baseTask, owner: "owner-x" }} reload={reload} />);
+      const ownerLabel = screen.getByText("Owner");
+      const row = ownerLabel.closest("tr");
+      expect(row?.textContent).toContain("owner-x");
+    });
+
+    it("renders Owner row with em-dash fallback when owner is missing", () => {
+      render(<TaskDetail task={baseTask} reload={reload} />);
+      const ownerLabel = screen.getByText("Owner");
+      const row = ownerLabel.closest("tr");
+      expect(row?.textContent).toContain("—");
+    });
+
+    it("renders Due date row with formatted dueDate", () => {
+      render(
+        <TaskDetail task={{ ...baseTask, dueDate: "2026-06-01T09:00:00.000Z" }} reload={reload} />,
+      );
+      const dueLabel = screen.getByText("Due date");
+      const row = dueLabel.closest("tr");
+      // fmtDue produces a non-empty formatted string.
+      expect(row?.textContent?.length).toBeGreaterThan("Due date".length);
+    });
+
+    it("renders Due date row with em-dash fallback when dueDate is missing", () => {
+      render(<TaskDetail task={baseTask} reload={reload} />);
+      const dueLabel = screen.getByText("Due date");
+      const row = dueLabel.closest("tr");
+      expect(row?.textContent).toContain("—");
+    });
+  });
 });

@@ -38,6 +38,7 @@ Every call — success or failure — pushes an entry into `API_LOG` and fires a
 | `getProcessInstanceVariables(id)`          | GET    | `/runtime/process-instances/{id}/variables`           |                                             |
 | `listTasks(params)`                        | GET    | `/runtime/tasks`                                      | Used both for screens and for `navCounts`   |
 | `taskAction(taskId, action, body)`         | POST   | `/runtime/tasks/{taskId}`                             | Body: `{ action, ...extra }`. Actions: `claim`, `complete`, `delegate`, `resolve`, `unclaim` |
+| `updateTask(id, fields)`                   | PUT    | `/runtime/tasks/{id}`                                 | Body `Partial<{priority, dueDate, owner, assignee}>` (FR-44). Same URL as `taskAction` — engine discriminates by HTTP method (POST action-verbs vs PUT field-patches). Returns the echoed FlowableTask. Throws if `fields` is empty. |
 | `getTaskVariables(taskId)`                 | GET    | `/runtime/tasks/{taskId}/variables`                   |                                             |
 
 ## Form
