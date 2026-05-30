@@ -160,12 +160,4 @@ test.describe("/definitions Edit category (Story 20.1)", () => {
     await expect(dialog).toHaveAttribute("aria-modal", "true");
     await expect(dialog).toHaveAttribute("aria-labelledby", "edit-category-title");
   });
-
-  // Test 4 — failure path: SKIPPED per spec T-9.2. The Flowable engine accepts
-  // `{category}` PUTs on suspended definitions and on definitions with any
-  // existing state; the only realistic rejection path is PUT against a
-  // deleted definition id, which can't be reproduced through the operator UI
-  // (the row is gone). The live-engine probe in T-10 documents the verbatim
-  // error message for posterity, but Playwright UI can't reach that state.
-  test.skip("failure path — no realistic engine-rejection scenario via the UI", () => {});
 });
