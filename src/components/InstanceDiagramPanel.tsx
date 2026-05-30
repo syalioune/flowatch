@@ -51,7 +51,7 @@
 
 import NavigatedViewer from "bpmn-js/lib/NavigatedViewer";
 import React from "react";
-import { api, type FlowableHistoricActivity, FlowableError } from "../api";
+import { api, FlowableError, type FlowableHistoricActivity } from "../api";
 import { Icon } from "../components";
 import { EmptyState, getEmptyState } from "../lib/empty-states";
 import { ErrorBox } from "../lib/error-box";
