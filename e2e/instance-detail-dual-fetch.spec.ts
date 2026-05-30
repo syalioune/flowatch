@@ -203,6 +203,22 @@ test.describe("/instances/$id dual-fetch sibling pattern (Story 13.1)", () => {
       await expect(canvas.locator(".djs-element.activity-current").first()).toBeAttached({
         timeout: 15_000,
       });
+      // Regression guard: bpmn-js applies stroke via INLINE style attribute,
+      // so the marker CSS needs `!important` to actually paint. Verify the
+      // computed stroke on the current-task primary visual is the design-
+      // system accent color (oklch), not the default near-black.
+      const currentStroke = await canvas
+        .locator(".djs-element.activity-current .djs-visual > :nth-child(1)")
+        .first()
+        .evaluate((el) => getComputedStyle(el).stroke);
+      expect(currentStroke).toMatch(/^oklch\(/);
+      // Same regression guard for completed sequence flows — first child of
+      // .djs-visual is <defs>, so the path needs to be targeted directly.
+      const completedConnStroke = await canvas
+        .locator(".djs-element.djs-connection.activity-completed .djs-visual path")
+        .first()
+        .evaluate((el) => getComputedStyle(el).stroke);
+      expect(completedConnStroke).toMatch(/^oklch\(/);
       // Legend mirrors the overlay state: at least the Current swatch is visible.
       const legend = page.getByTestId("instance-diagram-legend");
       await expect(legend).toBeVisible({ timeout: 15_000 });

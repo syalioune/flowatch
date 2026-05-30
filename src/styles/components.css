@@ -571,31 +571,35 @@
 /* Story 26.2 — Activity overlay markers + legend.
    `canvas.addMarker(activityId, "activity-{current,completed}")` from
    bpmn-js applies the class to the rendered `<g class="djs-element">`
-   group. We target the primary visual via `.djs-visual > :nth-child(1)`
-   which is the documented bpmn-io highlight pattern.
+   group. bpmn-js' BpmnRenderer sets `stroke` / `fill` via INLINE STYLE
+   attributes on the rendered SVG primitives, so CSS rules need
+   `!important` to override — consistent with diagram-js' own
+   `connect-ok` / `drop-ok` / `attach-ok` marker rules.
    Token reuse: `var(--accent)` for current (focal point) + `var(--ok)`
    for completed. Stroke-width carries the discrimination — color
    reinforces. No new tokens added in 26.2 (8 look × theme audit owed
    for Story 32.x if needed). */
 .djs-element.activity-completed .djs-visual > :nth-child(1) {
-  stroke: var(--ok);
-  stroke-width: 2.5;
-  fill-opacity: 0.08;
-  fill: var(--ok);
+  stroke: var(--ok) !important;
+  stroke-width: 2.5px !important;
+  fill: var(--ok) !important;
+  fill-opacity: 0.12 !important;
 }
 .djs-element.activity-current .djs-visual > :nth-child(1) {
-  stroke: var(--accent);
-  stroke-width: 3;
+  stroke: var(--accent) !important;
+  stroke-width: 3px !important;
 }
-/* Connections (sequence flows) also receive the marker class; restrict
-   to the primary path child so labels don't double-stroke. */
-.djs-connection.activity-completed .djs-visual > path {
-  stroke: var(--ok);
-  stroke-width: 2.5;
+/* Connections (sequence flows + message flows) — the first child of
+   `.djs-visual` is `<defs>` for the arrowhead, not the actual path.
+   Target the `<path>` directly so the stroke override paints the
+   visible line. */
+.djs-connection.activity-completed .djs-visual path {
+  stroke: var(--ok) !important;
+  stroke-width: 2.5px !important;
 }
-.djs-connection.activity-current .djs-visual > path {
-  stroke: var(--accent);
-  stroke-width: 3;
+.djs-connection.activity-current .djs-visual path {
+  stroke: var(--accent) !important;
+  stroke-width: 3px !important;
 }
 
 .instance-diagram-legend {
