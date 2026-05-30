@@ -42,6 +42,7 @@ import {
 const {
   importXMLMock,
   zoomMock,
+  resizedMock,
   addMarkerMock,
   removeMarkerMock,
   destroyMock,
@@ -50,11 +51,13 @@ const {
 } = vi.hoisted(() => {
   const importXMLMock = vi.fn().mockResolvedValue({ warnings: [] });
   const zoomMock = vi.fn();
+  const resizedMock = vi.fn();
   const addMarkerMock = vi.fn();
   const removeMarkerMock = vi.fn();
   const destroyMock = vi.fn();
   const canvasGetMock = vi.fn().mockReturnValue({
     zoom: zoomMock,
+    resized: resizedMock,
     addMarker: addMarkerMock,
     removeMarker: removeMarkerMock,
   });
@@ -66,6 +69,7 @@ const {
   return {
     importXMLMock,
     zoomMock,
+    resizedMock,
     addMarkerMock,
     removeMarkerMock,
     destroyMock,
@@ -119,6 +123,7 @@ beforeEach(() => {
   (api as unknown as Host).listHistoricActivities = actsSpy as unknown as ListActsFn;
   importXMLMock.mockClear();
   zoomMock.mockClear();
+  resizedMock.mockClear();
   addMarkerMock.mockClear();
   removeMarkerMock.mockClear();
   destroyMock.mockClear();
@@ -301,6 +306,11 @@ describe("<InstanceDiagramPanel>", () => {
 
     await waitFor(() => expect(importXMLMock).toHaveBeenCalledWith(SAMPLE_XML));
     await waitFor(() => expect(zoomMock).toHaveBeenCalledWith("fit-viewport", "auto"));
+    // Regression guard: canvas.resized() MUST run before zoom("fit-viewport")
+    // so bpmn-js' cached viewbox is invalidated against the current container
+    // dimensions. Without it, fit-viewport measures against stale bounds and
+    // produces a tiny diagram (smoke-test bug).
+    expect(resizedMock).toHaveBeenCalled();
     expect(viewerCtor).toHaveBeenCalledTimes(1);
     const ctorArg = viewerCtor.mock.calls[0]?.[0] as { container?: HTMLElement } | undefined;
     expect(ctorArg?.container).toBeInstanceOf(HTMLElement);

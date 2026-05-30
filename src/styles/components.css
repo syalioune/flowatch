@@ -543,19 +543,30 @@
 }
 
 /* InstanceDiagramPanel (Story 26.1) — read-only NavigatedViewer host.
-   Height bounds prevent the panel from exploding on very large diagrams
-   while leaving the bpmn-js pan + mouse-wheel zoom intact. The skeleton
-   reuses the @keyframes shimmer defined above for the kpi / table
-   skeletons (Pattern P-007 — single keyframe definition). */
+   Explicit `height` (not `min-height`) is REQUIRED — bpmn-js' inner
+   `.djs-container` resolves `height: 100%` against the containing
+   block's height, and `min-height` does NOT establish that. With only
+   `min-height`, `.djs-container` collapses to its SVG content's
+   intrinsic size and `canvas.zoom("fit-viewport")` measures against
+   the wrong height, producing a tiny viewBox.
+   The skeleton reuses the @keyframes shimmer defined above for the
+   kpi / table skeletons (Pattern P-007 — single keyframe definition). */
 .instance-diagram-canvas {
-  min-height: 320px;
-  max-height: 600px;
+  height: 480px;
   width: 100%;
   background: var(--bg);
   border-radius: var(--r-sm);
+  position: relative; /* gives `.djs-container`'s `position: absolute` (if set) a frame */
+}
+/* bpmn-js / diagram-js don't ship any CSS for .djs-container — host pages
+   own its sizing. Make it fill our explicit-height container so the
+   fit-viewport calculation measures against the real available area. */
+.instance-diagram-canvas .djs-container {
+  width: 100%;
+  height: 100%;
 }
 .diagram-skeleton {
-  min-height: 320px;
+  height: 480px;
   width: 100%;
   background: linear-gradient(90deg, var(--bg-elev) 25%, var(--bg-hover) 50%, var(--bg-elev) 75%);
   background-size: 200% 100%;
@@ -575,19 +586,21 @@
    attributes on the rendered SVG primitives, so CSS rules need
    `!important` to override — consistent with diagram-js' own
    `connect-ok` / `drop-ok` / `attach-ok` marker rules.
-   Token reuse: `var(--accent)` for current (focal point) + `var(--ok)`
-   for completed. Stroke-width carries the discrimination — color
-   reinforces. No new tokens added in 26.2 (8 look × theme audit owed
-   for Story 32.x if needed). */
+   Token choice mirrors industry BPMN-tool convention: GREEN (--ok) for
+   completed + ORANGE/YELLOW (--warn) for current. Distinct hues
+   (~145° vs ~70-80°) AND distinct fill tints so the two classes pop
+   apart at-a-glance across all 8 look × theme combinations. */
 .djs-element.activity-completed .djs-visual > :nth-child(1) {
   stroke: var(--ok) !important;
   stroke-width: 2.5px !important;
   fill: var(--ok) !important;
-  fill-opacity: 0.12 !important;
+  fill-opacity: 0.16 !important;
 }
 .djs-element.activity-current .djs-visual > :nth-child(1) {
-  stroke: var(--accent) !important;
-  stroke-width: 3px !important;
+  stroke: var(--warn) !important;
+  stroke-width: 3.5px !important;
+  fill: var(--warn) !important;
+  fill-opacity: 0.22 !important;
 }
 /* Connections (sequence flows + message flows) — the first child of
    `.djs-visual` is `<defs>` for the arrowhead, not the actual path.
@@ -598,8 +611,8 @@
   stroke-width: 2.5px !important;
 }
 .djs-connection.activity-current .djs-visual path {
-  stroke: var(--accent) !important;
-  stroke-width: 3px !important;
+  stroke: var(--warn) !important;
+  stroke-width: 3.5px !important;
 }
 
 .instance-diagram-legend {
@@ -620,11 +633,11 @@
 }
 .legend-completed {
   border-color: var(--ok);
-  background: color-mix(in oklch, var(--ok) 12%, transparent);
+  background: color-mix(in oklch, var(--ok) 16%, transparent);
 }
 .legend-current {
-  border-color: var(--accent);
-  background: color-mix(in oklch, var(--accent) 8%, transparent);
+  border-color: var(--warn);
+  background: color-mix(in oklch, var(--warn) 22%, transparent);
 }
 
 /* RowActionMenu (Story 9.1) — keyboard-accessible `⋮` per-row action menu.

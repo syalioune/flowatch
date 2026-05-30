@@ -203,7 +203,15 @@ export function InstanceDiagramPanel({ instanceId }: Props) {
         await viewer.importXML(xmlData);
         if (cancelled) return;
         try {
-          viewer.get("canvas").zoom("fit-viewport", "auto");
+          const canvas = viewer.get("canvas");
+          // canvas.resized() invalidates bpmn-js' cached viewbox so the
+          // subsequent fit-viewport measures against the current container
+          // dimensions — required because the canvas may have been created
+          // before the surrounding layout settled (e.g. parent panel just
+          // exited the loading branch). Without this, fit-viewport keeps
+          // using stale container measurements and produces a tiny SVG.
+          canvas.resized();
+          canvas.zoom("fit-viewport", "auto");
         } catch {
           /* canvas not ready — non-fatal */
         }
@@ -214,7 +222,9 @@ export function InstanceDiagramPanel({ instanceId }: Props) {
         if (typeof ResizeObserver !== "undefined") {
           observer = new ResizeObserver(() => {
             try {
-              viewer?.get("canvas").zoom("fit-viewport", "auto");
+              const canvas = viewer?.get("canvas");
+              canvas?.resized();
+              canvas?.zoom("fit-viewport", "auto");
             } catch {
               /* canvas torn down mid-resize — ignore */
             }
