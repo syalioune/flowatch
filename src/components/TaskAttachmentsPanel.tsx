@@ -16,16 +16,35 @@
 
 import { useRef, useState } from "react";
 import { api, type FlowableAttachment } from "../api";
-import { fmtTime, Icon } from "../components";
+import { fmtTime, Icon, toast } from "../components";
 import { AddAttachmentModal } from "../lib/add-attachment-modal";
+import { DeleteAttachmentModal } from "../lib/delete-attachment-modal";
 import { EmptyState, getEmptyState } from "../lib/empty-states";
 import { ErrorBox } from "../lib/error-box";
+import { RowActionMenu } from "../lib/row-action-menu";
 import { TableSkeleton } from "../lib/table-skeleton";
 import { useApi } from "../lib/useApi";
 
 interface Props {
   taskId: string;
 }
+
+// Story 21.3 inline binary-download trigger — duplicated from
+// <BpmnResourcesPanel> Story 9.6 (N=2 consumer; NOT extracted per CLAUDE.md
+// "Three similar lines is better than a premature abstraction").
+const triggerBlobDownload = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  try {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+};
 
 const renderSource = (a: FlowableAttachment) => {
   if (a.externalUrl) {
@@ -48,7 +67,34 @@ export function TaskAttachmentsPanel({ taskId }: Props) {
   const attachments = useApi(() => api.listTaskAttachments(taskId), [taskId]);
   const list = attachments.data ?? [];
   const [addOpen, setAddOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<FlowableAttachment | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
   const addBtnRef = useRef<HTMLButtonElement>(null);
+  const rowTriggerRef = useRef<HTMLElement | null>(null);
+
+  const handleDownload = async (attachment: FlowableAttachment) => {
+    setDownloading(attachment.id);
+    try {
+      const res = await api.getTaskAttachmentContent(taskId, attachment.id);
+      const blob = await res.blob();
+      triggerBlobDownload(blob, attachment.name || attachment.id);
+    } catch (err) {
+      toast({
+        kind: "err",
+        text: "Download failed",
+        sub: (err as Error)?.message ?? String(err),
+        ttl: 8000,
+      });
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  const handleOpenLink = (attachment: FlowableAttachment) => {
+    if (attachment.externalUrl) {
+      window.open(attachment.externalUrl, "_blank", "noopener,noreferrer");
+    }
+  };
 
   return (
     <div className="panel" data-testid="task-attachments-panel" style={{ marginTop: 18 }}>
@@ -101,26 +147,65 @@ export function TaskAttachmentsPanel({ taskId }: Props) {
                 <th scope="col">Type</th>
                 <th scope="col">Source</th>
                 <th scope="col">Time</th>
+                <th scope="col"></th>
               </tr>
             </thead>
             <tbody>
-              {list.map((a) => (
-                <tr key={a.id} data-attachment-id={a.id}>
-                  <td>
-                    <span className="mono">{a.name || <span className="mute">—</span>}</span>
-                  </td>
-                  <td>
-                    <span className="badge" data-tone="mute">
-                      <span className="sr-only">Type: </span>
-                      {a.type ?? "—"}
-                    </span>
-                  </td>
-                  <td>{renderSource(a)}</td>
-                  <td className="mono">
-                    {a.time ? fmtTime(a.time) : <span className="mute">—</span>}
-                  </td>
-                </tr>
-              ))}
+              {list.map((a) => {
+                const isUrl = !!a.externalUrl;
+                const downloadLabel = isUrl ? "Open link" : "Download";
+                return (
+                  <tr key={a.id} data-attachment-id={a.id}>
+                    <td>
+                      <span className="mono">{a.name || <span className="mute">—</span>}</span>
+                    </td>
+                    <td>
+                      <span className="badge" data-tone="mute">
+                        <span className="sr-only">Type: </span>
+                        {a.type ?? "—"}
+                      </span>
+                    </td>
+                    <td>{renderSource(a)}</td>
+                    <td className="mono">
+                      {a.time ? fmtTime(a.time) : <span className="mute">—</span>}
+                    </td>
+                    <td
+                      onClick={(e) => {
+                        const target = e.target as HTMLElement;
+                        const trigger = target.closest<HTMLButtonElement>(
+                          '[data-testid="row-action-trigger"]',
+                        );
+                        if (trigger) rowTriggerRef.current = trigger;
+                      }}
+                      onKeyDown={(e) => {
+                        const target = e.target as HTMLElement;
+                        const trigger = target.closest<HTMLButtonElement>(
+                          '[data-testid="row-action-trigger"]',
+                        );
+                        if (trigger) rowTriggerRef.current = trigger;
+                      }}
+                    >
+                      <RowActionMenu
+                        ariaLabel={`Open actions for ${a.name || a.id}`}
+                        items={[
+                          {
+                            label: downloadLabel,
+                            onSelect: () => (isUrl ? handleOpenLink(a) : handleDownload(a)),
+                            disabled: downloading === a.id,
+                            testId: `attachment-download-${a.id}`,
+                          },
+                          {
+                            label: "Delete…",
+                            onSelect: () => setDeleteTarget(a),
+                            danger: true,
+                            testId: `attachment-delete-${a.id}`,
+                          },
+                        ]}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
@@ -131,6 +216,14 @@ export function TaskAttachmentsPanel({ taskId }: Props) {
         onClose={() => setAddOpen(false)}
         onSuccess={() => attachments.reload()}
         triggerRef={addBtnRef}
+      />
+      <DeleteAttachmentModal
+        attachment={deleteTarget}
+        taskId={taskId}
+        onClose={() => setDeleteTarget(null)}
+        onSettled={() => attachments.reload()}
+        triggerRef={rowTriggerRef}
+        fallbackRef={addBtnRef}
       />
     </div>
   );

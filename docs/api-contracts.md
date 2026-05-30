@@ -42,6 +42,8 @@ Every call — success or failure — pushes an entry into `API_LOG` and fires a
 | `getTaskVariables(taskId)`                 | GET    | `/runtime/tasks/{taskId}/variables`                   |                                             |
 | `listTaskAttachments(taskId)`              | GET    | `/runtime/tasks/{taskId}/attachments`                 | Bare array response (NOT envelope). (FR-45). |
 | `addTaskAttachment(taskId, payload)`       | POST   | `/runtime/tasks/{taskId}/attachments`                 | Body discriminated: `kind="url"` → JSON `{name, description?, type?, externalUrl}`; `kind="file"` → multipart FormData with `name` / `description?` / `type?` / `content`. Mirrors `uploadDeployment`'s multipart envelope inside src/api.ts (Pattern P-001 preserved). Returns FlowableAttachment. (FR-45). |
+| `getTaskAttachmentContent(taskId, attachmentId)` | GET | `/runtime/tasks/{taskId}/attachments/{attachmentId}/content` | Binary `asResponse:true` (caller picks `.blob()`/`.text()`). (FR-45). |
+| `deleteTaskAttachment(taskId, attachmentId)` | DELETE | `/runtime/tasks/{taskId}/attachments/{attachmentId}` | `204 No Content`. Symmetric with `addTaskAttachment`. (FR-45). |
 
 ## Form
 
