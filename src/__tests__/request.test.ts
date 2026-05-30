@@ -378,6 +378,60 @@ describe("api.* wrappers smoke (P-001 — every call goes through request())", (
     expect(init.body).toBe('{"category":""}');
   });
 
+  it("Story 20.1: getProcessDefinitionFresh resolves via the LIST endpoint (RC-16 happy path)", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 200,
+        json: {
+          data: [
+            { id: "other:1:abc", key: "loan", version: 1 },
+            { id: "loan:2:xyz", key: "loan", version: 2, category: "finance" },
+          ],
+          total: 2,
+        },
+      }),
+    );
+    const out = await api.getProcessDefinitionFresh("loan:2:xyz");
+    const [url] = fetchMock.mock.calls[0] as [string];
+    // LIST endpoint, filtered by `key` extracted from id (split on ':' [0]).
+    expect(url).toContain("/repository/process-definitions");
+    expect(url).toContain("key=loan");
+    expect(url).toContain("size=200");
+    // Single fetch — find() resolves; no fallthrough.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(out).toMatchObject({ id: "loan:2:xyz", category: "finance" });
+  });
+
+  it("Story 20.1: getProcessDefinitionFresh falls through to single-GET when LIST yields no match", async () => {
+    fetchMock.mockReset();
+    // LIST returns empty (or unrelated rows) → find() returns undefined →
+    // fallthrough single-GET fires.
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, json: { data: [], total: 0 } }));
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 200,
+        json: { id: "loan:9:zzz", key: "loan", version: 9, category: "fallback" },
+      }),
+    );
+    const out = await api.getProcessDefinitionFresh("loan:9:zzz");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [fallbackUrl] = fetchMock.mock.calls[1] as [string];
+    expect(fallbackUrl).toBe(`${DEFAULT_BASE}/repository/process-definitions/loan:9:zzz`);
+    expect(out).toMatchObject({ id: "loan:9:zzz", category: "fallback" });
+  });
+
+  it("Story 20.1: updateProcessDefinition throws synchronously when fields object is empty", async () => {
+    fetchMock.mockReset();
+    // Empty body would collide with the suspend/activate body discriminator
+    // on the same wire URL; the wrapper rejects at its boundary.
+    expect(() => api.updateProcessDefinition("def-1", {})).toThrow(
+      "updateProcessDefinition requires at least one field",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(API_LOG.length).toBe(0);
+  });
+
   it("Story 20.1: updateProcessDefinition surfaces 4xx engine bodies as FlowableError", async () => {
     const engineBody = '{"message":"Bad request","exception":"definition not found"}';
     fetchMock.mockReset();
