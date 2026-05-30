@@ -729,6 +729,49 @@ const listTasks = (params?: QueryParams) =>
 const getTask = (id: string) => request<FlowableTask>("GET", `/runtime/tasks/${id}`);
 const taskAction = (taskId: string, action: string, body?: Record<string, unknown>) =>
   request<FlowableTask>("POST", `/runtime/tasks/${taskId}`, { body: { action, ...(body ?? {}) } });
+/**
+ * Story 21.1: edit fields on a runtime task (priority / dueDate / owner /
+ * assignee).
+ *
+ * Funnels `PUT /runtime/tasks/{id}` through `request()` with a partial-fields
+ * body (e.g. `{priority: 75, dueDate: null}`). Nullable string + datetime
+ * fields use `null` to clear — verified live on flowable-rest 7.2.0 per
+ * docs/compat.md FR-44 + the T-9 probe. Empty-string is silently coerced to
+ * `null` by the engine; the wrapper sends `null` for clarity.
+ *
+ * Two-method endpoint duality with `taskAction` (Story 11.x): both wrappers
+ * hit the SAME wire URL `/runtime/tasks/{id}`, but discriminated by HTTP
+ * method:
+ *   - POST {action: "claim" | "complete" | "delegate" | "resolve" | "unclaim"}
+ *     → action-verb path (`taskAction`)
+ *   - PUT  {<field>: <value>}
+ *     → field-patch path (`updateTask`)
+ * Per CLAUDE.md "Operator-feel UI labels can diverge from wire-level action
+ * verbs" (Story 12.2 codification), the two operator-feel actions get
+ * distinct wrappers. The `fields` parameter shape allows future scope
+ * extensions (name, description, category, parentTaskId, tenantId per
+ * compat.md line 61) to land as a type-level addition without churn.
+ *
+ * Priority is numeric (Flowable default = 50); the engine accepts 0-100 but
+ * the wrapper does NOT pre-validate — operator typos surface as engine 4xx.
+ * `dueDate` is ISO-8601 UTC; the caller is responsible for the local→UTC
+ * round-trip (see `<EditTaskModal>` + Story 12.2 `<input type="datetime-local">`
+ * convention).
+ *
+ * Engine response: `200 OK` with the echoed FlowableTask body.
+ */
+const updateTask = (
+  id: string,
+  fields: Partial<{
+    priority: number;
+    dueDate: string | null;
+    owner: string | null;
+    assignee: string | null;
+  }>,
+) => {
+  if (Object.keys(fields).length === 0) throw new Error("updateTask requires at least one field");
+  return request<FlowableTask>("PUT", `/runtime/tasks/${id}`, { body: fields });
+};
 const getTaskVariables = (taskId: string) =>
   request<FlowableVariable[]>("GET", `/runtime/tasks/${taskId}/variables`);
 
@@ -1111,6 +1154,7 @@ export const api = {
   listTasks,
   getTask,
   taskAction,
+  updateTask,
   getTaskVariables,
   // Form
   getTaskForm,

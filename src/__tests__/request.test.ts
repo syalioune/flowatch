@@ -444,6 +444,90 @@ describe("api.* wrappers smoke (P-001 — every call goes through request())", (
     expect(API_LOG[0]?.error).toBe(engineBody);
   });
 
+  it("Story 21.1: updateTask PUTs a single-field body and resolves to echoed task", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 200,
+        json: {
+          id: "task-1",
+          name: "Approve",
+          priority: 75,
+          createTime: "2026-01-01T00:00:00.000Z",
+        },
+      }),
+    );
+    const out = await api.updateTask("task-1", { priority: 75 });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${DEFAULT_BASE}/runtime/tasks/task-1`);
+    expect(init.method).toBe("PUT");
+    expect(init.body).toBe(JSON.stringify({ priority: 75 }));
+    expect((init.headers as Record<string, string>).Authorization).toMatch(/^Basic /);
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+    expect(API_LOG[0]?.method).toBe("PUT");
+    expect(API_LOG[0]?.path).toBe("/runtime/tasks/task-1");
+    expect(API_LOG[0]?.body).toEqual({ priority: 75 });
+    expect(out).toMatchObject({ id: "task-1", priority: 75 });
+  });
+
+  it("Story 21.1: updateTask PUTs an explicit null to clear a nullable field", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 200,
+        json: { id: "task-1", name: "n", priority: 50, createTime: "2026-01-01T00:00:00.000Z" },
+      }),
+    );
+    await api.updateTask("task-1", { dueDate: null });
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(init.body).toBe('{"dueDate":null}');
+  });
+
+  it("Story 21.1: updateTask PUTs a multi-field diff with explicit nulls preserved", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 200,
+        json: { id: "task-1", name: "n", priority: 50, createTime: "2026-01-01T00:00:00.000Z" },
+      }),
+    );
+    await api.updateTask("task-1", { owner: null, assignee: null });
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(init.body).toBe('{"owner":null,"assignee":null}');
+  });
+
+  it("Story 21.1: updateTask sends ISO-8601 dueDate verbatim", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 200,
+        json: { id: "task-1", name: "n", priority: 50, createTime: "2026-01-01T00:00:00.000Z" },
+      }),
+    );
+    await api.updateTask("task-1", { dueDate: "2026-06-01T09:00:00.000Z" });
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(init.body).toBe('{"dueDate":"2026-06-01T09:00:00.000Z"}');
+  });
+
+  it("Story 21.1: updateTask throws synchronously when fields object is empty", () => {
+    fetchMock.mockReset();
+    expect(() => api.updateTask("task-1", {})).toThrow("updateTask requires at least one field");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(API_LOG.length).toBe(0);
+  });
+
+  it("Story 21.1: updateTask surfaces 4xx engine bodies as FlowableError", async () => {
+    const engineBody = '{"message":"Forbidden","exception":"task is suspended"}';
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue(mockResponse({ status: 403, body: engineBody }));
+    await expect(api.updateTask("task-gone", { priority: 1 })).rejects.toMatchObject({
+      status: 403,
+      message: engineBody,
+    });
+    expect(API_LOG[0]?.status).toBe(403);
+    expect(API_LOG[0]?.error).toBe(engineBody);
+  });
+
   it("instances: list / start / delete / variables", async () => {
     await api.listProcessInstances({ size: 5 });
     await api.startProcessInstance({ processDefinitionId: "def-1" });

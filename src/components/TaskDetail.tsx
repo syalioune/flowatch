@@ -15,6 +15,7 @@ import React from "react";
 import { api, type FlowableTask, type FlowableTaskForm } from "../api";
 import { fmtDue, fmtTime, Icon, PageHead, toast } from "../components";
 import { DelegateTaskModal } from "../lib/delegate-task-modal";
+import { EditTaskModal } from "../lib/edit-task-modal";
 import { ErrorBox } from "../lib/error-box";
 import { NAV_INVALIDATE_COUNTS } from "../lib/nav-events";
 import { useApi } from "../lib/useApi";
@@ -59,6 +60,10 @@ export function TaskDetail({ task, reload }: Props) {
   const [delegateTarget, setDelegateTarget] = React.useState<FlowableTask | null>(null);
   const delegateButtonRef = React.useRef<HTMLButtonElement>(null);
   const [resolveBusy, setResolveBusy] = React.useState(false);
+
+  // Story 21.1: Edit task modal state.
+  const [editTarget, setEditTarget] = React.useState<FlowableTask | null>(null);
+  const editButtonRef = React.useRef<HTMLButtonElement>(null);
 
   const cfgUsername = api.config().username?.trim() ?? "";
   // AC-5: Resolve is visible only when the operator is the delegated assignee
@@ -148,6 +153,16 @@ export function TaskDetail({ task, reload }: Props) {
             >
               Delegate…
             </button>
+            <button
+              ref={editButtonRef}
+              type="button"
+              className="btn"
+              data-variant="ghost"
+              data-testid="edit-task"
+              onClick={() => setEditTarget(task)}
+            >
+              Edit task…
+            </button>
           </>
         }
       />
@@ -180,8 +195,18 @@ export function TaskDetail({ task, reload }: Props) {
                 </td>
               </tr>
               <tr>
+                <td className="mute">Owner</td>
+                <td className="mono">{t.owner || <span className="mute">—</span>}</td>
+              </tr>
+              <tr>
                 <td className="mute">Priority</td>
                 <td className="mono">{t.priority}</td>
+              </tr>
+              <tr>
+                <td className="mute">Due date</td>
+                <td className="mono">
+                  {t.dueDate ? fmtDue(t.dueDate) : <span className="mute">—</span>}
+                </td>
               </tr>
               <tr>
                 <td className="mute">Process instance</td>
@@ -260,6 +285,15 @@ export function TaskDetail({ task, reload }: Props) {
         onClose={() => setDelegateTarget(null)}
         onSubmitted={() => {
           setDelegateTarget(null);
+          reload();
+        }}
+      />
+      <EditTaskModal
+        task={editTarget}
+        triggerRef={editButtonRef}
+        onClose={() => setEditTarget(null)}
+        onSuccess={() => {
+          setEditTarget(null);
           reload();
         }}
       />
