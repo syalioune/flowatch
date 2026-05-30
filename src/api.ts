@@ -595,9 +595,65 @@ const listProcessDefinitions = (params?: QueryParams) =>
   });
 const getProcessDefinition = (id: string) =>
   request<FlowableProcessDefinition>("GET", `/repository/process-definitions/${id}`);
+/**
+ * Story 20.1 + RC-16 workaround: read a process definition via the LIST
+ * endpoint so the response reflects the DB-persisted `category` (and any
+ * other field the single-GET serves from its BPMN-model cache).
+ *
+ * Flowable 7.2.0 GET /repository/process-definitions/{id} returns
+ * `category` from the BPMN model cache (populated at deploy from the BPMN
+ * file's <targetNamespace>); the DB-persisted `act_re_procdef.category_`
+ * column — updated by `updateProcessDefinition` — is ignored. The LIST
+ * endpoint reads `category_` directly, so the post-edit value surfaces
+ * here. Engine `id`/`processDefinitionId` filters are silently ignored on
+ * the LIST endpoint; we filter by `key` (extracted from the engine's
+ * `key:version:UUID` id format) and JS-filter by id. The wrapper falls
+ * through to the single-GET if the list doesn't surface the id (defensive;
+ * should never happen for a deployed definition).
+ *
+ * Used by the /definitions/$id route loader so the detail page reflects
+ * the operator's edit. Other consumers of `getProcessDefinition` (single
+ * call) are unchanged; the wire-level contract there is documented per RC-16.
+ */
+const getProcessDefinitionFresh = async (id: string): Promise<FlowableProcessDefinition> => {
+  const [key] = id.split(":");
+  const page = await request<FlowablePage<FlowableProcessDefinition>>(
+    "GET",
+    "/repository/process-definitions",
+    { params: { key, size: 200 } },
+  );
+  const found = page.data.find((d) => d.id === id);
+  if (found) return found;
+  return request<FlowableProcessDefinition>("GET", `/repository/process-definitions/${id}`);
+};
 const suspendProcessDefinition = (id: string, suspend: boolean) =>
   request<FlowableProcessDefinition>("PUT", `/repository/process-definitions/${id}`, {
     body: { action: suspend ? "suspend" : "activate" },
+  });
+/**
+ * Story 20.1: edit fields on a process definition (currently: `category`).
+ *
+ * Funnels `PUT /repository/process-definitions/{id}` through `request()` with
+ * a partial-fields body (e.g. `{category: "finance"}`). The engine accepts
+ * `{category: ""}` to clear the value (revert to default per docs/compat.md
+ * line 149). Verified live on flowable-rest 7.2.0 per docs/compat.md FR-43.
+ *
+ * Endpoint-duality with `suspendProcessDefinition` (Story 9.4): both wrappers
+ * PUT to the SAME wire URL but the engine discriminates by body shape:
+ *   - `{action: "suspend" | "activate"}` → suspend / activate path
+ *   - `{category: "…"}`                  → field-update path
+ * Per CLAUDE.md "Operator-feel UI labels can diverge from wire-level action
+ * verbs" (Story 12.2 codification), the two operator-feel actions get distinct
+ * wrappers even though they share a URL. The `fields` parameter shape allows
+ * future Epic 21 / 22 field extensions (name, description, …) to land as a
+ * type-level addition rather than a wrapper-signature churn.
+ *
+ * Engine response: `200 OK` with the full FlowableProcessDefinition body
+ * echoed back (confirmed in T-10 live probe per spec AC-13).
+ */
+const updateProcessDefinition = (id: string, fields: Partial<{ category: string }>) =>
+  request<FlowableProcessDefinition>("PUT", `/repository/process-definitions/${id}`, {
+    body: fields,
   });
 const getProcessDefinitionResource = (id: string): Promise<string> =>
   request<string>("GET", `/repository/process-definitions/${id}/resourcedata`, { raw: true });
@@ -1036,7 +1092,9 @@ export const api = {
   getDeploymentResource,
   listProcessDefinitions,
   getProcessDefinition,
+  getProcessDefinitionFresh,
   suspendProcessDefinition,
+  updateProcessDefinition,
   getProcessDefinitionResource,
   // Runtime
   listProcessInstances,

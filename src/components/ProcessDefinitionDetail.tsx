@@ -14,8 +14,10 @@
  */
 
 import { Link } from "@tanstack/react-router";
+import React from "react";
 import { api, type FlowableProcessDefinition } from "../api";
 import { Icon, PageHead } from "../components";
+import { EditCategoryModal } from "../lib/edit-category-modal";
 import { ErrorBox } from "../lib/error-box";
 import { useApi } from "../lib/useApi";
 
@@ -31,6 +33,9 @@ type DefinitionWide = FlowableProcessDefinition & {
 export function ProcessDefinitionDetail({ definition, reload }: Props) {
   const xml = useApi(() => api.getProcessDefinitionResource(definition.id), [definition.id]);
   const d = definition as DefinitionWide;
+  // Story 20.1: inline Edit-category affordance + modal. Null target = closed.
+  const [editing, setEditing] = React.useState<FlowableProcessDefinition | null>(null);
+  const editTriggerRef = React.useRef<HTMLButtonElement | null>(null);
 
   const toggle = async () => {
     await api.suspendProcessDefinition(d.id, !d.suspended);
@@ -102,7 +107,28 @@ export function ProcessDefinitionDetail({ definition, reload }: Props) {
               </tr>
               <tr>
                 <td className="mute">Category</td>
-                <td>{d.category || <span className="mute">—</span>}</td>
+                <td>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 8,
+                    }}
+                  >
+                    <span>{d.category || <span className="mute">—</span>}</span>
+                    <button
+                      ref={editTriggerRef}
+                      type="button"
+                      className="btn small"
+                      data-variant="ghost"
+                      data-testid="edit-category-button"
+                      onClick={() => setEditing(d)}
+                    >
+                      Edit
+                    </button>
+                  </div>
+                </td>
               </tr>
               <tr>
                 <td className="mute">Tenant</td>
@@ -147,6 +173,13 @@ export function ProcessDefinitionDetail({ definition, reload }: Props) {
           )}
         </div>
       </div>
+
+      <EditCategoryModal
+        definition={editing}
+        onClose={() => setEditing(null)}
+        onSuccess={reload}
+        triggerRef={editTriggerRef}
+      />
     </div>
   );
 }
