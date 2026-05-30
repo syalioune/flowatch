@@ -62,6 +62,8 @@ export type ScreenKey =
   | "historicNoRecord"
   | "historicTasks"
   | "historicVariables"
+  | "instanceDiagram"
+  | "instanceDiagramNoXml"
   | "instances"
   | "instanceVariables"
   | "jobs"
@@ -135,6 +137,14 @@ export const emptyStates = {
   historicVariables: {
     title: "No historic variables yet.",
     body: "Variables appear here once a process instance ends and the engine archives its variable history.",
+  },
+  instanceDiagram: {
+    title: "No diagram available.",
+    body: "The process definition couldn't be located — it may have been deleted, or this instance's deployment did not bundle a BPMN file.",
+  },
+  instanceDiagramNoXml: {
+    title: "No diagram resource for this definition.",
+    body: "The engine returned 404 for the BPMN XML resource. The definition exists but its source file wasn't bundled with the deployment — re-deploy the definition with the .bpmn / .bpmn20.xml file to populate the diagram.",
   },
   instances: {
     title: "No running process instances.",
