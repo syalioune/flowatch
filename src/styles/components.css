@@ -542,6 +542,32 @@
   }
 }
 
+/* InstanceDiagramPanel (Story 26.1) — read-only NavigatedViewer host.
+   Height bounds prevent the panel from exploding on very large diagrams
+   while leaving the bpmn-js pan + mouse-wheel zoom intact. The skeleton
+   reuses the @keyframes shimmer defined above for the kpi / table
+   skeletons (Pattern P-007 — single keyframe definition). */
+.instance-diagram-canvas {
+  min-height: 320px;
+  max-height: 600px;
+  width: 100%;
+  background: var(--bg);
+  border-radius: var(--r-sm);
+}
+.diagram-skeleton {
+  min-height: 320px;
+  width: 100%;
+  background: linear-gradient(90deg, var(--bg-elev) 25%, var(--bg-hover) 50%, var(--bg-elev) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--r-sm);
+}
+@media (prefers-reduced-motion: reduce) {
+  .diagram-skeleton {
+    animation: none;
+  }
+}
+
 /* RowActionMenu (Story 9.1) — keyboard-accessible `⋮` per-row action menu.
    Used by Deployments (delete cascade/no-cascade) and copied verbatim by 9.4
    (suspend/activate), 10.x (cancel), etc. Pattern P-006 a11y + P-007 tokens. */

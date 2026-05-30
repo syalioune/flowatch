@@ -151,6 +151,41 @@ test.describe("/instances/$id dual-fetch sibling pattern (Story 13.1)", () => {
     }
   });
 
+  test("diagram panel mounts the NavigatedViewer canvas on a live instance (Story 26.1)", async ({
+    page,
+  }) => {
+    const fresh = await startInstance(`${BUSINESS_KEY}-26-1-live`);
+    try {
+      await page.goto(`/instances/${fresh.id}`);
+      const panel = page.getByTestId("instance-diagram-panel");
+      await expect(panel).toBeVisible({ timeout: 15_000 });
+      // The canvas <div> is always rendered; we wait until display:none is
+      // cleared (the data-state) and the bpmn-js .djs-container has mounted
+      // its SVG inside.
+      const canvas = page.getByTestId("instance-diagram-canvas");
+      await expect(canvas).toBeVisible({ timeout: 15_000 });
+      // Per Story 17.4 baseline policy + spec AC-14, no pixel-content
+      // assertion — only structural presence of the bpmn-js container.
+      await expect(canvas.locator(".djs-container")).toBeAttached({ timeout: 15_000 });
+    } finally {
+      await cancelInstance(fresh.id);
+    }
+  });
+
+  test("diagram panel renders for an ENDED instance via historic-fallback probe (Story 26.1)", async ({
+    page,
+  }) => {
+    const fresh = await startInstance(`${BUSINESS_KEY}-26-1-ended`);
+    await cancelInstance(fresh.id);
+    const endedId = await getEndedId(`${BUSINESS_KEY}-26-1-ended`);
+    await page.goto(`/instances/${endedId}`);
+    const panel = page.getByTestId("instance-diagram-panel");
+    await expect(panel).toBeVisible({ timeout: 15_000 });
+    const canvas = page.getByTestId("instance-diagram-canvas");
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await expect(canvas.locator(".djs-container")).toBeAttached({ timeout: 15_000 });
+  });
+
   test("activities Refresh button fires a second fetch (Story 13.2)", async ({ page }) => {
     const fresh = await startInstance(`${BUSINESS_KEY}-13-2-refresh`);
     try {
