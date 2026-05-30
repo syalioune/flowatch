@@ -102,16 +102,18 @@ test.describe("/history?type=instances + dual-fetch on /instances/$id (Story 13.
     await expect(row.locator("td").first()).toContainText(BUSINESS_KEY);
   });
 
-  test("clicking the historic row navigates to the unified /instances/{id} detail", async ({
+  test("clicking the historic row navigates to /instances/{id}?tab=history (post-Epic-26 tab restructure)", async ({
     page,
   }) => {
     await page.goto("/history?type=instances");
     const row = page.locator(`tr[data-historic-instance-id="${endedInstance?.id}"]`).first();
     await expect(row).toBeVisible({ timeout: 15_000 });
     await row.locator("td").first().click();
-    await expect(page).toHaveURL(new RegExp(`/instances/${endedInstance?.id}$`));
-    // Runtime panel renders the "instance has ended" empty state (404 → null).
-    await expect(page.getByText("This instance has ended.")).toBeVisible({ timeout: 15_000 });
+    // Operator clicked a HISTORIC row → land directly on the History tab so
+    // the historic-record perspective they were looking at carries through.
+    await expect(page).toHaveURL(new RegExp(`/instances/${endedInstance?.id}\\?tab=history$`));
+    // History tab is active.
+    await expect(page.getByTestId("instance-tab-history")).toHaveAttribute("data-on", "1");
     // Historic panel mounts with its data-testid + an ended badge. Scope the
     // assertion to the badge element (not the bare text) — `<td>Ended</td>`
     // also matches `getByText("ended")` under Playwright's default

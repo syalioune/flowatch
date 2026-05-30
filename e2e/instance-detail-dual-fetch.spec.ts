@@ -95,18 +95,20 @@ test.describe("/instances/$id dual-fetch sibling pattern (Story 13.1)", () => {
     await deleteFixtureDeployments();
   });
 
-  test("runtime panel renders properties; historic panel shows the in-progress historic snapshot (eager record, endTime missing)", async ({
+  test("runtime tab renders properties; switching to history tab shows the in-progress historic snapshot (eager record, endTime missing)", async ({
     page,
   }) => {
     await page.goto(`/instances/${runningInstance?.id}`);
-    // Runtime panel: properties (Business key cell)
+    // Default tab is Runtime — runtime panel visible with Business key cell.
     const runtime = page.getByTestId("instance-runtime-panel");
     await expect(runtime).toBeVisible({ timeout: 15_000 });
     await expect(runtime).toContainText(BUSINESS_KEY);
-    // Historic panel: Flowable 7.x eagerly archives the instance the moment
-    // it starts (the historic-process-instances/{id} endpoint returns 200
-    // with `endTime: null`, NOT 404). The panel renders the populated
+    // Switch to History tab — historic panel renders. Flowable 7.x eagerly
+    // archives the instance the moment it starts (the
+    // historic-process-instances/{id} endpoint returns 200 with
+    // `endTime: null`, NOT 404). The panel renders the populated
     // properties table with a `historic` badge (warn tone) — see RC-13.
+    await page.getByTestId("instance-tab-history").click();
     const historic = page.getByTestId("historic-instance-panel");
     await expect(historic).toBeVisible();
     await expect(historic.locator('.badge[data-tone="warn"]', { hasText: "historic" })).toBeVisible(
@@ -115,32 +117,30 @@ test.describe("/instances/$id dual-fetch sibling pattern (Story 13.1)", () => {
     await expect(historic).toContainText(BUSINESS_KEY);
   });
 
-  test("after cancellation, runtime panel flips to ended empty + historic panel badge flips to ended", async ({
+  test("after cancellation, runtime tab flips to ended empty + history tab badge flips to ended", async ({
     page,
   }) => {
     await cancelInstance(runningInstance!.id);
     runningInstance = null; // prevent double-cancel in afterAll
     await page.goto(`/instances/${await getEndedId(BUSINESS_KEY)}`);
-    // Runtime panel: 404 → "This instance has ended."
+    // Runtime tab (default): 404 → "This instance has ended."
     const runtime = page.getByTestId("instance-runtime-panel");
     await expect(runtime).toBeVisible({ timeout: 15_000 });
     await expect(runtime.getByText("This instance has ended.")).toBeVisible({ timeout: 15_000 });
-    // Historic panel: data populated with the captured business key; badge
+    // History tab: data populated with the captured business key; badge
     // flips to `ended` (mute tone). Scope to the badge to avoid the
     // strict-mode collision with `<td>Ended</td>`.
+    await page.getByTestId("instance-tab-history").click();
     const historic = page.getByTestId("historic-instance-panel");
     await expect(historic).toBeVisible();
     await expect(historic).toContainText(BUSINESS_KEY);
     await expect(historic.locator('.badge[data-tone="mute"]', { hasText: "ended" })).toBeVisible();
   });
 
-  test("activities panel renders the timeline with at least two rows (Story 13.2)", async ({
-    page,
-  }) => {
-    // Fresh instance so both runtime + activities panels render side-by-side.
+  test("audit tab renders the timeline with at least two rows (Story 13.2)", async ({ page }) => {
     const fresh = await startInstance(`${BUSINESS_KEY}-13-2`);
     try {
-      await page.goto(`/instances/${fresh.id}`);
+      await page.goto(`/instances/${fresh.id}?tab=audit`);
       const timeline = page.getByTestId("historic-activities-timeline");
       await expect(timeline).toBeVisible({ timeout: 15_000 });
       // loan-approval has at least a startEvent + a userTask, so expect ≥ 2.
@@ -149,6 +149,28 @@ test.describe("/instances/$id dual-fetch sibling pattern (Story 13.1)", () => {
     } finally {
       await cancelInstance(fresh.id);
     }
+  });
+
+  test("instance detail renders the three tabs (Runtime / History / Audit) with Runtime as default", async ({
+    page,
+  }) => {
+    await page.goto(`/instances/${runningInstance?.id ?? "any"}`);
+    const tabs = page.getByTestId("instance-detail-tabs");
+    await expect(tabs).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("instance-tab-runtime")).toHaveAttribute("data-on", "1");
+    await expect(page.getByTestId("instance-tab-history")).toHaveAttribute("data-on", "0");
+    await expect(page.getByTestId("instance-tab-audit")).toHaveAttribute("data-on", "0");
+    // Diagram slot is visible on Runtime tab.
+    await expect(page.getByTestId("instance-diagram-slot")).toBeVisible();
+  });
+
+  test("Audit tab hides the diagram slot (timeline-only perspective)", async ({ page }) => {
+    await page.goto(`/instances/${runningInstance?.id ?? "any"}?tab=audit`);
+    await expect(page.getByTestId("instance-tab-audit")).toHaveAttribute("data-on", "1");
+    // The slot stays in the DOM (the bpmn-js viewer is kept alive) but is
+    // hidden via display:none so it doesn't render alongside the timeline.
+    const slot = page.getByTestId("instance-diagram-slot");
+    await expect(slot).toBeHidden();
   });
 
   test("diagram panel mounts the NavigatedViewer canvas on a live instance (Story 26.1)", async ({
@@ -250,7 +272,7 @@ test.describe("/instances/$id dual-fetch sibling pattern (Story 13.1)", () => {
   test("activities Refresh button fires a second fetch (Story 13.2)", async ({ page }) => {
     const fresh = await startInstance(`${BUSINESS_KEY}-13-2-refresh`);
     try {
-      await page.goto(`/instances/${fresh.id}`);
+      await page.goto(`/instances/${fresh.id}?tab=audit`);
       await expect(page.getByTestId("historic-activities-timeline")).toBeVisible({
         timeout: 15_000,
       });
