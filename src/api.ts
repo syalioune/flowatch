@@ -830,6 +830,34 @@ const listTaskAttachments = (taskId: string) =>
  * the echoed FlowableAttachment body. Verified live on flowable-rest 7.2.0
  * per docs/compat.md FR-45.
  */
+/**
+ * Story 21.3: fetch the binary content of a task attachment (file-mode only).
+ *
+ * Returns the raw `Response` so the caller picks the body method
+ * (`.blob()` for binary, `.text()` for text). Mirrors `getDeploymentResource`
+ * (Story 9.6) at the task-attachment level. URL-mode attachments are
+ * opened via their `externalUrl` directly — they do NOT use this wrapper.
+ *
+ * Engine response: `200 OK` with binary body. Verified live on
+ * flowable-rest 7.2.0 per docs/compat.md FR-45.
+ */
+const getTaskAttachmentContent = (taskId: string, attachmentId: string) =>
+  request<Response>("GET", `/runtime/tasks/${taskId}/attachments/${attachmentId}/content`, {
+    asResponse: true,
+  });
+
+/**
+ * Story 21.3: remove a task attachment by id.
+ *
+ * Funnels `DELETE /runtime/tasks/{taskId}/attachments/{attachmentId}` through
+ * `request()`. Symmetric pair with `addTaskAttachment` (Story 21.2).
+ *
+ * Engine response: `204 No Content`. Verified live on flowable-rest 7.2.0
+ * per docs/compat.md FR-45.
+ */
+const deleteTaskAttachment = (taskId: string, attachmentId: string) =>
+  request<void>("DELETE", `/runtime/tasks/${taskId}/attachments/${attachmentId}`);
+
 const addTaskAttachment = async (
   taskId: string,
   payload: AddAttachmentPayload,
@@ -1268,6 +1296,8 @@ export const api = {
   getTaskVariables,
   listTaskAttachments,
   addTaskAttachment,
+  getTaskAttachmentContent,
+  deleteTaskAttachment,
   // Form
   getTaskForm,
   submitTaskForm,

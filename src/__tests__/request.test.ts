@@ -624,6 +624,50 @@ describe("api.* wrappers smoke (P-001 — every call goes through request())", (
     ).rejects.toMatchObject({ status: 400, message: "malformed url" });
   });
 
+  it("Story 21.3: getTaskAttachmentContent resolves to the raw Response (asResponse:true)", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ status: 200, body: "binary", contentType: "application/octet-stream" }),
+    );
+    const out = await api.getTaskAttachmentContent("task-1", "att-1");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${DEFAULT_BASE}/runtime/tasks/task-1/attachments/att-1/content`);
+    expect(init.method).toBe("GET");
+    expect(out).toBeInstanceOf(Response);
+    // Caller picks the body method.
+    expect(await out.text()).toBe("binary");
+  });
+
+  it("Story 21.3: getTaskAttachmentContent surfaces 4xx as FlowableError", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue(mockResponse({ status: 404, body: "gone" }));
+    await expect(api.getTaskAttachmentContent("task-1", "ghost")).rejects.toMatchObject({
+      status: 404,
+      message: "gone",
+    });
+  });
+
+  it("Story 21.3: deleteTaskAttachment DELETEs the attachment endpoint", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await api.deleteTaskAttachment("task-1", "att-1");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${DEFAULT_BASE}/runtime/tasks/task-1/attachments/att-1`);
+    expect(init.method).toBe("DELETE");
+    expect((init.headers as Record<string, string>).Authorization).toMatch(/^Basic /);
+  });
+
+  it("Story 21.3: deleteTaskAttachment surfaces 4xx as FlowableError", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue(mockResponse({ status: 404, body: "already gone" }));
+    await expect(api.deleteTaskAttachment("task-1", "ghost")).rejects.toMatchObject({
+      status: 404,
+      message: "already gone",
+    });
+    expect(API_LOG[0]?.status).toBe(404);
+    expect(API_LOG[0]?.error).toBe("already gone");
+  });
+
   it("instances: list / start / delete / variables", async () => {
     await api.listProcessInstances({ size: 5 });
     await api.startProcessInstance({ processDefinitionId: "def-1" });
