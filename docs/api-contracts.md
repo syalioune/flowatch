@@ -24,6 +24,7 @@ Every call — success or failure — pushes an entry into `API_LOG` and fires a
 | `listDeploymentResources(id)`          | GET    | `/repository/deployments/{id}/resources`                          |                                                                      |
 | `listProcessDefinitions(params)`       | GET    | `/repository/process-definitions`                                 |                                                                      |
 | `suspendProcessDefinition(id, suspend)`| PUT    | `/repository/process-definitions/{id}`                            | Body `{ action: "suspend" \| "activate" }`                           |
+| `updateProcessDefinition(id, fields)`  | PUT    | `/repository/process-definitions/{id}`                            | Body `{ category }` (FR-43). Same URL as `suspendProcessDefinition` — the engine discriminates by body shape (`{action}` vs `{category}`). `{category: ""}` clears the value. Returns the echoed `FlowableProcessDefinition`. |
 | `getProcessDefinitionResource(id)`     | GET    | `/repository/process-definitions/{id}/resourcedata`               | Returns **raw XML** (`raw: true`)                                    |
 
 ## Runtime

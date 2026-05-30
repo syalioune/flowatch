@@ -339,6 +339,57 @@ describe("api.* wrappers smoke (P-001 — every call goes through request())", (
     await api.getProcessDefinitionResource("def-1");
   });
 
+  it("Story 20.1: updateProcessDefinition sends a PUT with a single-object body", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 200,
+        json: { id: "def-1", key: "loan", name: "Loan", version: 1, category: "finance" },
+      }),
+    );
+    const out = await api.updateProcessDefinition("def-1", { category: "finance" });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${DEFAULT_BASE}/repository/process-definitions/def-1`);
+    expect(init.method).toBe("PUT");
+    // Body is an OBJECT (distinct from 19.1's array shape).
+    expect(init.body).toBe(JSON.stringify({ category: "finance" }));
+    expect((init.headers as Record<string, string>).Authorization).toMatch(/^Basic /);
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+    expect(API_LOG[0]?.method).toBe("PUT");
+    expect(API_LOG[0]?.path).toBe("/repository/process-definitions/def-1");
+    // Captured body is the object form per the body byte-budget convention.
+    expect(API_LOG[0]?.body).toEqual({ category: "finance" });
+    // Engine echoes the entity on 2xx; the wrapper resolves to the parsed body.
+    expect(out).toMatchObject({ id: "def-1", category: "finance" });
+  });
+
+  it("Story 20.1: updateProcessDefinition PUTs an empty-string category exactly (not stripped)", async () => {
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 200,
+        json: { id: "def-1", key: "loan", name: "Loan", version: 1 },
+      }),
+    );
+    await api.updateProcessDefinition("def-1", { category: "" });
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    // Empty-clear shape: the body is {"category":""} verbatim — engine reverts
+    // to default category per docs/compat.md line 149. NOT omitted, NOT null.
+    expect(init.body).toBe('{"category":""}');
+  });
+
+  it("Story 20.1: updateProcessDefinition surfaces 4xx engine bodies as FlowableError", async () => {
+    const engineBody = '{"message":"Bad request","exception":"definition not found"}';
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue(mockResponse({ status: 404, body: engineBody }));
+    await expect(api.updateProcessDefinition("def-gone", { category: "x" })).rejects.toMatchObject({
+      status: 404,
+      message: engineBody,
+    });
+    expect(API_LOG[0]?.status).toBe(404);
+    expect(API_LOG[0]?.error).toBe(engineBody);
+  });
+
   it("instances: list / start / delete / variables", async () => {
     await api.listProcessInstances({ size: 5 });
     await api.startProcessInstance({ processDefinitionId: "def-1" });

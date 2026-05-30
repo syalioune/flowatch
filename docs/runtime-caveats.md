@@ -426,6 +426,50 @@ $ curl -X PUT $BASE/runtime/process-instances/$PIID/variables \
 
 ---
 
+## RC-16 — `PUT /repository/process-definitions/{id}` persists `category` to the DB but the single-GET endpoint serves the BPMN-cached value, not the persisted one
+
+**Naive intuition:** PUT a new `category`, then GET the same id and observe the new value. Symmetric writes and reads — REST convention.
+
+**Actual behaviour:** flowable-rest 7.2.0 splits the read paths between two storage tiers and only ONE tier reflects PUT updates:
+
+1. **`PUT /repository/process-definitions/{id}` with `{"category": "X"}` returns `200 OK`** with the echoed body. The engine writes `X` to `act_re_procdef.category_` in the database (verified via `psql -c 'SELECT category_ FROM act_re_procdef WHERE id_=…'`).
+
+2. **`GET /repository/process-definitions/{id}` (single)** reads `category` from the engine's process-definition cache, which is populated at deploy time from the BPMN file's `<definitions targetNamespace="…">` attribute (or a `category` attribute if explicitly set — non-standard). PUT updates do NOT invalidate this cache, so the single-GET keeps returning the BPMN-derived value forever.
+
+3. **`GET /repository/process-definitions?…` (list)** reads `category` directly from `act_re_procdef.category_` via the JPA query. The DB-persisted value DOES surface here.
+
+The contradiction is observable in a single session:
+
+```bash
+# Fresh deploy of a BPMN with targetNamespace="http://flowable.org/bpmn"
+# and no explicit `category` attribute → category = "http://flowable.org/bpmn"
+
+$ curl -X PUT $BASE/repository/process-definitions/$DEF \
+    -H "Content-Type: application/json" -d '{"category":"finance"}'
+# HTTP 200 — body echoes "category":"finance"
+
+$ curl $BASE/repository/process-definitions/$DEF
+# HTTP 200 — body says "category":"http://flowable.org/bpmn"    ← STALE
+
+$ curl "$BASE/repository/process-definitions?deploymentId=$DEP"
+# HTTP 200 — body says "category":"finance"                     ← FRESH
+
+$ psql -c "SELECT category_ FROM act_re_procdef WHERE id_='$DEF'"
+# category_ = "finance"                                          ← FRESH
+```
+
+The LIST endpoint's `id` and `processDefinitionId` query filters are SILENTLY IGNORED (a follow-up quirk: filters like `?id=$DEF` return the entire unfiltered page). The reliable per-id filters are `key=` (matches all versions of the key — JS-filter to the specific id) or `deploymentId=` (matches all definitions in that deployment — JS-filter to the id). `category=` works as expected (it's the underlying DB query column).
+
+**Workaround:** for any code path that loads a process definition AFTER a `PUT /repository/process-definitions/{id}` (i.e., the operator just edited the category), read via the list endpoint, NOT via the single-GET. The `api.getProcessDefinitionFresh(id)` wrapper in [src/api.ts](../src/api.ts) implements the workaround: extract `key` from the engine's `id` format (`key:version:UUID`), call `GET /repository/process-definitions?key=$KEY&size=200`, JS-filter by id. Falls through to the single-GET if the list doesn't surface the id (defensive — shouldn't happen for a deployed definition). The route loader at [src/routes/definitions/$id.tsx](../src/routes/definitions/$id.tsx) uses the fresh variant; the original `api.getProcessDefinition(id)` wrapper is preserved unchanged for any callers that explicitly want the single-GET (currently no in-tree consumers; reserved for future cache-aware uses).
+
+**Surfaced by:** Story 20.1 live-engine probe + E2E walkthrough (2026-05-30). The story spec assumed the single-GET would reflect the PUT (compat.md FR-43 line 60 / line 149 documented the PUT but did NOT verify GET-after-PUT consistency on the single endpoint — only the list endpoint and the manual psql probe confirmed persistence). Without this caveat, the operator-feel UX is "I saved a category but the detail page still shows the old value, even after refresh — did the save really work?". The list-endpoint workaround makes the detail page reflect the new value on the very next route load.
+
+Filed downstream notes for follow-up:
+- The behaviour is reproducible on the `flowable/all-in-one:7.2.0` container with PostgreSQL backend.
+- This affects any future story that needs to read fresh per-id state for fields the engine caches at deploy time. Epic 21 task PUT touches `/runtime/tasks/{id}` (runtime tier, not deployment-cached) so likely won't hit this quirk; Epic 22 user/group PUT touches `/identity/*` which has its own data path. Re-probe if symptoms surface there.
+
+---
+
 ## How to extend this file
 
 When a review surfaces a runtime quirk that meets all three of:

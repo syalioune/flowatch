@@ -6,7 +6,10 @@ import { ProcessDefinitionDetail } from "../../components/ProcessDefinitionDetai
 import { ErrorBox } from "../../lib/error-box";
 
 export const Route = createFileRoute("/definitions/$id")({
-  loader: ({ params }) => api.getProcessDefinition(params.id),
+  // Story 20.1: use getProcessDefinitionFresh so the detail page reflects
+  // post-edit `category` values. The single-GET endpoint returns a
+  // BPMN-cached value that ignores PUT updates — see RC-16.
+  loader: ({ params }) => api.getProcessDefinitionFresh(params.id),
   staticData: {
     title: "Process definition detail",
     endpoints: [
