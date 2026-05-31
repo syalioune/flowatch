@@ -17,6 +17,11 @@
 
 import React from "react";
 import { Icon } from "../components";
+import {
+  type AuthStrategyKind,
+  formatErrors,
+  parseAuthStrategyConfig,
+} from "./auth-strategy-config";
 import { ErrorBox } from "./error-box";
 import { type SavedConnection, updateConnection } from "./saved-connections";
 
@@ -35,15 +40,42 @@ type Inputs = {
   username: string;
   password: string;
   tenantId: string;
+  kind: AuthStrategyKind;
+  bearerToken: string;
+  oidcIssuer: string;
+  oidcClientId: string;
+  oidcScopes: string;
 };
 
-const inputsFrom = (c: SavedConnection): Inputs => ({
-  label: c.label,
-  baseUrl: c.baseUrl,
-  username: c.username,
-  password: c.password,
-  tenantId: c.tenantId,
-});
+const inputsFrom = (c: SavedConnection): Inputs => {
+  // Story 23.2: hydrate per-kind state from the persisted authStrategyConfig
+  // slot. Connections without a stored config default to Basic (the runtime
+  // call path uses Basic auth today).
+  const ascCfg = c.authStrategyConfig;
+  const kind: AuthStrategyKind = ascCfg?.kind ?? "basic";
+  let bearerToken = "";
+  let oidcIssuer = "";
+  let oidcClientId = "";
+  let oidcScopes = "";
+  if (ascCfg?.kind === "bearer") bearerToken = ascCfg.config.token;
+  if (ascCfg?.kind === "oidc") {
+    oidcIssuer = ascCfg.config.issuer;
+    oidcClientId = ascCfg.config.clientId;
+    oidcScopes = ascCfg.config.scopes.join(", ");
+  }
+  return {
+    label: c.label,
+    baseUrl: c.baseUrl,
+    username: c.username,
+    password: c.password,
+    tenantId: c.tenantId,
+    kind,
+    bearerToken,
+    oidcIssuer,
+    oidcClientId,
+    oidcScopes,
+  };
+};
 
 export const EditConnectionModal: React.FC<EditConnectionModalProps> = ({
   open,
@@ -55,7 +87,18 @@ export const EditConnectionModal: React.FC<EditConnectionModalProps> = ({
   const [inputs, setInputs] = React.useState<Inputs>(() =>
     connection
       ? inputsFrom(connection)
-      : { label: "", baseUrl: "", username: "", password: "", tenantId: "" },
+      : {
+          label: "",
+          baseUrl: "",
+          username: "",
+          password: "",
+          tenantId: "",
+          kind: "basic",
+          bearerToken: "",
+          oidcIssuer: "",
+          oidcClientId: "",
+          oidcScopes: "",
+        },
   );
   const [error, setError] = React.useState<Error | null>(null);
   const [busy, setBusy] = React.useState(false);
@@ -88,6 +131,75 @@ export const EditConnectionModal: React.FC<EditConnectionModalProps> = ({
     setInputs((prev) => ({ ...prev, [key]: value }));
   };
 
+  const switchKind = (next: AuthStrategyKind) => {
+    if (next === inputs.kind) return;
+    setInputs((prev) => ({
+      ...prev,
+      kind: next,
+      bearerToken: "",
+      oidcIssuer: "",
+      oidcClientId: "",
+      oidcScopes: "",
+    }));
+  };
+
+  const buildAuthStrategyConfig = (): unknown => {
+    if (inputs.kind === "basic") {
+      return { kind: "basic", config: { username: inputs.username, password: inputs.password } };
+    }
+    if (inputs.kind === "bearer") {
+      // Review patch: trim — canSubmit already enforces non-empty trim.
+      return { kind: "bearer", config: { token: inputs.bearerToken.trim() } };
+    }
+    return {
+      kind: "oidc",
+      config: {
+        issuer: inputs.oidcIssuer.trim(),
+        clientId: inputs.oidcClientId.trim(),
+        scopes: inputs.oidcScopes
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      },
+    };
+  };
+
+  const authConfigChanged = ((): boolean => {
+    // Review patch: guard against `connection === null` — the early-return
+    // below already covers the render path, but `authConfigChanged` runs in
+    // the component body BEFORE the return so the deref would throw.
+    if (!connection) return false;
+    const origKind = connection.authStrategyConfig?.kind ?? "basic";
+    if (inputs.kind !== origKind) return true;
+    if (inputs.kind === "basic") {
+      // Basic-kind config tracks the username/password top-level fields; any
+      // diff there is already captured via the label/username/password diff
+      // below, so authStrategyConfig changes when those change.
+      return inputs.username !== connection.username || inputs.password !== connection.password;
+    }
+    if (inputs.kind === "bearer") {
+      const orig =
+        connection.authStrategyConfig?.kind === "bearer"
+          ? connection.authStrategyConfig.config.token
+          : "";
+      return inputs.bearerToken !== orig;
+    }
+    const origCfg =
+      connection.authStrategyConfig?.kind === "oidc"
+        ? connection.authStrategyConfig.config
+        : { issuer: "", clientId: "", scopes: [] as string[] };
+    const scopesNow = inputs.oidcScopes
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return (
+      inputs.oidcIssuer.trim() !== origCfg.issuer ||
+      inputs.oidcClientId.trim() !== origCfg.clientId ||
+      scopesNow.length !== origCfg.scopes.length ||
+      scopesNow.some((s, i) => s !== origCfg.scopes[i])
+    );
+  })();
+
   const closeWithFocus = () => {
     triggerRef?.current?.focus();
     onClose();
@@ -100,9 +212,22 @@ export const EditConnectionModal: React.FC<EditConnectionModalProps> = ({
   if (inputs.password !== connection.password) diff.password = inputs.password;
   if (inputs.tenantId !== connection.tenantId) diff.tenantId = inputs.tenantId;
 
-  const diffEmpty = Object.keys(diff).length === 0;
+  const diffEmpty = Object.keys(diff).length === 0 && !authConfigChanged;
+  const perKindFilled =
+    (inputs.kind !== "bearer" || inputs.bearerToken.trim() !== "") &&
+    (inputs.kind !== "oidc" ||
+      (inputs.oidcIssuer.trim() !== "" &&
+        inputs.oidcClientId.trim() !== "" &&
+        inputs.oidcScopes
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean).length > 0));
   const canSubmit =
-    !busy && !diffEmpty && inputs.label.trim() !== "" && inputs.baseUrl.trim() !== "";
+    !busy &&
+    !diffEmpty &&
+    inputs.label.trim() !== "" &&
+    inputs.baseUrl.trim() !== "" &&
+    perKindFilled;
 
   const submit = () => {
     if (!canSubmit) return;
@@ -115,9 +240,17 @@ export const EditConnectionModal: React.FC<EditConnectionModalProps> = ({
         return;
       }
     }
+    const parsed = parseAuthStrategyConfig(buildAuthStrategyConfig());
+    if (!parsed.ok) {
+      setError(new Error(formatErrors(parsed.errors)));
+      return;
+    }
     setBusy(true);
     try {
-      const updated = updateConnection(connection.id, diff);
+      const updated = updateConnection(connection.id, {
+        ...diff,
+        authStrategyConfig: parsed.value,
+      });
       setBusy(false);
       onSuccess(updated);
       closeWithFocus();
@@ -210,6 +343,158 @@ export const EditConnectionModal: React.FC<EditConnectionModalProps> = ({
                   style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: 12 }}
                 />
               </div>
+              <div>
+                <label
+                  style={{ display: "block", marginBottom: 4, fontSize: 12 }}
+                  htmlFor="edit-connection-auth-kind-basic"
+                >
+                  Authentication
+                </label>
+                {/* Segmented-control archetype N=2 (after <AddAttachmentModal> Story 21.2).
+                    Per CLAUDE.md "Segmented-control mode-toggle inside a modal" the shape is
+                    inline-keep-not-extract until N=3 (projected: Story 27 new-version-from
+                    vs from-current). Do NOT extract a <SegmentedControl> helper here. */}
+                <div
+                  role="radiogroup"
+                  aria-label="Authentication method"
+                  style={{ display: "flex", gap: 6 }}
+                >
+                  <button
+                    id="edit-connection-auth-kind-basic"
+                    type="button"
+                    className="btn"
+                    data-variant={inputs.kind === "basic" ? "primary" : "ghost"}
+                    aria-pressed={inputs.kind === "basic"}
+                    data-testid="auth-kind-basic"
+                    onClick={() => switchKind("basic")}
+                    disabled={busy}
+                  >
+                    Basic
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    data-variant={inputs.kind === "bearer" ? "primary" : "ghost"}
+                    aria-pressed={inputs.kind === "bearer"}
+                    data-testid="auth-kind-bearer"
+                    onClick={() => switchKind("bearer")}
+                    disabled={busy}
+                  >
+                    Bearer
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    data-variant={inputs.kind === "oidc" ? "primary" : "ghost"}
+                    aria-pressed={inputs.kind === "oidc"}
+                    data-testid="auth-kind-oidc"
+                    onClick={() => switchKind("oidc")}
+                    disabled={busy}
+                  >
+                    OIDC
+                  </button>
+                </div>
+                <p
+                  className="mute"
+                  data-testid="auth-dormancy-note"
+                  style={{ marginTop: 6, fontSize: 11 }}
+                >
+                  Persists per-connection config only — activation lands in v1.0.0 (Story 28).
+                </p>
+              </div>
+              {inputs.kind === "bearer" && (
+                <div>
+                  <label
+                    htmlFor="edit-connection-bearer-token"
+                    style={{ display: "block", marginBottom: 4, fontSize: 12 }}
+                  >
+                    Bearer token
+                  </label>
+                  <textarea
+                    id="edit-connection-bearer-token"
+                    data-testid="auth-bearer-token"
+                    rows={3}
+                    maxLength={4096}
+                    value={inputs.bearerToken}
+                    onChange={(e) => setField("bearerToken", e.target.value)}
+                    disabled={busy}
+                    style={{
+                      width: "100%",
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 12,
+                      resize: "vertical",
+                    }}
+                  />
+                  <p
+                    className="mute"
+                    data-testid="auth-bearer-help"
+                    style={{ marginTop: 4, fontSize: 11 }}
+                  >
+                    Stored locally in plaintext — only paste tokens you'd treat as you treat a
+                    password.
+                  </p>
+                </div>
+              )}
+              {inputs.kind === "oidc" && (
+                <>
+                  <div>
+                    <label
+                      htmlFor="edit-connection-oidc-issuer"
+                      style={{ display: "block", marginBottom: 4, fontSize: 12 }}
+                    >
+                      Issuer URL
+                    </label>
+                    <input
+                      id="edit-connection-oidc-issuer"
+                      data-testid="auth-oidc-issuer"
+                      type="text"
+                      value={inputs.oidcIssuer}
+                      onChange={(e) => setField("oidcIssuer", e.target.value)}
+                      disabled={busy}
+                      style={{
+                        width: "100%",
+                        fontFamily: "var(--font-mono)",
+                        fontSize: 12,
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="edit-connection-oidc-client-id"
+                      style={{ display: "block", marginBottom: 4, fontSize: 12 }}
+                    >
+                      Client ID
+                    </label>
+                    <input
+                      id="edit-connection-oidc-client-id"
+                      data-testid="auth-oidc-client-id"
+                      type="text"
+                      value={inputs.oidcClientId}
+                      onChange={(e) => setField("oidcClientId", e.target.value)}
+                      disabled={busy}
+                      style={{ width: "100%", fontSize: 12 }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="edit-connection-oidc-scopes"
+                      style={{ display: "block", marginBottom: 4, fontSize: 12 }}
+                    >
+                      Scopes
+                    </label>
+                    <input
+                      id="edit-connection-oidc-scopes"
+                      data-testid="auth-oidc-scopes"
+                      type="text"
+                      value={inputs.oidcScopes}
+                      onChange={(e) => setField("oidcScopes", e.target.value)}
+                      disabled={busy}
+                      placeholder="openid, profile, email, offline_access"
+                      style={{ width: "100%", fontSize: 12 }}
+                    />
+                  </div>
+                </>
+              )}
               <div>
                 <label
                   htmlFor="edit-connection-username"

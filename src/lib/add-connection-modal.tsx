@@ -21,6 +21,11 @@
 
 import React from "react";
 import { Icon } from "../components";
+import {
+  type AuthStrategyKind,
+  formatErrors,
+  parseAuthStrategyConfig,
+} from "./auth-strategy-config";
 import { ErrorBox } from "./error-box";
 import { addConnection, type SavedConnection } from "./saved-connections";
 
@@ -44,6 +49,16 @@ export const AddConnectionModal: React.FC<AddConnectionModalProps> = ({
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [tenantId, setTenantId] = React.useState("");
+  // Story 23.2: segmented-control archetype N=2 (after <AddAttachmentModal>
+  // Story 21.2). Per CLAUDE.md "Segmented-control mode-toggle inside a modal"
+  // the shape is inline-keep-not-extract until N=3 (projected: Story 27
+  // new-version-from vs from-current). Do NOT extract a <SegmentedControl>
+  // helper here.
+  const [kind, setKind] = React.useState<AuthStrategyKind>("basic");
+  const [bearerToken, setBearerToken] = React.useState("");
+  const [oidcIssuer, setOidcIssuer] = React.useState("");
+  const [oidcClientId, setOidcClientId] = React.useState("");
+  const [oidcScopes, setOidcScopes] = React.useState("");
   const [error, setError] = React.useState<Error | null>(null);
   const [busy, setBusy] = React.useState(false);
   const labelRef = React.useRef<HTMLInputElement | null>(null);
@@ -55,10 +70,26 @@ export const AddConnectionModal: React.FC<AddConnectionModalProps> = ({
     setUsername("");
     setPassword("");
     setTenantId("");
+    setKind("basic");
+    setBearerToken("");
+    setOidcIssuer("");
+    setOidcClientId("");
+    setOidcScopes("");
     setError(null);
     setBusy(false);
     setTimeout(() => labelRef.current?.focus(), 0);
   }, [open]);
+
+  const switchKind = (next: AuthStrategyKind) => {
+    if (next === kind) return;
+    // Mode-switch clears the previous kind's exclusive fields per the
+    // segmented-control archetype contract; shared fields stay.
+    setBearerToken("");
+    setOidcIssuer("");
+    setOidcClientId("");
+    setOidcScopes("");
+    setKind(next);
+  };
 
   React.useEffect(() => {
     if (!open || busy) return;
@@ -80,17 +111,54 @@ export const AddConnectionModal: React.FC<AddConnectionModalProps> = ({
     onClose();
   };
 
-  const canSubmit = !busy && label.trim() !== "" && baseUrl.trim() !== "";
+  const canSubmit =
+    !busy &&
+    label.trim() !== "" &&
+    baseUrl.trim() !== "" &&
+    (kind !== "bearer" || bearerToken.trim() !== "") &&
+    (kind !== "oidc" ||
+      (oidcIssuer.trim() !== "" &&
+        oidcClientId.trim() !== "" &&
+        oidcScopes
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean).length > 0));
+
+  const buildAuthStrategyConfig = (): unknown => {
+    if (kind === "basic") {
+      return { kind: "basic", config: { username, password } };
+    }
+    if (kind === "bearer") {
+      // Review patch: trim — `canSubmit` already requires `bearerToken.trim()`
+      // to be non-empty; persist the trimmed form so the Authorization header
+      // never picks up trailing whitespace on activation.
+      return { kind: "bearer", config: { token: bearerToken.trim() } };
+    }
+    return {
+      kind: "oidc",
+      config: {
+        issuer: oidcIssuer.trim(),
+        clientId: oidcClientId.trim(),
+        scopes: oidcScopes
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      },
+    };
+  };
 
   const submit = () => {
     if (!canSubmit) return;
     setError(null);
     try {
-      // Validate URL before touching storage so the operator sees the same
-      // error as a future engine connection attempt would surface.
       new URL(baseUrl.trim());
     } catch {
       setError(new Error("Invalid URL"));
+      return;
+    }
+    const parsed = parseAuthStrategyConfig(buildAuthStrategyConfig());
+    if (!parsed.ok) {
+      setError(new Error(formatErrors(parsed.errors)));
       return;
     }
     setBusy(true);
@@ -101,6 +169,7 @@ export const AddConnectionModal: React.FC<AddConnectionModalProps> = ({
         username,
         password,
         tenantId,
+        authStrategyConfig: parsed.value,
       });
       setBusy(false);
       onSuccess(created);
@@ -196,6 +265,154 @@ export const AddConnectionModal: React.FC<AddConnectionModalProps> = ({
                   style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: 12 }}
                 />
               </div>
+              <div>
+                <label
+                  style={{ display: "block", marginBottom: 4, fontSize: 12 }}
+                  htmlFor="add-connection-auth-kind-basic"
+                >
+                  Authentication
+                </label>
+                <div
+                  role="radiogroup"
+                  aria-label="Authentication method"
+                  style={{ display: "flex", gap: 6 }}
+                >
+                  <button
+                    id="add-connection-auth-kind-basic"
+                    type="button"
+                    className="btn"
+                    data-variant={kind === "basic" ? "primary" : "ghost"}
+                    aria-pressed={kind === "basic"}
+                    data-testid="auth-kind-basic"
+                    onClick={() => switchKind("basic")}
+                    disabled={busy}
+                  >
+                    Basic
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    data-variant={kind === "bearer" ? "primary" : "ghost"}
+                    aria-pressed={kind === "bearer"}
+                    data-testid="auth-kind-bearer"
+                    onClick={() => switchKind("bearer")}
+                    disabled={busy}
+                  >
+                    Bearer
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    data-variant={kind === "oidc" ? "primary" : "ghost"}
+                    aria-pressed={kind === "oidc"}
+                    data-testid="auth-kind-oidc"
+                    onClick={() => switchKind("oidc")}
+                    disabled={busy}
+                  >
+                    OIDC
+                  </button>
+                </div>
+                <p
+                  className="mute"
+                  data-testid="auth-dormancy-note"
+                  style={{ marginTop: 6, fontSize: 11 }}
+                >
+                  Persists per-connection config only — activation lands in v1.0.0 (Story 28).
+                </p>
+              </div>
+              {kind === "bearer" && (
+                <div>
+                  <label
+                    htmlFor="add-connection-bearer-token"
+                    style={{ display: "block", marginBottom: 4, fontSize: 12 }}
+                  >
+                    Bearer token
+                  </label>
+                  <textarea
+                    id="add-connection-bearer-token"
+                    data-testid="auth-bearer-token"
+                    rows={3}
+                    maxLength={4096}
+                    value={bearerToken}
+                    onChange={(e) => setBearerToken(e.target.value)}
+                    disabled={busy}
+                    style={{
+                      width: "100%",
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 12,
+                      resize: "vertical",
+                    }}
+                  />
+                  <p
+                    className="mute"
+                    data-testid="auth-bearer-help"
+                    style={{ marginTop: 4, fontSize: 11 }}
+                  >
+                    Stored locally in plaintext — only paste tokens you'd treat as you treat a
+                    password.
+                  </p>
+                </div>
+              )}
+              {kind === "oidc" && (
+                <>
+                  <div>
+                    <label
+                      htmlFor="add-connection-oidc-issuer"
+                      style={{ display: "block", marginBottom: 4, fontSize: 12 }}
+                    >
+                      Issuer URL
+                    </label>
+                    <input
+                      id="add-connection-oidc-issuer"
+                      data-testid="auth-oidc-issuer"
+                      type="text"
+                      value={oidcIssuer}
+                      onChange={(e) => setOidcIssuer(e.target.value)}
+                      disabled={busy}
+                      style={{
+                        width: "100%",
+                        fontFamily: "var(--font-mono)",
+                        fontSize: 12,
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="add-connection-oidc-client-id"
+                      style={{ display: "block", marginBottom: 4, fontSize: 12 }}
+                    >
+                      Client ID
+                    </label>
+                    <input
+                      id="add-connection-oidc-client-id"
+                      data-testid="auth-oidc-client-id"
+                      type="text"
+                      value={oidcClientId}
+                      onChange={(e) => setOidcClientId(e.target.value)}
+                      disabled={busy}
+                      style={{ width: "100%", fontSize: 12 }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="add-connection-oidc-scopes"
+                      style={{ display: "block", marginBottom: 4, fontSize: 12 }}
+                    >
+                      Scopes
+                    </label>
+                    <input
+                      id="add-connection-oidc-scopes"
+                      data-testid="auth-oidc-scopes"
+                      type="text"
+                      value={oidcScopes}
+                      onChange={(e) => setOidcScopes(e.target.value)}
+                      disabled={busy}
+                      placeholder="openid, profile, email, offline_access"
+                      style={{ width: "100%", fontSize: 12 }}
+                    />
+                  </div>
+                </>
+              )}
               <div>
                 <label
                   htmlFor="add-connection-username"

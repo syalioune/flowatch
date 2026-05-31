@@ -206,4 +206,120 @@ describe("<EditConnectionModal>", () => {
     await user.keyboard("{Escape}");
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it("hydrates segmented-control to Basic for connections without authStrategyConfig", async () => {
+    const c = seed();
+    render(
+      <EditConnectionModal
+        open
+        connection={c}
+        onClose={() => undefined}
+        onSuccess={() => undefined}
+      />,
+    );
+    const basic = await screen.findByTestId("auth-kind-basic");
+    expect(basic).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("hydrates Bearer with the persisted token + populates textarea", async () => {
+    loadConnections();
+    const c = addConnection({
+      label: "BTest",
+      baseUrl: "http://b/flowable-rest/service",
+      username: "",
+      password: "",
+      tenantId: "",
+      authStrategyConfig: { kind: "bearer", config: { token: "tok-xyz" } },
+    });
+    render(
+      <EditConnectionModal
+        open
+        connection={c}
+        onClose={() => undefined}
+        onSuccess={() => undefined}
+      />,
+    );
+    expect((await screen.findByTestId("auth-kind-bearer")).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    const ta = (await screen.findByTestId("auth-bearer-token")) as HTMLTextAreaElement;
+    expect(ta.value).toBe("tok-xyz");
+  });
+
+  it("hydrates OIDC scopes joined with ', '", async () => {
+    loadConnections();
+    const c = addConnection({
+      label: "OTest",
+      baseUrl: "http://o/flowable-rest/service",
+      username: "",
+      password: "",
+      tenantId: "",
+      authStrategyConfig: {
+        kind: "oidc",
+        config: {
+          issuer: "https://idp.example.com",
+          clientId: "flowatch",
+          scopes: ["openid", "profile"],
+        },
+      },
+    });
+    render(
+      <EditConnectionModal
+        open
+        connection={c}
+        onClose={() => undefined}
+        onSuccess={() => undefined}
+      />,
+    );
+    expect((await screen.findByTestId("auth-kind-oidc")).getAttribute("aria-pressed")).toBe("true");
+    const scopes = (await screen.findByTestId("auth-oidc-scopes")) as HTMLInputElement;
+    expect(scopes.value).toBe("openid, profile");
+  });
+
+  it("mode-switch enables Save even when other fields unchanged (diff-empty extended)", async () => {
+    const c = seed();
+    const user = userEvent.setup();
+    render(
+      <EditConnectionModal
+        open
+        connection={c}
+        onClose={() => undefined}
+        onSuccess={() => undefined}
+      />,
+    );
+    const submit = (await screen.findByTestId("edit-connection-submit")) as HTMLButtonElement;
+    expect(submit).toBeDisabled();
+    await user.click(screen.getByTestId("auth-kind-bearer"));
+    await user.type(screen.getByTestId("auth-bearer-token"), "x");
+    expect(submit).not.toBeDisabled();
+  });
+
+  it("submit without touching segmented-control preserves the original kind on the persisted entity", async () => {
+    loadConnections();
+    const c = addConnection({
+      label: "BPersisted",
+      baseUrl: "http://b/flowable-rest/service",
+      username: "",
+      password: "",
+      tenantId: "",
+      authStrategyConfig: { kind: "bearer", config: { token: "tok" } },
+    });
+    const user = userEvent.setup();
+    render(
+      <EditConnectionModal
+        open
+        connection={c}
+        onClose={() => undefined}
+        onSuccess={() => undefined}
+      />,
+    );
+    const username = await screen.findByTestId("edit-connection-username");
+    await user.clear(username);
+    await user.type(username, "alice");
+    await user.click(screen.getByTestId("edit-connection-submit"));
+    await waitFor(() => {
+      const persisted = loadConnections().connections.find((x) => x.id === c.id);
+      expect(persisted?.authStrategyConfig?.kind).toBe("bearer");
+    });
+  });
 });
