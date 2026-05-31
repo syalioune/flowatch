@@ -317,6 +317,54 @@ describe("<AddConnectionModal>", () => {
     expect(submit).not.toBeDisabled();
   });
 
+  it("Bearer kind hides username/password inputs; persisted payload omits them", async () => {
+    let created: {
+      username?: string;
+      password?: string;
+      authStrategyConfig?: { kind: string };
+    } | null = null;
+    const user = userEvent.setup();
+    render(
+      <AddConnectionModal
+        open
+        onClose={() => undefined}
+        onSuccess={(c) => {
+          created = c as unknown as typeof created;
+        }}
+      />,
+    );
+    await user.type(await screen.findByTestId("add-connection-label"), "B");
+    await user.type(
+      screen.getByTestId("add-connection-base-url"),
+      "http://b/flowable-rest/service",
+    );
+    await user.click(screen.getByTestId("auth-kind-bearer"));
+    expect(screen.queryByTestId("add-connection-username")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-connection-password")).not.toBeInTheDocument();
+    await user.type(screen.getByTestId("auth-bearer-token"), "tok");
+    await user.click(screen.getByTestId("add-connection-submit"));
+    await waitFor(() => expect(created).not.toBeNull());
+    const c = created as unknown as {
+      username?: string;
+      password?: string;
+      authStrategyConfig?: { kind: string };
+    };
+    expect(c.username).toBeUndefined();
+    expect(c.password).toBeUndefined();
+    expect(c.authStrategyConfig?.kind).toBe("bearer");
+  });
+
+  it("switching Basic → Bearer clears any typed username/password", async () => {
+    const user = userEvent.setup();
+    render(<AddConnectionModal open onClose={() => undefined} onSuccess={() => undefined} />);
+    await user.type(await screen.findByTestId("add-connection-username"), "alice");
+    await user.type(screen.getByTestId("add-connection-password"), "s3cret");
+    await user.click(screen.getByTestId("auth-kind-bearer"));
+    await user.click(screen.getByTestId("auth-kind-basic"));
+    expect((screen.getByTestId("add-connection-username") as HTMLInputElement).value).toBe("");
+    expect((screen.getByTestId("add-connection-password") as HTMLInputElement).value).toBe("");
+  });
+
   it("radiogroup carries role + aria-label", async () => {
     render(<AddConnectionModal open onClose={() => undefined} onSuccess={() => undefined} />);
     const rg = await screen.findByRole("radiogroup", { name: "Authentication method" });

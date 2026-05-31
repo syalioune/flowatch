@@ -221,6 +221,56 @@ describe("<EditConnectionModal>", () => {
     expect(basic).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("Bearer-hydrated modal hides username/password inputs", async () => {
+    loadConnections();
+    const c = addConnection({
+      label: "BHidden",
+      baseUrl: "http://b/flowable-rest/service",
+      tenantId: "",
+      authStrategyConfig: { kind: "bearer", config: { token: "tok" } },
+    });
+    render(
+      <EditConnectionModal
+        open
+        connection={c}
+        onClose={() => undefined}
+        onSuccess={() => undefined}
+      />,
+    );
+    await screen.findByTestId("auth-kind-bearer");
+    expect(screen.queryByTestId("edit-connection-username")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("edit-connection-password")).not.toBeInTheDocument();
+  });
+
+  it("switching kind=basic → kind=bearer drops persisted username/password (tombstone)", async () => {
+    loadConnections();
+    const c = addConnection({
+      label: "ToFlip",
+      baseUrl: "http://b/flowable-rest/service",
+      username: "alice",
+      password: "s3cret",
+      tenantId: "",
+    });
+    const user = userEvent.setup();
+    render(
+      <EditConnectionModal
+        open
+        connection={c}
+        onClose={() => undefined}
+        onSuccess={() => undefined}
+      />,
+    );
+    await user.click(await screen.findByTestId("auth-kind-bearer"));
+    await user.type(screen.getByTestId("auth-bearer-token"), "tok");
+    await user.click(screen.getByTestId("edit-connection-submit"));
+    await waitFor(() => {
+      const persisted = loadConnections().connections.find((x) => x.id === c.id);
+      expect(persisted?.username).toBeUndefined();
+      expect(persisted?.password).toBeUndefined();
+      expect(persisted?.authStrategyConfig?.kind).toBe("bearer");
+    });
+  });
+
   it("hydrates Bearer with the persisted token + populates textarea", async () => {
     loadConnections();
     const c = addConnection({
@@ -299,8 +349,6 @@ describe("<EditConnectionModal>", () => {
     const c = addConnection({
       label: "BPersisted",
       baseUrl: "http://b/flowable-rest/service",
-      username: "",
-      password: "",
       tenantId: "",
       authStrategyConfig: { kind: "bearer", config: { token: "tok" } },
     });
@@ -313,9 +361,11 @@ describe("<EditConnectionModal>", () => {
         onSuccess={() => undefined}
       />,
     );
-    const username = await screen.findByTestId("edit-connection-username");
-    await user.clear(username);
-    await user.type(username, "alice");
+    // Bearer connection — username/password inputs are hidden; type into
+    // the always-visible label to make the diff non-empty.
+    const label = await screen.findByTestId("edit-connection-label");
+    await user.clear(label);
+    await user.type(label, "BPersisted v2");
     await user.click(screen.getByTestId("edit-connection-submit"));
     await waitFor(() => {
       const persisted = loadConnections().connections.find((x) => x.id === c.id);
