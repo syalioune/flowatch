@@ -1058,3 +1058,81 @@ describe("uploadDeployment() — sync-throw pre-network (Story 9.2 AC-7)", () =>
     }
   });
 });
+
+describe("api.createUser (Story 22.1)", () => {
+  it("POSTs /identity/users with the full body", async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        status: 201,
+        json: { id: "alice", firstName: "Alice", lastName: "Smith", email: "a@b.c" },
+      }),
+    );
+    const out = await api.createUser({
+      id: "alice",
+      firstName: "Alice",
+      lastName: "Smith",
+      email: "a@b.c",
+      password: "s3cret",
+    });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${DEFAULT_BASE}/identity/users`);
+    expect(init.method).toBe("POST");
+    expect(init.body).toBe(
+      JSON.stringify({
+        id: "alice",
+        firstName: "Alice",
+        lastName: "Smith",
+        email: "a@b.c",
+        password: "s3cret",
+      }),
+    );
+    expect((init.headers as Record<string, string>).Authorization).toMatch(/^Basic /);
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+    expect(out).toMatchObject({ id: "alice", firstName: "Alice" });
+  });
+
+  it("POSTs id-only body when only id is provided", async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 201, json: { id: "bob" } }));
+    await api.createUser({ id: "bob" });
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(init.body).toBe('{"id":"bob"}');
+  });
+
+  it("API_LOG captures method POST + object body + redacted Authorization", async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 201, json: { id: "carol" } }));
+    await api.createUser({ id: "carol", email: "c@x" });
+    expect(API_LOG[0]?.method).toBe("POST");
+    expect(API_LOG[0]?.path).toBe("/identity/users");
+    expect(API_LOG[0]?.body).toEqual({ id: "carol", email: "c@x" });
+    expect(API_LOG[0]?.headers?.Authorization).toBe("Basic ***");
+  });
+
+  it("rejects with FlowableError on 4xx duplicate-id (verbatim engine message)", async () => {
+    const engineBody = '{"errorMessage":"User already exists","exception":"..."}';
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 409, body: engineBody }));
+    await expect(api.createUser({ id: "dup" })).rejects.toMatchObject({
+      status: 409,
+      message: engineBody,
+    });
+    expect(API_LOG[0]?.status).toBe(409);
+    expect(API_LOG[0]?.error).toBe(engineBody);
+  });
+
+  it("rejects with FlowableError on 400 (engine validates id non-null)", async () => {
+    const engineBody = "Bad request: Id cannot be null";
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 400, body: engineBody }));
+    // The wrapper does not pre-validate — the engine is the source of truth.
+    await expect(api.createUser({ id: "" })).rejects.toMatchObject({
+      status: 400,
+      message: engineBody,
+    });
+  });
+
+  it("resolves on 201 with parsed FlowableUser echo", async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ status: 201, json: { id: "ed", firstName: "Ed" } }),
+    );
+    const u = await api.createUser({ id: "ed", firstName: "Ed", password: "x" });
+    expect(u).toEqual({ id: "ed", firstName: "Ed" });
+  });
+});

@@ -18,10 +18,11 @@
  */
 
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
-import type React from "react";
+import React from "react";
 import { z } from "zod";
 import { api, type FlowableGroup, type FlowablePage, type FlowableUser } from "../../api";
 import { Icon, PageHead } from "../../components";
+import { CreateUserModal } from "../../lib/create-user-modal";
 import { EmptyState, getEmptyState } from "../../lib/empty-states";
 import { ErrorBox } from "../../lib/error-box";
 import { TableSkeleton } from "../../lib/table-skeleton";
@@ -71,21 +72,25 @@ interface PageChromeProps {
   tab: IdentityTab;
   onTabChange: (t: IdentityTab) => void;
   onRefresh?: (() => void) | undefined;
+  extraActions?: React.ReactNode;
 }
 
-function PageChrome({ children, tab, onTabChange, onRefresh }: PageChromeProps) {
+function PageChrome({ children, tab, onTabChange, onRefresh, extraActions }: PageChromeProps) {
   return (
     <div className="page">
       <PageHead
         title="Users & groups"
         subtitle="Identity records used by candidate-user, candidate-group, and assignee bindings."
         actions={
-          onRefresh ? (
-            <button type="button" className="btn" onClick={onRefresh}>
-              <Icon name="refresh" size={13} />
-              Refresh
-            </button>
-          ) : undefined
+          <>
+            {extraActions}
+            {onRefresh ? (
+              <button type="button" className="btn" onClick={onRefresh}>
+                <Icon name="refresh" size={13} />
+                Refresh
+              </button>
+            ) : null}
+          </>
         }
       />
       <div className="seg-row" data-testid="identity-tabs" style={{ padding: "0 0 12px 0" }}>
@@ -149,14 +154,40 @@ function IdentityRoute() {
   const { tab, onTabChange } = useTabNav();
   const router = useRouter();
   const refresh = () => router.invalidate({ filter: (r) => r.routeId === "/identity/" });
+  const [createUserOpen, setCreateUserOpen] = React.useState(false);
+  const createUserButtonRef = React.useRef<HTMLButtonElement>(null);
+
+  const extraActions =
+    tab === "users" ? (
+      <button
+        ref={createUserButtonRef}
+        type="button"
+        className="btn"
+        data-variant="primary"
+        data-testid="create-user"
+        onClick={() => setCreateUserOpen(true)}
+      >
+        <Icon name="plus" size={13} />
+        Create user
+      </button>
+    ) : null;
 
   return (
-    <PageChrome tab={tab} onTabChange={onTabChange} onRefresh={refresh}>
+    <PageChrome tab={tab} onTabChange={onTabChange} onRefresh={refresh} extraActions={extraActions}>
       {tab === "users" ? (
         <UsersList page={data as FlowablePage<FlowableUser>} />
       ) : (
         <GroupsList page={data as FlowablePage<FlowableGroup>} />
       )}
+      <CreateUserModal
+        open={createUserOpen}
+        onClose={() => setCreateUserOpen(false)}
+        onSuccess={() => {
+          setCreateUserOpen(false);
+          router.invalidate({ filter: (r) => r.routeId === "/identity/" });
+        }}
+        triggerRef={createUserButtonRef}
+      />
     </PageChrome>
   );
 }
