@@ -245,6 +245,80 @@
   color: var(--fg-mute);
 }
 
+/* Story 23.1 — connection-switch chip + popover listbox (FR-49). */
+.connection-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  font-size: 12.5px;
+  cursor: pointer;
+  color: var(--fg);
+  font-family: inherit;
+}
+.connection-switch:hover {
+  background: var(--bg-hover);
+}
+.connection-switch .caret {
+  color: var(--fg-mute);
+}
+.connection-picker-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 60;
+  min-width: 280px;
+  max-width: 420px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-md);
+}
+.connection-picker-popover ul {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.connection-picker-popover li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+.connection-picker-popover li:hover,
+.connection-picker-popover li:focus-visible {
+  background: var(--bg-hover);
+  outline: none;
+}
+.connection-picker-popover li[aria-selected="true"] {
+  border-left-color: var(--accent);
+  background: var(--bg-hover);
+}
+.connection-picker-popover li .conn-label {
+  font-weight: 500;
+  font-size: 12.5px;
+}
+.connection-picker-popover li .conn-baseurl {
+  font-size: 11px;
+  color: var(--fg-mute);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.connection-picker-popover .popover-footer {
+  border-top: 1px solid var(--line);
+  padding: 6px 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+
 .search {
   flex: 1;
   max-width: 460px;
