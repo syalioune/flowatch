@@ -8,11 +8,18 @@
  *   - error    → route's errorComponent
  *   - empty    → reverse-membership lookup not exposed by flowable-rest 7.2
  *   - data     → property table
+ *
+ * Story 22.3 — adds Edit + Delete header affordances mirroring UserDetail
+ * (Story 22.2). Delete is one-shot destructive `alertdialog` with
+ * `fallbackRef` cross-domain consumer N=2.
  */
 
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate, useRouter } from "@tanstack/react-router";
+import React from "react";
 import type { FlowableGroup } from "../api";
 import { Icon, PageHead } from "../components";
+import { DeleteGroupModal } from "../lib/delete-group-modal";
+import { EditGroupModal } from "../lib/edit-group-modal";
 import { GroupMembersPanel } from "./GroupMembersPanel";
 
 interface Props {
@@ -21,15 +28,45 @@ interface Props {
 
 export function GroupDetail({ group }: Props) {
   const g = group;
+  const router = useRouter();
+  const navigate = useNavigate();
+  const [editOpen, setEditOpen] = React.useState(false);
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const editTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const deleteTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const backLinkRef = React.useRef<HTMLAnchorElement>(null);
+
   return (
     <div className="page">
       <PageHead
         title={g.name || g.id}
         actions={
-          <Link to="/identity" className="btn" data-variant="ghost">
-            <Icon name="chevron" size={12} />
-            Back
-          </Link>
+          <>
+            <button
+              ref={editTriggerRef}
+              type="button"
+              className="btn"
+              data-variant="ghost"
+              data-testid="edit-group"
+              onClick={() => setEditOpen(true)}
+            >
+              Edit group
+            </button>
+            <button
+              ref={deleteTriggerRef}
+              type="button"
+              className="btn"
+              data-variant="danger"
+              data-testid="delete-group"
+              onClick={() => setDeleteOpen(true)}
+            >
+              Delete group…
+            </button>
+            <Link ref={backLinkRef} to="/identity" className="btn" data-variant="ghost">
+              <Icon name="chevron" size={12} />
+              Back
+            </Link>
+          </>
         }
       />
       <div className="panel">
@@ -68,6 +105,25 @@ export function GroupDetail({ group }: Props) {
         </div>
       </div>
       <GroupMembersPanel groupId={g.id} />
+      <EditGroupModal
+        group={editOpen ? g : null}
+        triggerRef={editTriggerRef}
+        onClose={() => setEditOpen(false)}
+        onSuccess={() => {
+          setEditOpen(false);
+          router.invalidate({ filter: (r) => r.routeId === "/identity/groups/$id" });
+        }}
+      />
+      <DeleteGroupModal
+        group={deleteOpen ? g : null}
+        triggerRef={deleteTriggerRef}
+        fallbackRef={backLinkRef as React.RefObject<HTMLElement | null>}
+        onClose={() => setDeleteOpen(false)}
+        onSettled={() => {
+          setDeleteOpen(false);
+          navigate({ to: "/identity", search: { tab: "groups" as const } });
+        }}
+      />
     </div>
   );
 }

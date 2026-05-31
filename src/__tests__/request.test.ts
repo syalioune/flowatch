@@ -1226,3 +1226,109 @@ describe("api.deleteUser (Story 22.2)", () => {
     expect(API_LOG[0]?.error).toBeUndefined();
   });
 });
+
+describe("api.createGroup (Story 22.3)", () => {
+  it("POSTs /identity/groups with the full body", async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ status: 201, json: { id: "g1", name: "G1", type: "assignment" } }),
+    );
+    const out = await api.createGroup({ id: "g1", name: "G1", type: "assignment" });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${DEFAULT_BASE}/identity/groups`);
+    expect(init.method).toBe("POST");
+    expect(init.body).toBe('{"id":"g1","name":"G1","type":"assignment"}');
+    expect(out).toMatchObject({ id: "g1", name: "G1" });
+  });
+
+  it("POSTs id-only body", async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 201, json: { id: "g2" } }));
+    await api.createGroup({ id: "g2" });
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(init.body).toBe('{"id":"g2"}');
+  });
+
+  it("rejects with FlowableError on 409 duplicate-id", async () => {
+    const engineBody = '{"errorMessage":"already exists"}';
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 409, body: engineBody }));
+    await expect(api.createGroup({ id: "dup" })).rejects.toMatchObject({
+      status: 409,
+      message: engineBody,
+    });
+  });
+
+  it("API_LOG records POST + body + redacted auth", async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 201, json: { id: "g3" } }));
+    await api.createGroup({ id: "g3" });
+    expect(API_LOG[0]?.method).toBe("POST");
+    expect(API_LOG[0]?.body).toEqual({ id: "g3" });
+    expect(API_LOG[0]?.headers?.Authorization).toBe("Basic ***");
+  });
+});
+
+describe("api.updateGroup (Story 22.3)", () => {
+  it("PUTs /identity/groups/{id} with a single-field body", async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ status: 200, json: { id: "g1", name: "renamed" } }),
+    );
+    await api.updateGroup("g1", { name: "renamed" });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${DEFAULT_BASE}/identity/groups/g1`);
+    expect(init.method).toBe("PUT");
+    expect(init.body).toBe('{"name":"renamed"}');
+  });
+
+  it("PUTs multi-field body", async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, json: { id: "g1" } }));
+    await api.updateGroup("g1", { name: "n", type: "security" });
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(init.body).toBe('{"name":"n","type":"security"}');
+  });
+
+  it("encodes special characters in id", async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, json: { id: "g.dot" } }));
+    await api.updateGroup("g.dot", { name: "x" });
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toBe(`${DEFAULT_BASE}/identity/groups/g.dot`);
+  });
+
+  it("throws synchronously when fields is empty", () => {
+    expect(() => api.updateGroup("g1", {})).toThrow("updateGroup requires at least one field");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects with FlowableError on 4xx", async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 404, body: "not found" }));
+    await expect(api.updateGroup("gone", { name: "x" })).rejects.toMatchObject({
+      status: 404,
+      message: "not found",
+    });
+  });
+});
+
+describe("api.deleteGroup (Story 22.3)", () => {
+  it("DELETEs /identity/groups/{id}", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await api.deleteGroup("g1");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${DEFAULT_BASE}/identity/groups/g1`);
+    expect(init.method).toBe("DELETE");
+    expect(API_LOG[0]?.status).toBe(204);
+  });
+
+  it("encodes special characters in id", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await api.deleteGroup("group.with.dots");
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toBe(`${DEFAULT_BASE}/identity/groups/group.with.dots`);
+  });
+
+  it("rejects with FlowableError on 404", async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 404, body: "gone" }));
+    await expect(api.deleteGroup("gone")).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("resolves on 204", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await expect(api.deleteGroup("g1")).resolves.not.toThrow();
+  });
+});
