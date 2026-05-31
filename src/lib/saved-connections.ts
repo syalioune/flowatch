@@ -27,17 +27,14 @@
  */
 
 import { api } from "../api";
+import { type AuthStrategyConfig, parseAuthStrategyConfig } from "./auth-strategy-config";
 import { SAVED_CONNECTIONS_CHANGED } from "./nav-events";
 
-/**
- * Reserved for Story 23.2. The shape is intentionally permissive at 23.1
- * (the slot exists but is unread). Story 23.2 narrows `config` per `kind`
- * via a discriminated union in `src/lib/auth-strategy-config.ts`.
- */
-export interface AuthStrategyConfig {
-  kind: "basic" | "bearer" | "oidc";
-  config: Record<string, unknown>;
-}
+// Story 23.2: the permissive 23.1 typedef is dropped; `AuthStrategyConfig`
+// now comes from `auth-strategy-config.ts` as a strict discriminated union.
+// Re-exported here so existing `SavedConnection` consumers keep their import
+// path stable.
+export type { AuthStrategyConfig };
 
 export interface SavedConnection {
   id: string;
@@ -148,6 +145,12 @@ export function migrateLegacyConnection(): SavedConnectionsState {
 /**
  * Read the persisted state. Defensive — corrupt JSON, missing schemaVersion,
  * or a non-array `connections` triggers {@link migrateLegacyConnection}.
+ *
+ * Story 23.2: each connection's `authStrategyConfig` (if present) is run
+ * through {@link parseAuthStrategyConfig}; corrupt shapes silent-drop to
+ * `undefined`. The operator's recovery is the Edit modal (where kind
+ * defaults to `"basic"` when the slot is empty). The connection itself
+ * survives — only the bad config is dropped.
  */
 export function loadConnections(): SavedConnectionsState {
   try {
@@ -155,6 +158,17 @@ export function loadConnections(): SavedConnectionsState {
     if (!raw) return migrateLegacyConnection();
     const parsed = JSON.parse(raw);
     if (!isValidStateShape(parsed)) return migrateLegacyConnection();
+    for (const c of parsed.connections) {
+      if (c.authStrategyConfig !== undefined) {
+        const r = parseAuthStrategyConfig(c.authStrategyConfig);
+        if (r.ok) c.authStrategyConfig = r.value;
+        // Review patch: `delete` rather than assigning `undefined` so the slot
+        // doesn't become an enumerable own-property carrying a `undefined`
+        // value that JSON.stringify would still skip but Object.keys would
+        // surface.
+        else delete c.authStrategyConfig;
+      }
+    }
     return parsed;
   } catch {
     return migrateLegacyConnection();

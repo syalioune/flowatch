@@ -148,6 +148,181 @@ describe("<AddConnectionModal>", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("segmented-control renders three buttons with aria-pressed reflecting kind", async () => {
+    render(<AddConnectionModal open onClose={() => undefined} onSuccess={() => undefined} />);
+    const basic = await screen.findByTestId("auth-kind-basic");
+    const bearer = screen.getByTestId("auth-kind-bearer");
+    const oidc = screen.getByTestId("auth-kind-oidc");
+    expect(basic).toHaveAttribute("aria-pressed", "true");
+    expect(bearer).toHaveAttribute("aria-pressed", "false");
+    expect(oidc).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("dormancy note + bearer help text render conditionally on kind", async () => {
+    const user = userEvent.setup();
+    render(<AddConnectionModal open onClose={() => undefined} onSuccess={() => undefined} />);
+    expect(await screen.findByTestId("auth-dormancy-note")).toBeInTheDocument();
+    expect(screen.queryByTestId("auth-bearer-help")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("auth-kind-bearer"));
+    expect(await screen.findByTestId("auth-bearer-help")).toBeInTheDocument();
+  });
+
+  it("switching kind clears the previous kind's exclusive field", async () => {
+    const user = userEvent.setup();
+    render(<AddConnectionModal open onClose={() => undefined} onSuccess={() => undefined} />);
+    await user.click(await screen.findByTestId("auth-kind-bearer"));
+    const tokenInput = await screen.findByTestId("auth-bearer-token");
+    await user.type(tokenInput, "tok-xyz");
+    expect((tokenInput as HTMLTextAreaElement).value).toBe("tok-xyz");
+    await user.click(screen.getByTestId("auth-kind-oidc"));
+    expect(screen.queryByTestId("auth-bearer-token")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("auth-kind-bearer"));
+    const re = await screen.findByTestId("auth-bearer-token");
+    expect((re as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("Submit happy: Bearer kind writes authStrategyConfig", async () => {
+    let created: { authStrategyConfig?: unknown } | null = null;
+    const user = userEvent.setup();
+    render(
+      <AddConnectionModal
+        open
+        onClose={() => undefined}
+        onSuccess={(c) => {
+          created = c;
+        }}
+      />,
+    );
+    await user.type(await screen.findByTestId("add-connection-label"), "Br");
+    await user.type(
+      screen.getByTestId("add-connection-base-url"),
+      "http://b/flowable-rest/service",
+    );
+    await user.click(screen.getByTestId("auth-kind-bearer"));
+    await user.type(screen.getByTestId("auth-bearer-token"), "tok");
+    await user.click(screen.getByTestId("add-connection-submit"));
+    await waitFor(() => expect(created).not.toBeNull());
+    expect(
+      (created as unknown as { authStrategyConfig?: { kind: string } } | null)?.authStrategyConfig
+        ?.kind,
+    ).toBe("bearer");
+  });
+
+  it("Submit OIDC happy: writes scopes as string[]", async () => {
+    let created: { authStrategyConfig?: { kind: string; config: { scopes?: string[] } } } | null =
+      null;
+    const user = userEvent.setup();
+    render(
+      <AddConnectionModal
+        open
+        onClose={() => undefined}
+        onSuccess={(c) => {
+          created = c as unknown as typeof created;
+        }}
+      />,
+    );
+    await user.type(await screen.findByTestId("add-connection-label"), "Oc");
+    await user.type(
+      screen.getByTestId("add-connection-base-url"),
+      "http://o/flowable-rest/service",
+    );
+    await user.click(screen.getByTestId("auth-kind-oidc"));
+    await user.type(screen.getByTestId("auth-oidc-issuer"), "https://idp.example.com");
+    await user.type(screen.getByTestId("auth-oidc-client-id"), "flowatch");
+    await user.type(screen.getByTestId("auth-oidc-scopes"), "openid, profile");
+    await user.click(screen.getByTestId("add-connection-submit"));
+    await waitFor(() => expect(created).not.toBeNull());
+    expect(
+      (
+        created as unknown as {
+          authStrategyConfig?: { kind: string; config: { scopes?: string[] } };
+        } | null
+      )?.authStrategyConfig?.config?.scopes,
+    ).toEqual(["openid", "profile"]);
+  });
+
+  it("Submit Basic implicit writes authStrategyConfig kind basic without touching segmented-control", async () => {
+    let created: { authStrategyConfig?: { kind: string } } | null = null;
+    const user = userEvent.setup();
+    render(
+      <AddConnectionModal
+        open
+        onClose={() => undefined}
+        onSuccess={(c) => {
+          created = c as unknown as typeof created;
+        }}
+      />,
+    );
+    await user.type(await screen.findByTestId("add-connection-label"), "Imp");
+    await user.type(
+      screen.getByTestId("add-connection-base-url"),
+      "http://i/flowable-rest/service",
+    );
+    await user.click(screen.getByTestId("add-connection-submit"));
+    await waitFor(() => expect(created).not.toBeNull());
+    expect(
+      (created as unknown as { authStrategyConfig?: { kind: string } } | null)?.authStrategyConfig
+        ?.kind,
+    ).toBe("basic");
+  });
+
+  it("Save disabled when Bearer textarea empty", async () => {
+    const user = userEvent.setup();
+    render(<AddConnectionModal open onClose={() => undefined} onSuccess={() => undefined} />);
+    await user.type(await screen.findByTestId("add-connection-label"), "Br");
+    await user.type(
+      screen.getByTestId("add-connection-base-url"),
+      "http://b/flowable-rest/service",
+    );
+    await user.click(screen.getByTestId("auth-kind-bearer"));
+    const submit = screen.getByTestId("add-connection-submit") as HTMLButtonElement;
+    expect(submit).toBeDisabled();
+    await user.type(screen.getByTestId("auth-bearer-token"), "tok");
+    expect(submit).not.toBeDisabled();
+  });
+
+  it("OIDC invalid issuer surfaces ErrorBox", async () => {
+    const user = userEvent.setup();
+    render(<AddConnectionModal open onClose={() => undefined} onSuccess={() => undefined} />);
+    await user.type(await screen.findByTestId("add-connection-label"), "Bad");
+    await user.type(
+      screen.getByTestId("add-connection-base-url"),
+      "http://x/flowable-rest/service",
+    );
+    await user.click(screen.getByTestId("auth-kind-oidc"));
+    await user.type(screen.getByTestId("auth-oidc-issuer"), "not-a-url");
+    await user.type(screen.getByTestId("auth-oidc-client-id"), "c");
+    await user.type(screen.getByTestId("auth-oidc-scopes"), "openid");
+    await user.click(screen.getByTestId("add-connection-submit"));
+    await waitFor(() => expect(screen.getByText(/Must be a valid URL/)).toBeInTheDocument());
+    expect(screen.getByTestId("add-connection-modal")).toBeInTheDocument();
+  });
+
+  it("Save disabled when OIDC required fields missing", async () => {
+    const user = userEvent.setup();
+    render(<AddConnectionModal open onClose={() => undefined} onSuccess={() => undefined} />);
+    await user.type(await screen.findByTestId("add-connection-label"), "Oc");
+    await user.type(
+      screen.getByTestId("add-connection-base-url"),
+      "http://o/flowable-rest/service",
+    );
+    await user.click(screen.getByTestId("auth-kind-oidc"));
+    const submit = screen.getByTestId("add-connection-submit") as HTMLButtonElement;
+    expect(submit).toBeDisabled();
+    await user.type(screen.getByTestId("auth-oidc-issuer"), "https://idp.example.com");
+    expect(submit).toBeDisabled();
+    await user.type(screen.getByTestId("auth-oidc-client-id"), "c");
+    expect(submit).toBeDisabled();
+    await user.type(screen.getByTestId("auth-oidc-scopes"), "openid");
+    expect(submit).not.toBeDisabled();
+  });
+
+  it("radiogroup carries role + aria-label", async () => {
+    render(<AddConnectionModal open onClose={() => undefined} onSuccess={() => undefined} />);
+    const rg = await screen.findByRole("radiogroup", { name: "Authentication method" });
+    expect(rg).toBeInTheDocument();
+  });
+
   it("resets state on re-open", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();

@@ -262,6 +262,60 @@ describe("getActiveConnection", () => {
   });
 });
 
+describe("loadConnections — defensive narrowing of authStrategyConfig (Story 23.2)", () => {
+  it("valid bearer config persists + parses back narrowed", () => {
+    loadConnections();
+    const added = addConnection({
+      label: "BearerTest",
+      baseUrl: "http://b/flowable-rest/service",
+      username: "",
+      password: "",
+      tenantId: "",
+      authStrategyConfig: { kind: "bearer", config: { token: "abc" } },
+    });
+    const state = loadConnections();
+    const found = state.connections.find((c) => c.id === added.id);
+    expect(found?.authStrategyConfig?.kind).toBe("bearer");
+    if (found?.authStrategyConfig?.kind === "bearer") {
+      expect(found.authStrategyConfig.config.token).toBe("abc");
+    }
+  });
+
+  it("invalid persisted bearer config (empty token) silently drops to undefined", () => {
+    const state = loadConnections();
+    const id = state.connections[0]?.id as string;
+    // Manually mutate localStorage to insert a corrupt config.
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) as string);
+    raw.connections[0].authStrategyConfig = { kind: "bearer", config: { token: "" } };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(raw));
+    const reread = loadConnections();
+    const found = reread.connections.find((c) => c.id === id);
+    expect(found?.authStrategyConfig).toBeUndefined();
+  });
+
+  it("unknown kind silently drops to undefined", () => {
+    const state = loadConnections();
+    const id = state.connections[0]?.id as string;
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) as string);
+    raw.connections[0].authStrategyConfig = { kind: "foo", config: {} };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(raw));
+    const reread = loadConnections();
+    const found = reread.connections.find((c) => c.id === id);
+    expect(found?.authStrategyConfig).toBeUndefined();
+  });
+
+  it("non-object authStrategyConfig silently drops", () => {
+    const state = loadConnections();
+    const id = state.connections[0]?.id as string;
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) as string);
+    raw.connections[0].authStrategyConfig = "not-an-object";
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(raw));
+    const reread = loadConnections();
+    const found = reread.connections.find((c) => c.id === id);
+    expect(found?.authStrategyConfig).toBeUndefined();
+  });
+});
+
 describe("saveConnections — quota error is silent", () => {
   it("setItem throw does not bubble", () => {
     const state = loadConnections();
