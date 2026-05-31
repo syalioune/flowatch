@@ -82,12 +82,15 @@ export const AddConnectionModal: React.FC<AddConnectionModalProps> = ({
 
   const switchKind = (next: AuthStrategyKind) => {
     if (next === kind) return;
-    // Mode-switch clears the previous kind's exclusive fields per the
-    // segmented-control archetype contract; shared fields stay.
+    // Mode-switch clears every kind-exclusive field. username/password are
+    // Basic-exclusive (Story 23.2 follow-up) — clear them when leaving
+    // Basic AND when entering Basic the operator types them fresh.
     setBearerToken("");
     setOidcIssuer("");
     setOidcClientId("");
     setOidcScopes("");
+    setUsername("");
+    setPassword("");
     setKind(next);
   };
 
@@ -163,14 +166,20 @@ export const AddConnectionModal: React.FC<AddConnectionModalProps> = ({
     }
     setBusy(true);
     try {
-      const created = addConnection({
+      const payload: Omit<SavedConnection, "id"> = {
         label: label.trim(),
         baseUrl: baseUrl.trim(),
-        username,
-        password,
         tenantId,
         authStrategyConfig: parsed.value,
-      });
+      };
+      // Story 23.2 follow-up: username/password are Basic-exclusive —
+      // omitted entirely for Bearer / OIDC so the persisted model doesn't
+      // carry empty credentials.
+      if (kind === "basic") {
+        payload.username = username;
+        payload.password = password;
+      }
+      const created = addConnection(payload);
       setBusy(false);
       onSuccess(created);
       closeWithFocus();
@@ -413,42 +422,46 @@ export const AddConnectionModal: React.FC<AddConnectionModalProps> = ({
                   </div>
                 </>
               )}
-              <div>
-                <label
-                  htmlFor="add-connection-username"
-                  style={{ display: "block", marginBottom: 4, fontSize: 12 }}
-                >
-                  Username
-                </label>
-                <input
-                  id="add-connection-username"
-                  data-testid="add-connection-username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  disabled={busy}
-                  maxLength={255}
-                  style={{ width: "100%", fontSize: 12 }}
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="add-connection-password"
-                  style={{ display: "block", marginBottom: 4, fontSize: 12 }}
-                >
-                  Password
-                </label>
-                <input
-                  id="add-connection-password"
-                  data-testid="add-connection-password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={busy}
-                  maxLength={255}
-                  style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: 12 }}
-                />
-              </div>
+              {kind === "basic" && (
+                <>
+                  <div>
+                    <label
+                      htmlFor="add-connection-username"
+                      style={{ display: "block", marginBottom: 4, fontSize: 12 }}
+                    >
+                      Username
+                    </label>
+                    <input
+                      id="add-connection-username"
+                      data-testid="add-connection-username"
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      disabled={busy}
+                      maxLength={255}
+                      style={{ width: "100%", fontSize: 12 }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="add-connection-password"
+                      style={{ display: "block", marginBottom: 4, fontSize: 12 }}
+                    >
+                      Password
+                    </label>
+                    <input
+                      id="add-connection-password"
+                      data-testid="add-connection-password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      disabled={busy}
+                      maxLength={255}
+                      style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: 12 }}
+                    />
+                  </div>
+                </>
+              )}
               <div>
                 <label
                   htmlFor="add-connection-tenant-id"

@@ -66,8 +66,8 @@ const inputsFrom = (c: SavedConnection): Inputs => {
   return {
     label: c.label,
     baseUrl: c.baseUrl,
-    username: c.username,
-    password: c.password,
+    username: c.username ?? "",
+    password: c.password ?? "",
     tenantId: c.tenantId,
     kind,
     bearerToken,
@@ -133,6 +133,10 @@ export const EditConnectionModal: React.FC<EditConnectionModalProps> = ({
 
   const switchKind = (next: AuthStrategyKind) => {
     if (next === inputs.kind) return;
+    // Story 23.2 follow-up: username/password are Basic-exclusive — clear
+    // them along with the other mode-exclusive fields. Switching back to
+    // Basic shows empty fields; the operator re-types or saves an empty
+    // Basic config.
     setInputs((prev) => ({
       ...prev,
       kind: next,
@@ -140,6 +144,8 @@ export const EditConnectionModal: React.FC<EditConnectionModalProps> = ({
       oidcIssuer: "",
       oidcClientId: "",
       oidcScopes: "",
+      username: "",
+      password: "",
     }));
   };
 
@@ -208,9 +214,17 @@ export const EditConnectionModal: React.FC<EditConnectionModalProps> = ({
   const diff: Partial<Omit<SavedConnection, "id">> = {};
   if (inputs.label !== connection.label) diff.label = inputs.label;
   if (inputs.baseUrl !== connection.baseUrl) diff.baseUrl = inputs.baseUrl;
-  if (inputs.username !== connection.username) diff.username = inputs.username;
-  if (inputs.password !== connection.password) diff.password = inputs.password;
   if (inputs.tenantId !== connection.tenantId) diff.tenantId = inputs.tenantId;
+  // Story 23.2 follow-up: username/password tracked only when kind=basic.
+  // For Bearer/OIDC, emit `undefined` (tombstone via updateConnection) when
+  // the persisted entity still carries those fields from a prior Basic life.
+  if (inputs.kind === "basic") {
+    if (inputs.username !== (connection.username ?? "")) diff.username = inputs.username;
+    if (inputs.password !== (connection.password ?? "")) diff.password = inputs.password;
+  } else {
+    if (connection.username !== undefined) diff.username = undefined;
+    if (connection.password !== undefined) diff.password = undefined;
+  }
 
   const diffEmpty = Object.keys(diff).length === 0 && !authConfigChanged;
   const perKindFilled =
@@ -495,42 +509,46 @@ export const EditConnectionModal: React.FC<EditConnectionModalProps> = ({
                   </div>
                 </>
               )}
-              <div>
-                <label
-                  htmlFor="edit-connection-username"
-                  style={{ display: "block", marginBottom: 4, fontSize: 12 }}
-                >
-                  Username
-                </label>
-                <input
-                  id="edit-connection-username"
-                  data-testid="edit-connection-username"
-                  type="text"
-                  value={inputs.username}
-                  onChange={(e) => setField("username", e.target.value)}
-                  disabled={busy}
-                  maxLength={255}
-                  style={{ width: "100%", fontSize: 12 }}
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="edit-connection-password"
-                  style={{ display: "block", marginBottom: 4, fontSize: 12 }}
-                >
-                  Password
-                </label>
-                <input
-                  id="edit-connection-password"
-                  data-testid="edit-connection-password"
-                  type="password"
-                  value={inputs.password}
-                  onChange={(e) => setField("password", e.target.value)}
-                  disabled={busy}
-                  maxLength={255}
-                  style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: 12 }}
-                />
-              </div>
+              {inputs.kind === "basic" && (
+                <>
+                  <div>
+                    <label
+                      htmlFor="edit-connection-username"
+                      style={{ display: "block", marginBottom: 4, fontSize: 12 }}
+                    >
+                      Username
+                    </label>
+                    <input
+                      id="edit-connection-username"
+                      data-testid="edit-connection-username"
+                      type="text"
+                      value={inputs.username}
+                      onChange={(e) => setField("username", e.target.value)}
+                      disabled={busy}
+                      maxLength={255}
+                      style={{ width: "100%", fontSize: 12 }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="edit-connection-password"
+                      style={{ display: "block", marginBottom: 4, fontSize: 12 }}
+                    >
+                      Password
+                    </label>
+                    <input
+                      id="edit-connection-password"
+                      data-testid="edit-connection-password"
+                      type="password"
+                      value={inputs.password}
+                      onChange={(e) => setField("password", e.target.value)}
+                      disabled={busy}
+                      maxLength={255}
+                      style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: 12 }}
+                    />
+                  </div>
+                </>
+              )}
               <div>
                 <label
                   htmlFor="edit-connection-tenant-id"

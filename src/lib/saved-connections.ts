@@ -40,8 +40,18 @@ export interface SavedConnection {
   id: string;
   label: string;
   baseUrl: string;
-  username: string;
-  password: string;
+  /**
+   * Basic-exclusive credentials. Story 23.2 follow-up: omitted when
+   * `authStrategyConfig.kind !== "basic"` so Bearer / OIDC entries don't
+   * carry empty / stale username/password fields. The runtime call path
+   * (api.setConfig) defaults missing values to "" via setActiveConnection.
+   *
+   * `undefined` is an accepted value for these slots so `updateConnection`
+   * can carry tombstones in the patch object (kind=basic → kind=bearer
+   * drops the fields from the entity).
+   */
+  username?: string | undefined;
+  password?: string | undefined;
   tenantId: string;
   /** Story 23.2 reserves; 23.1 leaves typed-but-unread. */
   authStrategyConfig?: AuthStrategyConfig | undefined;
@@ -89,11 +99,12 @@ const isValidStateShape = (raw: unknown): raw is SavedConnectionsState => {
     const conn = c as Partial<SavedConnection>;
     if (typeof conn.id !== "string" || typeof conn.label !== "string") return false;
     // Review patch: strict typecheck on cfg string fields so a partially-
-    // corrupt entry (missing `password`, non-string `baseUrl`) cannot leak
-    // into `api.setConfig` and corrupt the Authorization header.
+    // corrupt entry cannot leak into `api.setConfig` and corrupt the
+    // Authorization header. Story 23.2 follow-up: `username`/`password` are
+    // optional (Basic-exclusive); accept missing OR string.
     if (typeof conn.baseUrl !== "string") return false;
-    if (typeof conn.username !== "string") return false;
-    if (typeof conn.password !== "string") return false;
+    if (conn.username !== undefined && typeof conn.username !== "string") return false;
+    if (conn.password !== undefined && typeof conn.password !== "string") return false;
     if (typeof conn.tenantId !== "string") return false;
   }
   return true;
@@ -228,6 +239,12 @@ export function updateConnection(
     }
   }
   const updated: SavedConnection = { ...current, ...patch };
+  // Tombstone semantics: callers that explicitly pass `undefined` for an
+  // optional field signal "delete it" (e.g., switching kind=basic → bearer
+  // drops `username`/`password` from the entity).
+  for (const k of Object.keys(patch) as (keyof typeof patch)[]) {
+    if (patch[k] === undefined) delete (updated as unknown as Record<string, unknown>)[k];
+  }
   state.connections[idx] = updated;
   saveConnections(state);
   dispatch();
@@ -267,8 +284,11 @@ export function setActiveConnection(id: string): SavedConnection {
   saveConnections(state);
   api.setConfig({
     baseUrl: selected.baseUrl,
-    username: selected.username,
-    password: selected.password,
+    // Missing username/password (Bearer/OIDC connections) defaults to "" —
+    // the runtime call path is still Basic auth today; Story 28.x activates
+    // the AuthStrategy interface that consumes `authStrategyConfig`.
+    username: selected.username ?? "",
+    password: selected.password ?? "",
     tenantId: selected.tenantId,
   });
   dispatch();
