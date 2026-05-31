@@ -27,3 +27,16 @@
  * Listener (sole): src/app.tsx's `refreshNavCounts` effect.
  */
 export const NAV_INVALIDATE_COUNTS = "nav:invalidate-counts" as const;
+
+/**
+ * Cross-component invalidation event dispatched by the saved-connections
+ * CRUD module (`src/lib/saved-connections.ts`) on every write — add / update
+ * / delete / set-active.
+ *
+ * Listeners: the SettingsModal Manage-connections panel + the Topbar
+ * `.connection-switch` chip popover. Both re-read `loadConnections()` on
+ * receipt; no prop drilling.
+ *
+ * Hoist origin: Story 23.1 (FR-49).
+ */
+export const SAVED_CONNECTIONS_CHANGED = "saved-connections:changed" as const;

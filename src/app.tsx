@@ -134,24 +134,41 @@ function App() {
     }
   }, []);
 
+  const refetchTenants = React.useCallback(async (): Promise<void> => {
+    try {
+      const tres = await api.listTenants();
+      const list = [DEFAULT_TENANT, ...(tres.data || [])];
+      setTenants(list);
+    } catch {}
+  }, []);
+
   React.useEffect(() => {
     void probe();
-    (async () => {
-      try {
-        const tres = await api.listTenants();
-        const list = [DEFAULT_TENANT, ...(tres.data || [])];
-        setTenants(list);
-      } catch {}
-    })();
-  }, [probe]);
+    void refetchTenants();
+  }, [probe, refetchTenants]);
 
+  // Story 23.1: a connection switch (Topbar `.connection-switch` chip OR the
+  // SettingsModal Manage section dropdown) funnels through `api.setConfig` →
+  // dispatches `conn:config-changed`. We re-probe, reset local tenant state
+  // to `All tenants` (cross-engine tenant lists differ — the previous engine's
+  // tenant id may not exist on the new one), re-fetch the tenant list, and
+  // invalidate the active route's loader (mirrors `cycleTenant`).
+  //
+  // Review patch: we do NOT call `api.setConfig({tenantId: ""})` here — that
+  // would (a) clobber the tenantId the just-selected `SavedConnection` wrote
+  // through `setActiveConnection`, and (b) re-dispatch `conn:config-changed`
+  // re-entering this same handler. The React `tenant` state reset is enough
+  // — the engine cfg's tenantId now reflects the new connection's choice.
   React.useEffect(() => {
     const handler = (): void => {
       void probe();
+      setTenant(DEFAULT_TENANT);
+      void refetchTenants();
+      void router.invalidate();
     };
     window.addEventListener("conn:config-changed", handler);
     return () => window.removeEventListener("conn:config-changed", handler);
-  }, [probe]);
+  }, [probe, refetchTenants, router]);
 
   // Sidebar count fetch — wrapped in a stable callback so the tenant-change
   // effect AND the `nav:invalidate-counts` window listener both call it.

@@ -4,6 +4,8 @@ import { Link } from "@tanstack/react-router";
 import React from "react";
 import noticeContent from "../NOTICE?raw";
 import { API_LOG, type ApiLogEntry, api, type FlowableConfig, type HTTPMethod } from "./api";
+import { ConnectionSwitch } from "./components/ConnectionSwitch";
+import { ManageConnectionsPanel } from "./components/ManageConnectionsPanel";
 import { buildCurlCommand, CURL_MULTIPART, CURL_UNSERIALIZABLE } from "./lib/curl";
 import { errorStatus } from "./lib/error";
 import { type RouteEndpoint, useRouteMeta } from "./lib/route-meta";
@@ -404,6 +406,7 @@ export const Topbar = ({
   onTweaks,
 }: TopbarProps) => (
   <div className="topbar">
+    <ConnectionSwitch onSettings={onSettings} />
     <div className="tenant-switch" data-testid="tenant-switch" onClick={onTenant}>
       <Icon name="tenant" size={13} />
       <span>
@@ -592,6 +595,7 @@ export const SettingsModal = ({ open, onClose }: SettingsModalProps) => {
                   </span>
                 )}
               </div>
+              <ManageConnectionsPanel onCloseSettings={onClose} />
             </div>
             <div className="modal-ft">
               <button type="button" className="btn" onClick={onClose}>
