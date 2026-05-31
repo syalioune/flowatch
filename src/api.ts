@@ -18,369 +18,85 @@
  * See ADR-001 / P-001 / P-003 / P-004 in _bmad-output/planning-artifacts/architecture.md.
  */
 
-// ── Type vocabulary ───────────────────────────────────────────────────────
+// ── Type vocabulary + DTOs ────────────────────────────────────────────────
+//
+// Extracted to src/api-types.ts at Story 21.x to satisfy the 50 KB NFR-21
+// navigability limit. Every symbol is re-exported below so existing
+// `import { FlowableTask } from "../api"` call sites resolve unchanged.
 
-export type HTTPMethod = "GET" | "POST" | "PUT" | "DELETE";
+export type {
+  AddAttachmentPayload,
+  ApiLogEntry,
+  ExecuteDecisionBody,
+  FlowableAttachment,
+  FlowableConfig,
+  FlowableDecision,
+  FlowableDecisionExecutionInputVariable,
+  FlowableDecisionResult,
+  FlowableDecisionResultVariable,
+  FlowableDeployment,
+  FlowableDmnExecutionAudit,
+  FlowableDmnRuleConditionResult,
+  FlowableDmnRuleExecution,
+  FlowableEngineInfo,
+  FlowableFormProperty,
+  FlowableGroup,
+  FlowableHistoricActivity,
+  FlowableHistoricDecisionExecution,
+  FlowableHistoricProcessInstance,
+  FlowableHistoricTask,
+  FlowableHistoricVariable,
+  FlowableHistoricVariableValue,
+  FlowableJob,
+  FlowablePage,
+  FlowableProcessDefinition,
+  FlowableProcessInstance,
+  FlowableResource,
+  FlowableTask,
+  FlowableTaskForm,
+  FlowableTenant,
+  FlowableUser,
+  FlowableVariable,
+  FlowableVariableInput,
+  HTTPMethod,
+  QueryParams,
+  RequestOpts,
+} from "./api-types";
+export { FlowableError } from "./api-types";
 
-export interface FlowableConfig {
-  baseUrl: string;
-  username: string;
-  password: string;
-  tenantId: string;
-}
-
-export interface FlowablePage<T> {
-  data: T[];
-  total: number;
-  start: number;
-  size: number;
-  sort: string;
-  order: string;
-}
-
-export interface FlowableEngineInfo {
-  name: string;
-  version: string;
-  resourceUrl?: string;
-  exception?: string | null;
-}
-
-export interface ApiLogEntry {
-  id: string;
-  method: HTTPMethod;
-  path: string;
-  url: string;
-  status: number;
-  ms: number;
-  at: string;
-  headers?: Record<string, string>;
-  body?: unknown;
-  error?: string;
-}
-
-export type QueryParams = Record<string, string | number | boolean | null | undefined>;
-
-export interface RequestOpts {
-  params?: QueryParams | undefined;
-  body?: unknown;
-  base?: string | undefined;
-  raw?: boolean | undefined;
-  // Story 9.6: when set, request() returns the raw `Response` object instead
-  // of a parsed body. Used by binary downloads where the caller picks the body
-  // method (`.blob()` / `.arrayBuffer()`). Mutually exclusive with `raw` — if
-  // both are set, `asResponse` wins.
-  asResponse?: boolean | undefined;
-}
-
-export class FlowableError extends Error {
-  readonly status: number;
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = "FlowableError";
-    this.status = status;
-  }
-}
-
-// ── Minimal Flowable DTOs (fields the UI consumes today) ──────────────────
-
-export interface FlowableDeployment {
-  id: string;
-  name: string;
-  deploymentTime: string;
-  tenantId: string;
-  category?: string;
-}
-
-export interface FlowableProcessDefinition {
-  id: string;
-  key: string;
-  name: string;
-  version: number;
-  deploymentId: string;
-  category?: string;
-  suspended?: boolean;
-  tenantId?: string;
-}
-
-export interface FlowableProcessInstance {
-  id: string;
-  processDefinitionId: string;
-  processDefinitionKey: string;
-  businessKey?: string;
-  startTime: string;
-  ended?: boolean;
-  tenantId?: string;
-  suspended?: boolean;
-}
-
-export interface FlowableTask {
-  id: string;
-  name: string;
-  assignee?: string;
-  owner?: string;
-  priority: number;
-  dueDate?: string;
-  createTime: string;
-  processInstanceId?: string;
-  processDefinitionId?: string;
-  tenantId?: string;
-}
-
-// Story 21.2: task attachment DTO. Optional fields per the Flowable REST
-// task-attachments spec — the engine derives `id` / `time` / `userId` and
-// echoes the operator-supplied `name` / `description` / `type` / `externalUrl`.
-// `url` is the engine-side content URL for file attachments (e.g.
-// /runtime/tasks/{id}/attachments/{aid}/content).
-export interface FlowableAttachment {
-  id: string;
-  name?: string;
-  description?: string;
-  type?: string;
-  taskId?: string;
-  processInstanceId?: string;
-  externalUrl?: string;
-  url?: string;
-  time?: string;
-  userId?: string;
-}
-
-// Story 21.2: discriminated-union payload for api.addTaskAttachment. The
-// wrapper branches at runtime: kind="url" → JSON body; kind="file" →
-// multipart FormData body (mirrors the uploadDeployment envelope shape
-// inside src/api.ts; Pattern P-001 preserved).
-export type AddAttachmentPayload =
-  | { kind: "url"; name: string; type?: string; description?: string; externalUrl: string }
-  | { kind: "file"; name: string; type?: string; description?: string; file: File };
-
-// Story 11.3 (closes the Story 1.1 deferred-work entry for FlowableTaskForm).
-// Per the Flowable FormProperty contract, `type` is a curated union; the
-// trailing `string` keeps unknown engine-extension types type-checking so
-// the form panel can fall through to a text-input render.
-export interface FlowableFormProperty {
-  id: string;
-  name?: string;
-  type: "string" | "long" | "double" | "enum" | "date" | "boolean" | string;
-  value?: string;
-  required?: boolean;
-  readable?: boolean;
-  writable?: boolean;
-  enumValues?: Array<string | { id?: string; name?: string }>;
-}
-
-export interface FlowableTaskForm {
-  formKey?: string;
-  formProperties?: FlowableFormProperty[];
-}
-
-export interface FlowableJob {
-  id: string;
-  processInstanceId?: string;
-  processDefinitionId?: string;
-  executionId?: string;
-  retries: number;
-  exceptionMessage?: string;
-  dueDate?: string;
-  tenantId?: string;
-}
-
-export interface FlowableUser {
-  id: string;
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  tenantId?: string;
-}
-
-export interface FlowableGroup {
-  id: string;
-  name?: string;
-  type?: string;
-}
-
-export interface FlowableVariable {
-  name: string;
-  value: unknown;
-  type?: string;
-  scope?: string;
-}
-
-// Story 19.1: PUT-side input DTO for /runtime/process-instances/{id}/variables.
-// Distinct from the GET-side FlowableVariable to avoid round-tripping computed
-// engine-side fields (e.g. valueUrl on binary types) back through PUT.
-export interface FlowableVariableInput {
-  name: string;
-  value: unknown;
-  type?: string;
-  scope?: "global" | "local";
-}
-
-export interface FlowableResource {
-  // Per the live flowable-rest 7.2 response: `id` is the filename
-  // (e.g. "Helpdesk.bpmn20.xml") and there is NO `name` field. Earlier DTO
-  // versions declared `name: string` — that field never existed on the wire.
-  id: string;
-  mediaType: string;
-  type?: string;
-  url?: string;
-  contentUrl?: string;
-}
-
-// Story 15.3: typed input variable shape for POST /dmn-rule/execute.
-export interface FlowableDecisionExecutionInputVariable {
-  name: string;
-  type?: "string" | "number" | "long" | "double" | "boolean" | "date" | "json" | string;
-  value: unknown;
-}
-
-export interface ExecuteDecisionBody {
-  decisionKey: string;
-  inputVariables: FlowableDecisionExecutionInputVariable[];
-  parentDeploymentId?: string;
-}
-
-// Per the live Flowable 7.2 DMN-rule/execute response, `resultVariables` is
-// an Array<Array<{name, type, value}>> — the OUTER array is one entry per
-// result row (for COLLECT / RULE_ORDER hit policies; length 1 for
-// UNIQUE / FIRST), the INNER array carries the typed output variables.
-// The engine does NOT surface matchedRules over the REST API — Story 15.3's
-// defensive widening assumed it might; live probing showed it never does.
-export interface FlowableDecisionResultVariable {
-  name: string;
-  // Flowable emits the engine-side type label directly: "string" / "double"
-  // / "long" / "boolean" / "date" / "json". Kept open as `string` so future
-  // type additions don't break the DTO.
-  type: string;
-  value: unknown;
-}
-
-export interface FlowableDecisionResult {
-  resultVariables?: FlowableDecisionResultVariable[][];
-  url?: string;
-}
-
-export interface FlowableTenant {
-  id: string;
-  name: string;
-}
-
-export interface FlowableDecision {
-  id: string;
-  key: string;
-  name?: string;
-  version: number;
-  deploymentId: string;
-  category?: string;
-  tenantId?: string;
-}
-
-// Story 15.4: historic decision-execution DTO. All fields defensive
-// (every new field optional) per the Epic 15 DTO-widening discipline.
-// The actual response shape may vary across Flowable versions; the
-// renderer treats missing fields as "—".
-export interface FlowableHistoricDecisionExecution {
-  id: string;
-  decisionDefinitionId?: string;
-  decisionKey?: string;
-  decisionName?: string;
-  // Per flowable-rest 7.2 historic-decision-executions response, the process
-  // instance id is named `instanceId` (NOT `processInstanceId`) and `failed`
-  // (NOT `executionFailed`). The list endpoint does not surface hitPolicy,
-  // durationInMillis, inputVariables, or outputVariables — those live on
-  // the auditdata endpoint per-execution.
-  instanceId?: string | null;
-  executionId?: string | null;
-  activityId?: string | null;
-  scopeType?: string | null;
-  scopeId?: string | null;
-  deploymentId?: string;
-  decisionVersion?: string;
-  startTime?: string;
-  endTime?: string;
-  failed?: boolean;
-  tenantId?: string;
-}
-
-// Per-execution audit response from
-// `/dmn-history/historic-decision-executions/{id}/auditdata`. Far richer
-// than the list row — surfaces the hit policy, typed input/result maps,
-// and the per-rule execution trace (which rule fired, condition+conclusion
-// results). Every field defensive (optional) because Flowable versions
-// vary on which fields are present.
-export interface FlowableDmnRuleConditionResult {
-  id?: string;
-  result?: unknown;
-}
-export interface FlowableDmnRuleExecution {
-  ruleNumber?: number;
-  startTime?: string;
-  endTime?: string;
-  valid?: boolean;
-  conditionResults?: FlowableDmnRuleConditionResult[];
-  conclusionResults?: FlowableDmnRuleConditionResult[];
-}
-export interface FlowableDmnExecutionAudit {
-  decisionKey?: string;
-  decisionName?: string;
-  decisionVersion?: number;
-  hitPolicy?: string;
-  startTime?: string;
-  endTime?: string;
-  inputVariables?: Record<string, unknown>;
-  inputVariableTypes?: Record<string, string>;
-  // decisionResult is an array of result rows (one per matched rule for
-  // COLLECT / RULE_ORDER / OUTPUT_ORDER; length 1 for UNIQUE / FIRST).
-  decisionResult?: Array<Record<string, unknown>>;
-  decisionResultTypes?: Record<string, string>;
-  multipleResults?: boolean;
-  // Keyed by rule number as a string ("1", "2", …).
-  ruleExecutions?: Record<string, FlowableDmnRuleExecution>;
-  failed?: boolean;
-  strictMode?: boolean;
-}
-
-// Historic equivalents — UI shape is close to the runtime DTOs.
-export interface FlowableHistoricProcessInstance extends FlowableProcessInstance {
-  endTime?: string;
-  durationInMillis?: number;
-}
-
-export interface FlowableHistoricActivity {
-  id: string;
-  activityId: string;
-  activityName?: string;
-  activityType: string;
-  processInstanceId?: string;
-  startTime: string;
-  endTime?: string;
-  durationInMillis?: number;
-}
-
-// Flowable 7.x returns historic variables with the variable payload nested
-// under a `variable` object — `{id, processInstanceId, taskId, executionId,
-// variable: {name, type, value, scope}}` — NOT flattened with top-level
-// `variableName` / `variableType` like the runtime variable endpoint
-// (`/runtime/process-instances/{id}/variables`). Operator-side render code
-// must read `entry.variable.name` / `entry.variable.type` / `entry.variable.value`.
-// See RC-12 in docs/runtime-caveats.md.
-export interface FlowableHistoricVariableValue {
-  name: string;
-  type?: string;
-  value: unknown;
-  scope?: string;
-}
-
-export interface FlowableHistoricVariable {
-  id: string;
-  variable: FlowableHistoricVariableValue;
-  processInstanceId?: string;
-  taskId?: string;
-  executionId?: string;
-}
-
-export interface FlowableHistoricTask extends FlowableTask {
-  endTime?: string;
-  durationInMillis?: number;
-}
+import type {
+  AddAttachmentPayload,
+  ApiLogEntry,
+  ExecuteDecisionBody,
+  FlowableAttachment,
+  FlowableConfig,
+  FlowableDecision,
+  FlowableDecisionResult,
+  FlowableDeployment,
+  FlowableDmnExecutionAudit,
+  FlowableEngineInfo,
+  FlowableGroup,
+  FlowableHistoricActivity,
+  FlowableHistoricDecisionExecution,
+  FlowableHistoricProcessInstance,
+  FlowableHistoricTask,
+  FlowableHistoricVariable,
+  FlowableJob,
+  FlowablePage,
+  FlowableProcessDefinition,
+  FlowableProcessInstance,
+  FlowableResource,
+  FlowableTask,
+  FlowableTaskForm,
+  FlowableTenant,
+  FlowableUser,
+  FlowableVariable,
+  FlowableVariableInput,
+  HTTPMethod,
+  QueryParams,
+  RequestOpts,
+} from "./api-types";
+import { FlowableError } from "./api-types";
 
 // ── Config + storage ──────────────────────────────────────────────────────
 
@@ -503,6 +219,53 @@ const qs = (params?: QueryParams): string => {
 };
 
 const basicAuth = (): string => "Basic " + btoa(`${cfg.username}:${cfg.password}`);
+
+// Shared multipart POST envelope used by `uploadDeployment` (Story 9.2) and
+// `addTaskAttachment` file path (Story 21.2). Bypasses `request()` because the
+// body is FormData (non-JSON) but logs via API_LOG identically. `buildFd` is a
+// callback so FormData / Blob constructor throws land in the API_LOG entry
+// with status=0 (Story 9.2 AC-7 + Story 8.1 deferred-work closure). Returns
+// the raw Response — caller parses via `.json()`.
+const multipartFetch = async (
+  root: string,
+  path: string,
+  buildFd: () => FormData,
+): Promise<Response> => {
+  const url = root.replace(/\/$/, "") + path;
+  const t0 = performance.now();
+  const entry: ApiLogEntry = {
+    id: Math.random().toString(36).slice(2, 9),
+    method: "POST",
+    path,
+    url,
+    status: 0,
+    ms: 0,
+    at: new Date().toISOString(),
+  };
+  try {
+    const fd = buildFd();
+    const headers: Record<string, string> = { Authorization: basicAuth() };
+    entry.headers = redactAuthHeader(headers);
+    const res = await fetch(url, { method: "POST", headers, body: fd });
+    entry.status = res.status;
+    entry.ms = Math.round(performance.now() - t0);
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      entry.error = text || `HTTP ${res.status}`;
+      logCall(entry);
+      throw new FlowableError(entry.error, res.status);
+    }
+    logCall(entry);
+    return res;
+  } catch (err) {
+    if (entry.status === 0) {
+      entry.error = err instanceof Error ? err.message : String(err);
+      entry.ms = Math.round(performance.now() - t0);
+      logCall(entry);
+    }
+    throw err;
+  }
+};
 
 // ── request() funnel ─────────────────────────────────────────────────────
 //
@@ -872,45 +635,15 @@ const addTaskAttachment = async (
       },
     });
   }
-  const path = `/runtime/tasks/${taskId}/attachments`;
-  const url = cfg.baseUrl.replace(/\/$/, "") + path;
-  const t0 = performance.now();
-  const entry: ApiLogEntry = {
-    id: Math.random().toString(36).slice(2, 9),
-    method: "POST",
-    path,
-    url,
-    status: 0,
-    ms: 0,
-    at: new Date().toISOString(),
-  };
-  try {
+  const res = await multipartFetch(cfg.baseUrl, `/runtime/tasks/${taskId}/attachments`, () => {
     const fd = new FormData();
     fd.append("name", payload.name);
     if (payload.description) fd.append("description", payload.description);
     if (payload.type) fd.append("type", payload.type);
     fd.append("content", payload.file, payload.name);
-    const uploadHeaders: Record<string, string> = { Authorization: basicAuth() };
-    entry.headers = redactAuthHeader(uploadHeaders);
-    const res = await fetch(url, { method: "POST", headers: uploadHeaders, body: fd });
-    entry.status = res.status;
-    entry.ms = Math.round(performance.now() - t0);
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      entry.error = text || `HTTP ${res.status}`;
-      logCall(entry);
-      throw new FlowableError(entry.error, res.status);
-    }
-    logCall(entry);
-    return (await res.json()) as FlowableAttachment;
-  } catch (err) {
-    if (entry.status === 0) {
-      entry.error = err instanceof Error ? err.message : String(err);
-      entry.ms = Math.round(performance.now() - t0);
-      logCall(entry);
-    }
-    throw err;
-  }
+    return fd;
+  });
+  return (await res.json()) as FlowableAttachment;
 };
 
 // ── Form ──────────────────────────────────────────────────────────────────
@@ -1173,57 +906,18 @@ const uploadDeployment = async (
   type: string,
   opts: UploadOpts = {},
 ): Promise<FlowableDeployment> => {
-  const root = (opts.base || cfg.baseUrl).replace(/\/$/, "");
+  const root = opts.base || cfg.baseUrl;
   const path = opts.path || "/repository/deployments";
-  const url = root + path;
-  const t0 = performance.now();
-  const entry: ApiLogEntry = {
-    id: Math.random().toString(36).slice(2, 9),
-    method: "POST",
-    path,
-    url,
-    status: 0,
-    ms: 0,
-    at: new Date().toISOString(),
-  };
-  try {
-    // Multipart setup lives inside the try (Story 9.2, AC-7). FormData /
-    // Blob constructors and redactAuthHeader CAN throw — moving them inside
-    // the try ensures the entry lands in API_LOG with status=0 + the
-    // engine-visible error message even on these "throw before fetch" paths.
-    // Closes the Story 8.1 deferred-work item.
+  // FormData build happens inside multipartFetch's try (Story 9.2 AC-7) so a
+  // Blob constructor throw lands in API_LOG with status=0.
+  const res = await multipartFetch(root, path, () => {
     const fd = new FormData();
     fd.append("file", new Blob([content], { type }), filename);
     if (cfg.tenantId) fd.append("tenantId", cfg.tenantId);
     if (opts.deploymentName) fd.append("deploymentName", opts.deploymentName);
-
-    // Multipart uploads don't set Content-Type — fetch derives it from FormData.
-    // We mirror that in the captured headers (Authorization only), per AC-3.
-    const uploadHeaders: Record<string, string> = { Authorization: basicAuth() };
-    entry.headers = redactAuthHeader(uploadHeaders);
-    const res = await fetch(url, {
-      method: "POST",
-      headers: uploadHeaders,
-      body: fd,
-    });
-    entry.status = res.status;
-    entry.ms = Math.round(performance.now() - t0);
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      entry.error = text || `HTTP ${res.status}`;
-      logCall(entry);
-      throw new FlowableError(entry.error, res.status);
-    }
-    logCall(entry);
-    return (await res.json()) as FlowableDeployment;
-  } catch (err) {
-    if (entry.status === 0) {
-      entry.error = err instanceof Error ? err.message : String(err);
-      entry.ms = Math.round(performance.now() - t0);
-      logCall(entry);
-    }
-    throw err;
-  }
+    return fd;
+  });
+  return (await res.json()) as FlowableDeployment;
 };
 
 const deployBpmn = (name: string, xml: string) =>
