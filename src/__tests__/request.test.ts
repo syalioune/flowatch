@@ -1136,3 +1136,93 @@ describe("api.createUser (Story 22.1)", () => {
     expect(u).toEqual({ id: "ed", firstName: "Ed" });
   });
 });
+
+describe("api.updateUser (Story 22.2)", () => {
+  it("PUTs /identity/users/{id} with a single-field body", async () => {
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ status: 200, json: { id: "alice", firstName: "Alicia" } }),
+    );
+    const out = await api.updateUser("alice", { firstName: "Alicia" });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${DEFAULT_BASE}/identity/users/alice`);
+    expect(init.method).toBe("PUT");
+    expect(init.body).toBe('{"firstName":"Alicia"}');
+    expect((init.headers as Record<string, string>).Authorization).toMatch(/^Basic /);
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+    expect(API_LOG[0]?.method).toBe("PUT");
+    expect(API_LOG[0]?.body).toEqual({ firstName: "Alicia" });
+    expect(out).toMatchObject({ id: "alice", firstName: "Alicia" });
+  });
+
+  it("PUTs a multi-field body including empty string and password", async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, json: { id: "alice" } }));
+    await api.updateUser("alice", { email: "", password: "x" });
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(init.body).toBe('{"email":"","password":"x"}');
+  });
+
+  it("encodes special characters in user id", async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, json: { id: "alice.smith" } }));
+    await api.updateUser("alice.smith", { firstName: "x" });
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toBe(`${DEFAULT_BASE}/identity/users/alice.smith`);
+  });
+
+  it("throws synchronously when fields is empty", () => {
+    expect(() => api.updateUser("alice", {})).toThrow("updateUser requires at least one field");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(API_LOG.length).toBe(0);
+  });
+
+  it("rejects with FlowableError on 4xx", async () => {
+    const engineBody = '{"message":"Not Found","exception":"user alice not found"}';
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 404, body: engineBody }));
+    await expect(api.updateUser("alice", { firstName: "x" })).rejects.toMatchObject({
+      status: 404,
+      message: engineBody,
+    });
+    expect(API_LOG[0]?.error).toBe(engineBody);
+  });
+
+  it("API_LOG records redacted Authorization header", async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 200, json: { id: "alice" } }));
+    await api.updateUser("alice", { firstName: "x" });
+    expect(API_LOG[0]?.headers?.Authorization).toBe("Basic ***");
+  });
+});
+
+describe("api.deleteUser (Story 22.2)", () => {
+  it("DELETEs /identity/users/{id}", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await api.deleteUser("alice");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${DEFAULT_BASE}/identity/users/alice`);
+    expect(init.method).toBe("DELETE");
+    expect((init.headers as Record<string, string>).Authorization).toMatch(/^Basic /);
+    expect(API_LOG[0]?.method).toBe("DELETE");
+    expect(API_LOG[0]?.status).toBe(204);
+  });
+
+  it("encodes special characters in user id", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await api.deleteUser("user.with.dots");
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toBe(`${DEFAULT_BASE}/identity/users/user.with.dots`);
+  });
+
+  it("rejects with FlowableError on 404 (verbatim engine message)", async () => {
+    const engineBody = '{"message":"Not Found","exception":"user gone not found"}';
+    fetchMock.mockResolvedValueOnce(mockResponse({ status: 404, body: engineBody }));
+    await expect(api.deleteUser("gone")).rejects.toMatchObject({
+      status: 404,
+      message: engineBody,
+    });
+  });
+
+  it("resolves on 204 with empty-body API_LOG entry", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await expect(api.deleteUser("alice")).resolves.not.toThrow();
+    expect(API_LOG[0]?.status).toBe(204);
+    expect(API_LOG[0]?.error).toBeUndefined();
+  });
+});
