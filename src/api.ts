@@ -759,6 +759,37 @@ const addUserToGroup = (userId: string, groupId: string) =>
 const removeUserFromGroup = (userId: string, groupId: string) =>
   request<void>("DELETE", `/identity/groups/${groupId}/members/${userId}`);
 
+/**
+ * Story 22.1: create an identity user.
+ *
+ * Funnels `POST /identity/users` through `request()` with a full-object body
+ * shape. The engine validates `id` non-null (empty body returns
+ * `Bad request: Id cannot be null` per docs/compat.md FR-46 line 63); the
+ * wrapper does NOT pre-validate — the modal layer disables Save when id is
+ * empty (`<CreateUserModal>` AC-2).
+ *
+ * Body shape: `id` is required; `firstName` / `lastName` / `email` / `password`
+ * are accepted. `tenantId` is read-only on `FlowableUser` and is OMITTED from
+ * the create body (Story 22.1 spec — if T-9 Probe 6 reveals tenantId is
+ * mutable on create, open a deferred-work entry for a future widening).
+ *
+ * Anchors the POST-create wrapper family at N=1; Story 22.3 `createGroup`
+ * becomes N=2. Codify at N=4 per the "Never extract at N=4" reverse-logic
+ * rule.
+ *
+ * Engine response: `201 Created` with echoed `FlowableUser` (password omitted
+ * from echo per Flowable security default). Duplicate-id returns a 4xx with
+ * verbatim engine message surfaced through `<ErrorBox>` per Pattern P-003.
+ * Verified live on flowable-rest 7.2.0 per docs/compat.md FR-46.
+ */
+const createUser = (body: {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  password?: string;
+}) => request<FlowableUser>("POST", "/identity/users", { body });
+
 // Tenants are not exposed as a dedicated endpoint in flowable-rest 7.2.
 // Derive distinct tenantIds from deployments (truthy values only).
 //
@@ -1022,6 +1053,7 @@ export const api = {
   listGroupMembers,
   addUserToGroup,
   removeUserFromGroup,
+  createUser,
   listTenants,
   // DMN
   listDecisions,
