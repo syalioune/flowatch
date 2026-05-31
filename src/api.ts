@@ -790,6 +790,58 @@ const createUser = (body: {
   password?: string;
 }) => request<FlowableUser>("POST", "/identity/users", { body });
 
+/**
+ * Story 22.2: edit fields on an identity user (firstName / lastName / email /
+ * password).
+ *
+ * Funnels `PUT /identity/users/{id}` through `request()` with a partial-fields
+ * body. 1-line clone of `updateProcessDefinition` (Story 20.1) and
+ * `updateTask` (Story 21.1) — third consumer of the PUT-with-partial-fields
+ * wrapper family. See CLAUDE.md "PUT-with-partial-fields wrapper family"
+ * (codification triggers at N=4 with Story 22.3 `updateGroup`).
+ *
+ * `id` is immutable; the wrapper does NOT accept `id` in `fields`. Password is
+ * sent as the same shape (no special endpoint); the engine omits password
+ * from the 200-OK echo by default (verified live in T-10 Probe 4).
+ *
+ * `encodeURIComponent(id)` is non-negotiable — user ids may contain periods or
+ * unicode (e.g. `alice.smith`).
+ *
+ * Engine response: `200 OK` with the echoed `FlowableUser` body. Throws
+ * synchronously if `fields` is empty (mirrors Stories 20.1 / 21.1 guards).
+ *
+ * Verified live on flowable-rest 7.2.0 per docs/compat.md FR-46.
+ */
+const updateUser = (
+  id: string,
+  fields: Partial<{ firstName: string; lastName: string; email: string; password: string }>,
+) => {
+  if (Object.keys(fields).length === 0) throw new Error("updateUser requires at least one field");
+  return request<FlowableUser>("PUT", `/identity/users/${encodeURIComponent(id)}`, {
+    body: fields,
+  });
+};
+
+/**
+ * Story 22.2: hard-delete an identity user.
+ *
+ * Funnels `DELETE /identity/users/{id}` through `request()`. Anchors the
+ * DELETE-by-id wrapper family at N=1 (Story 22.3 `deleteGroup` becomes N=2).
+ *
+ * `encodeURIComponent(id)` is non-negotiable. Engine response: `204 No
+ * Content` on success; `404` with verbatim message on a non-existent id
+ * (idempotent retry returns the same shape — T-10 Probe 9).
+ *
+ * Cascade behaviour on a user with active tasks / instances — verified in
+ * T-10 Probe 7. Flowable 7.2 OSS orphans the foreign-key references rather
+ * than cascade-deleting; the UI surfaces no cascade checkbox (operator-feel
+ * acceptable for identity write surfaces).
+ *
+ * Verified live on flowable-rest 7.2.0 per docs/compat.md FR-46.
+ */
+const deleteUser = (id: string) =>
+  request<void>("DELETE", `/identity/users/${encodeURIComponent(id)}`);
+
 // Tenants are not exposed as a dedicated endpoint in flowable-rest 7.2.
 // Derive distinct tenantIds from deployments (truthy values only).
 //
@@ -1054,6 +1106,8 @@ export const api = {
   addUserToGroup,
   removeUserFromGroup,
   createUser,
+  updateUser,
+  deleteUser,
   listTenants,
   // DMN
   listDecisions,

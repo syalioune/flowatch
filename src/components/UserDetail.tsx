@@ -14,11 +14,13 @@
  * single `optimisticMembership` Map consumed by both handlers.
  */
 
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import React from "react";
 import { api, type FlowableGroup, type FlowableUser } from "../api";
 import { Icon, PageHead, toast } from "../components";
 import { AddMembershipModal } from "../lib/add-membership-modal";
+import { DeleteUserModal } from "../lib/delete-user-modal";
+import { EditUserModal } from "../lib/edit-user-modal";
 import { ErrorBox } from "../lib/error-box";
 import { useApi } from "../lib/useApi";
 
@@ -31,10 +33,17 @@ type OptimisticStatus = "added" | "removed";
 
 export function UserDetail({ user }: Props) {
   const memberships = useApi(() => api.getUserGroups(user.id), [user.id]);
+  const router = useRouter();
+  const navigate = useNavigate();
   const u = user as UserWide;
   const initials = `${(u.firstName || "?")[0]}${(u.lastName || "?")[0]}`;
   const [addOpen, setAddOpen] = React.useState(false);
+  const [editOpen, setEditOpen] = React.useState(false);
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
   const addTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const editTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const deleteTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const backLinkRef = React.useRef<HTMLAnchorElement>(null);
   const [optimisticMembership, setOptimisticMembership] = React.useState<
     Map<string, OptimisticStatus>
   >(new Map());
@@ -82,10 +91,32 @@ export function UserDetail({ user }: Props) {
         title={`${u.firstName || ""} ${u.lastName || ""}`.trim() || u.id}
         subtitle={u.displayName ?? undefined}
         actions={
-          <Link to="/identity" className="btn" data-variant="ghost">
-            <Icon name="chevron" size={12} />
-            Back
-          </Link>
+          <>
+            <button
+              ref={editTriggerRef}
+              type="button"
+              className="btn"
+              data-variant="ghost"
+              data-testid="edit-user"
+              onClick={() => setEditOpen(true)}
+            >
+              Edit user
+            </button>
+            <button
+              ref={deleteTriggerRef}
+              type="button"
+              className="btn"
+              data-variant="danger"
+              data-testid="delete-user"
+              onClick={() => setDeleteOpen(true)}
+            >
+              Delete user…
+            </button>
+            <Link ref={backLinkRef} to="/identity" className="btn" data-variant="ghost">
+              <Icon name="chevron" size={12} />
+              Back
+            </Link>
+          </>
         }
       />
       <div className="panel">
@@ -229,6 +260,25 @@ export function UserDetail({ user }: Props) {
         onSuccess={() => {
           setOptimisticMembership((prev) => new Map(prev));
           memberships.reload();
+        }}
+      />
+      <EditUserModal
+        user={editOpen ? u : null}
+        triggerRef={editTriggerRef}
+        onClose={() => setEditOpen(false)}
+        onSuccess={() => {
+          setEditOpen(false);
+          router.invalidate({ filter: (r) => r.routeId === "/identity/users/$id" });
+        }}
+      />
+      <DeleteUserModal
+        user={deleteOpen ? u : null}
+        triggerRef={deleteTriggerRef}
+        fallbackRef={backLinkRef as React.RefObject<HTMLElement | null>}
+        onClose={() => setDeleteOpen(false)}
+        onSettled={() => {
+          setDeleteOpen(false);
+          navigate({ to: "/identity", search: { tab: "users" as const } });
         }}
       />
     </div>
