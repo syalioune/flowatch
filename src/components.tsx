@@ -8,6 +8,7 @@ import { ConnectionSwitch } from "./components/ConnectionSwitch";
 import { ManageConnectionsPanel } from "./components/ManageConnectionsPanel";
 import { buildCurlCommand, CURL_MULTIPART, CURL_UNSERIALIZABLE } from "./lib/curl";
 import { errorStatus } from "./lib/error";
+import { randomId } from "./lib/random-id";
 import { type RouteEndpoint, useRouteMeta } from "./lib/route-meta";
 
 interface ApiLogEvent extends CustomEvent<ApiLogEntry> {}
@@ -1265,7 +1266,7 @@ export const Toaster = () => {
   const [items, setItems] = React.useState<ToastItem[]>([]);
   React.useEffect(() => {
     const onToast = (e: AppToastEvent) => {
-      const id = Math.random().toString(36).slice(2);
+      const id = randomId(10);
       const t: ToastItem = { id, kind: "info", ttl: 4000, ...e.detail };
       setItems((xs) => [...xs, t]);
       setTimeout(() => setItems((xs) => xs.filter((x) => x.id !== id)), t.ttl);

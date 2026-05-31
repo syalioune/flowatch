@@ -29,6 +29,7 @@
 import { api } from "../api";
 import { type AuthStrategyConfig, parseAuthStrategyConfig } from "./auth-strategy-config";
 import { SAVED_CONNECTIONS_CHANGED } from "./nav-events";
+import { randomId } from "./random-id";
 
 // Story 23.2: the permissive 23.1 typedef is dropped; `AuthStrategyConfig`
 // now comes from `auth-strategy-config.ts` as a strict discriminated union.
@@ -77,7 +78,11 @@ const newId = (): string => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
   }
-  return `conn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  // CodeQL CWE-338: avoid Math.random() for identity-bearing values. The
+  // `randomId` helper (src/lib/random-id.ts) pulls from
+  // crypto.getRandomValues when available; final fallback is timestamp-
+  // only, accepting a collision risk in environments with no Web Crypto.
+  return `conn-${Date.now().toString(36)}-${randomId(32)}`;
 };
 
 const dispatch = (): void => {
