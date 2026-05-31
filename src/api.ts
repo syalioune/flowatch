@@ -95,6 +95,7 @@ import type {
   RequestOpts,
 } from "./api-types";
 import { FlowableError } from "./api-types";
+import { randomId } from "./lib/random-id";
 
 // ── Config + storage ──────────────────────────────────────────────────────
 
@@ -232,7 +233,7 @@ const multipartFetch = async (
   const url = root.replace(/\/$/, "") + path;
   const t0 = performance.now();
   const entry: ApiLogEntry = {
-    id: Math.random().toString(36).slice(2, 9),
+    id: randomId(),
     method: "POST",
     path,
     url,
@@ -282,7 +283,7 @@ export async function request<T = unknown>(
   const url = root + path + qs(params);
   const t0 = performance.now();
   const entry: ApiLogEntry = {
-    id: Math.random().toString(36).slice(2, 9),
+    id: randomId(),
     method,
     path: path + qs(params),
     url,
