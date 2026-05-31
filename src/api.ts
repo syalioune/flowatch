@@ -75,7 +75,6 @@ import type {
   FlowableDeployment,
   FlowableDmnExecutionAudit,
   FlowableEngineInfo,
-  FlowableGroup,
   FlowableHistoricActivity,
   FlowableHistoricDecisionExecution,
   FlowableHistoricProcessInstance,
@@ -89,7 +88,6 @@ import type {
   FlowableTask,
   FlowableTaskForm,
   FlowableTenant,
-  FlowableUser,
   FlowableVariable,
   FlowableVariableInput,
   HTTPMethod,
@@ -274,7 +272,7 @@ const multipartFetch = async (
 // getDmnDecisionResource, jobStacktrace). Per AC-3, the runtime guarantees
 // the declared T matches when opts.raw is true.
 
-async function request<T = unknown>(
+export async function request<T = unknown>(
   method: HTTPMethod,
   path: string,
   opts: RequestOpts = {},
@@ -720,183 +718,25 @@ const listHistoricTasks = (params?: QueryParams) =>
   });
 
 // ── Identity ─────────────────────────────────────────────────────────────
-const listUsers = (params?: QueryParams) =>
-  request<FlowablePage<FlowableUser>>("GET", "/identity/users", { params });
-const getUser = (id: string) => request<FlowableUser>("GET", `/identity/users/${id}`);
-const listGroups = (params?: QueryParams) =>
-  request<FlowablePage<FlowableGroup>>("GET", "/identity/groups", { params });
-const getGroup = (id: string) => request<FlowableGroup>("GET", `/identity/groups/${id}`);
-// flowable-rest 7.2 OSS does NOT serve GET /identity/users/{userId}/groups —
-// the working recipe is GET /identity/groups?member={userId}, symmetric to
-// listGroupMembers's ?memberOfGroup={groupId} workaround above.
-const getUserGroups = (userId: string) =>
-  request<FlowablePage<FlowableGroup>>("GET", "/identity/groups", {
-    params: { member: userId },
-  });
-// flowable-rest 7.2 does not expose GET /identity/groups/{id}/members. The
-// supported recipe is GET /identity/users?memberOfGroup={id}, which returns
-// the FlowablePage<FlowableUser> in the group. Future flowable versions
-// may add the direct endpoint; if so, prefer it and deprecate this wrapper.
-const listGroupMembers = (groupId: string, params?: QueryParams) =>
-  request<FlowablePage<FlowableUser>>("GET", "/identity/users", {
-    params: { ...(params ?? {}), memberOfGroup: groupId },
-  });
-// Flowable 7.2 OSS exposes the group-centric membership-write endpoint:
-// POST /identity/groups/{groupId}/members with body {userId}. The inverse
-// user-centric route (POST /identity/users/{userId}/groups {groupId}) is
-// not honoured against a live engine — confirmed via Bruno during 14.3
-// post-closure verification.
-const addUserToGroup = (userId: string, groupId: string) =>
-  request<void>("POST", `/identity/groups/${groupId}/members`, { body: { userId } });
-// Symmetric pair to addUserToGroup. Flowable 7.2 OSS does NOT honour the
-// inverse user-centric DELETE /identity/users/{userId}/groups/{groupId}
-// path — the engine returns HTTP 500 "No endpoint DELETE ...". The working
-// recipe is DELETE /identity/groups/{groupId}/members/{userId}, mirroring
-// the group-centric POST above. Returns 204 No Content on success; 404 if
-// the membership doesn't exist; 403 if the caller lacks permission.
-// ErrorBox surfaces the verbatim engine message. First full application
-// of the Epic 13 retro §3.2 spec-symmetry discipline (14.3).
-const removeUserFromGroup = (userId: string, groupId: string) =>
-  request<void>("DELETE", `/identity/groups/${groupId}/members/${userId}`);
-
-/**
- * Story 22.1: create an identity user.
- *
- * Funnels `POST /identity/users` through `request()` with a full-object body
- * shape. The engine validates `id` non-null (empty body returns
- * `Bad request: Id cannot be null` per docs/compat.md FR-46 line 63); the
- * wrapper does NOT pre-validate — the modal layer disables Save when id is
- * empty (`<CreateUserModal>` AC-2).
- *
- * Body shape: `id` is required; `firstName` / `lastName` / `email` / `password`
- * are accepted. `tenantId` is read-only on `FlowableUser` and is OMITTED from
- * the create body (Story 22.1 spec — if T-9 Probe 6 reveals tenantId is
- * mutable on create, open a deferred-work entry for a future widening).
- *
- * Anchors the POST-create wrapper family at N=1; Story 22.3 `createGroup`
- * becomes N=2. Codify at N=4 per the "Never extract at N=4" reverse-logic
- * rule.
- *
- * Engine response: `201 Created` with echoed `FlowableUser` (password omitted
- * from echo per Flowable security default). Duplicate-id returns a 4xx with
- * verbatim engine message surfaced through `<ErrorBox>` per Pattern P-003.
- * Verified live on flowable-rest 7.2.0 per docs/compat.md FR-46.
- */
-const createUser = (body: {
-  id: string;
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  password?: string;
-}) => request<FlowableUser>("POST", "/identity/users", { body });
-
-/**
- * Story 22.2: edit fields on an identity user (firstName / lastName / email /
- * password).
- *
- * Funnels `PUT /identity/users/{id}` through `request()` with a partial-fields
- * body. 1-line clone of `updateProcessDefinition` (Story 20.1) and
- * `updateTask` (Story 21.1) — third consumer of the PUT-with-partial-fields
- * wrapper family. See CLAUDE.md "PUT-with-partial-fields wrapper family"
- * (codification triggers at N=4 with Story 22.3 `updateGroup`).
- *
- * `id` is immutable; the wrapper does NOT accept `id` in `fields`. Password is
- * sent as the same shape (no special endpoint); the engine omits password
- * from the 200-OK echo by default (verified live in T-10 Probe 4).
- *
- * `encodeURIComponent(id)` is non-negotiable — user ids may contain periods or
- * unicode (e.g. `alice.smith`).
- *
- * Engine response: `200 OK` with the echoed `FlowableUser` body. Throws
- * synchronously if `fields` is empty (mirrors Stories 20.1 / 21.1 guards).
- *
- * Verified live on flowable-rest 7.2.0 per docs/compat.md FR-46.
- */
-const updateUser = (
-  id: string,
-  fields: Partial<{ firstName: string; lastName: string; email: string; password: string }>,
-) => {
-  if (Object.keys(fields).length === 0) throw new Error("updateUser requires at least one field");
-  return request<FlowableUser>("PUT", `/identity/users/${encodeURIComponent(id)}`, {
-    body: fields,
-  });
-};
-
-/**
- * Story 22.2: hard-delete an identity user.
- *
- * Funnels `DELETE /identity/users/{id}` through `request()`. Anchors the
- * DELETE-by-id wrapper family at N=1 (Story 22.3 `deleteGroup` becomes N=2).
- *
- * `encodeURIComponent(id)` is non-negotiable. Engine response: `204 No
- * Content` on success; `404` with verbatim message on a non-existent id
- * (idempotent retry returns the same shape — T-10 Probe 9).
- *
- * Cascade behaviour on a user with active tasks / instances — verified in
- * T-10 Probe 7. Flowable 7.2 OSS orphans the foreign-key references rather
- * than cascade-deleting; the UI surfaces no cascade checkbox (operator-feel
- * acceptable for identity write surfaces).
- *
- * Verified live on flowable-rest 7.2.0 per docs/compat.md FR-46.
- */
-const deleteUser = (id: string) =>
-  request<void>("DELETE", `/identity/users/${encodeURIComponent(id)}`);
-
-/**
- * Story 22.3: create an identity group.
- *
- * Funnels `POST /identity/groups` through `request()` with a full-object
- * body. Second consumer of the POST-create wrapper family (after Story 22.1
- * `createUser`). The engine validates `id` non-null per FR-47. `type` is a
- * free string at the wire level — no enum enforced; common values are
- * `security` and `assignment`. Verified live on flowable-rest 7.2.0 per
- * docs/compat.md FR-47.
- *
- * Engine response: `201 Created` with echoed `FlowableGroup`. Duplicate-id
- * returns 4xx with verbatim engine message.
- */
-const createGroup = (body: { id: string; name?: string; type?: string }) =>
-  request<FlowableGroup>("POST", "/identity/groups", { body });
-
-/**
- * Story 22.3: edit fields on an identity group (name / type).
- *
- * Funnels `PUT /identity/groups/{id}` through `request()` with a partial-
- * fields body. **Fourth consumer of the PUT-with-partial-fields wrapper
- * family** (after `updateProcessDefinition` 20.1, `updateTask` 21.1,
- * `updateUser` 22.2). Codification fires here — see CLAUDE.md
- * "PUT-with-partial-fields wrapper family (Epic 22 retro N=4 codification)".
- *
- * `id` is immutable; `type` is typically `security` or `assignment` but is a
- * free string at the wire level. `encodeURIComponent(id)` non-negotiable.
- *
- * Engine response: `200 OK` with echoed `FlowableGroup`. Throws synchronously
- * if `fields` is empty. Verified live on flowable-rest 7.2.0 per
- * docs/compat.md FR-47.
- */
-const updateGroup = (id: string, fields: Partial<{ name: string; type: string }>) => {
-  if (Object.keys(fields).length === 0) throw new Error("updateGroup requires at least one field");
-  return request<FlowableGroup>("PUT", `/identity/groups/${encodeURIComponent(id)}`, {
-    body: fields,
-  });
-};
-
-/**
- * Story 22.3: hard-delete an identity group.
- *
- * Funnels `DELETE /identity/groups/{id}` through `request()`. Second consumer
- * of the DELETE-by-id wrapper family (after `deleteUser` 22.2).
- *
- * `encodeURIComponent(id)` non-negotiable. Engine response: `204 No Content`;
- * `404` on a non-existent id. Cascade behaviour: Flowable cascade-deletes the
- * group-membership join rows server-side (verified live in T-12 Probe 7) —
- * the modal surfaces no cascade checkbox (memberships are an internal join
- * table; operator does not need a cascade affordance).
- *
- * Verified live on flowable-rest 7.2.0 per docs/compat.md FR-47.
- */
-const deleteGroup = (id: string) =>
-  request<void>("DELETE", `/identity/groups/${encodeURIComponent(id)}`);
+// Identity-surface wrappers extracted to src/api-identity.ts per NFR-21
+// navigability (50 KB per-source-file limit). All wrappers funnel through
+// the same `request<T>` exported above; Pattern P-001 preserved.
+import {
+  addUserToGroup,
+  createGroup,
+  createUser,
+  deleteGroup,
+  deleteUser,
+  getGroup,
+  getUser,
+  getUserGroups,
+  listGroupMembers,
+  listGroups,
+  listUsers,
+  removeUserFromGroup,
+  updateGroup,
+  updateUser,
+} from "./api-identity";
 
 // Tenants are not exposed as a dedicated endpoint in flowable-rest 7.2.
 // Derive distinct tenantIds from deployments (truthy values only).
