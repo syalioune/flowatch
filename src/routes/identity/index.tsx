@@ -22,6 +22,7 @@ import React from "react";
 import { z } from "zod";
 import { api, type FlowableGroup, type FlowablePage, type FlowableUser } from "../../api";
 import { Icon, PageHead } from "../../components";
+import { CreateGroupModal } from "../../lib/create-group-modal";
 import { CreateUserModal } from "../../lib/create-user-modal";
 import { EmptyState, getEmptyState } from "../../lib/empty-states";
 import { ErrorBox } from "../../lib/error-box";
@@ -155,7 +156,9 @@ function IdentityRoute() {
   const router = useRouter();
   const refresh = () => router.invalidate({ filter: (r) => r.routeId === "/identity/" });
   const [createUserOpen, setCreateUserOpen] = React.useState(false);
+  const [createGroupOpen, setCreateGroupOpen] = React.useState(false);
   const createUserButtonRef = React.useRef<HTMLButtonElement>(null);
+  const createGroupButtonRef = React.useRef<HTMLButtonElement>(null);
 
   const extraActions =
     tab === "users" ? (
@@ -170,7 +173,19 @@ function IdentityRoute() {
         <Icon name="plus" size={13} />
         Create user
       </button>
-    ) : null;
+    ) : (
+      <button
+        ref={createGroupButtonRef}
+        type="button"
+        className="btn"
+        data-variant="primary"
+        data-testid="create-group"
+        onClick={() => setCreateGroupOpen(true)}
+      >
+        <Icon name="plus" size={13} />
+        Create group
+      </button>
+    );
 
   return (
     <PageChrome tab={tab} onTabChange={onTabChange} onRefresh={refresh} extraActions={extraActions}>
@@ -187,6 +202,15 @@ function IdentityRoute() {
           router.invalidate({ filter: (r) => r.routeId === "/identity/" });
         }}
         triggerRef={createUserButtonRef}
+      />
+      <CreateGroupModal
+        open={createGroupOpen}
+        onClose={() => setCreateGroupOpen(false)}
+        onSuccess={() => {
+          setCreateGroupOpen(false);
+          router.invalidate({ filter: (r) => r.routeId === "/identity/" });
+        }}
+        triggerRef={createGroupButtonRef}
       />
     </PageChrome>
   );

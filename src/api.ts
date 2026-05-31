@@ -842,6 +842,62 @@ const updateUser = (
 const deleteUser = (id: string) =>
   request<void>("DELETE", `/identity/users/${encodeURIComponent(id)}`);
 
+/**
+ * Story 22.3: create an identity group.
+ *
+ * Funnels `POST /identity/groups` through `request()` with a full-object
+ * body. Second consumer of the POST-create wrapper family (after Story 22.1
+ * `createUser`). The engine validates `id` non-null per FR-47. `type` is a
+ * free string at the wire level — no enum enforced; common values are
+ * `security` and `assignment`. Verified live on flowable-rest 7.2.0 per
+ * docs/compat.md FR-47.
+ *
+ * Engine response: `201 Created` with echoed `FlowableGroup`. Duplicate-id
+ * returns 4xx with verbatim engine message.
+ */
+const createGroup = (body: { id: string; name?: string; type?: string }) =>
+  request<FlowableGroup>("POST", "/identity/groups", { body });
+
+/**
+ * Story 22.3: edit fields on an identity group (name / type).
+ *
+ * Funnels `PUT /identity/groups/{id}` through `request()` with a partial-
+ * fields body. **Fourth consumer of the PUT-with-partial-fields wrapper
+ * family** (after `updateProcessDefinition` 20.1, `updateTask` 21.1,
+ * `updateUser` 22.2). Codification fires here — see CLAUDE.md
+ * "PUT-with-partial-fields wrapper family (Epic 22 retro N=4 codification)".
+ *
+ * `id` is immutable; `type` is typically `security` or `assignment` but is a
+ * free string at the wire level. `encodeURIComponent(id)` non-negotiable.
+ *
+ * Engine response: `200 OK` with echoed `FlowableGroup`. Throws synchronously
+ * if `fields` is empty. Verified live on flowable-rest 7.2.0 per
+ * docs/compat.md FR-47.
+ */
+const updateGroup = (id: string, fields: Partial<{ name: string; type: string }>) => {
+  if (Object.keys(fields).length === 0) throw new Error("updateGroup requires at least one field");
+  return request<FlowableGroup>("PUT", `/identity/groups/${encodeURIComponent(id)}`, {
+    body: fields,
+  });
+};
+
+/**
+ * Story 22.3: hard-delete an identity group.
+ *
+ * Funnels `DELETE /identity/groups/{id}` through `request()`. Second consumer
+ * of the DELETE-by-id wrapper family (after `deleteUser` 22.2).
+ *
+ * `encodeURIComponent(id)` non-negotiable. Engine response: `204 No Content`;
+ * `404` on a non-existent id. Cascade behaviour: Flowable cascade-deletes the
+ * group-membership join rows server-side (verified live in T-12 Probe 7) —
+ * the modal surfaces no cascade checkbox (memberships are an internal join
+ * table; operator does not need a cascade affordance).
+ *
+ * Verified live on flowable-rest 7.2.0 per docs/compat.md FR-47.
+ */
+const deleteGroup = (id: string) =>
+  request<void>("DELETE", `/identity/groups/${encodeURIComponent(id)}`);
+
 // Tenants are not exposed as a dedicated endpoint in flowable-rest 7.2.
 // Derive distinct tenantIds from deployments (truthy values only).
 //
@@ -1108,6 +1164,9 @@ export const api = {
   createUser,
   updateUser,
   deleteUser,
+  createGroup,
+  updateGroup,
+  deleteGroup,
   listTenants,
   // DMN
   listDecisions,
