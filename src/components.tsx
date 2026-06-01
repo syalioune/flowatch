@@ -302,6 +302,7 @@ const NAV: NavGroup[] = [
       { path: "/instances", label: "Process instances", icon: "instance", countsKey: "instances" },
       { path: "/jobs", label: "Jobs", icon: "job", countsKey: "jobs" },
       { path: "/batches", label: "Batches", icon: "job" },
+      { path: "/events", label: "Events", icon: "bell" },
       { path: "/history", label: "History", icon: "history" },
     ],
   },

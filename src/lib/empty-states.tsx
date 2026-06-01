@@ -58,6 +58,8 @@ export type ScreenKey =
   | "deploymentResources"
   | "dmnDeployments"
   | "dmnExecutions"
+  | "eventSubscriptions"
+  | "eventSubscriptionsForInstance"
   | "groupMembers"
   | "groups"
   | "historicActivities"
@@ -133,6 +135,14 @@ export const emptyStates = {
   dmnExecutions: {
     title: "No DMN executions yet.",
     body: "Decision executions appear here once you run a decision (Test execute from /decisions, or a process instance evaluates a Business Rule Task). The engine records each evaluation with inputs, outputs, hit policy, and timing.",
+  },
+  eventSubscriptions: {
+    title: "No event subscriptions.",
+    body: "Event subscriptions appear here when a running process instance is waiting on a message, signal, or timer. Deploy a BPMN with an intermediate message catch event (or signal / timer event) and start an instance to populate this list.",
+  },
+  eventSubscriptionsForInstance: {
+    title: "This instance is not waiting on any external triggers.",
+    body: "Event subscriptions appear here when the instance reaches an intermediate event catch (message, signal, timer). A purely synchronous workflow may never enter this state.",
   },
   historicActivities: {
     title: "No recorded activities for this instance yet.",

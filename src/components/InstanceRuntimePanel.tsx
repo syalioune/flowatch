@@ -32,6 +32,7 @@ import {
   fetchActiveActivitiesOrNull,
   InstanceActiveActivitiesPanel,
 } from "./InstanceActiveActivitiesPanel";
+import { InstanceEventSubscriptionsPanel } from "./InstanceEventSubscriptionsPanel";
 import { InstanceVariablesPanel } from "./InstanceVariablesPanel";
 
 // Derive a one-line Activity-row summary from the active-activities list.
@@ -219,6 +220,7 @@ export function InstanceRuntimePanel({ instanceId }: Props) {
       {p && (
         <>
           <InstanceActiveActivitiesPanel instanceId={p.id} />
+          <InstanceEventSubscriptionsPanel instanceId={p.id} />
           <InstanceVariablesPanel instance={p} />
           <CancelInstanceModal
             instance={cancelOpen ? p : null}

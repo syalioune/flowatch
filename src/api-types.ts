@@ -203,6 +203,25 @@ export interface FlowableBatchPart {
   url?: string;
 }
 
+// Story 24.2: Flowable event subscription DTO (FR-54). Surfaces messages,
+// signals, and timers a running instance is waiting on. Read-only — Story
+// 24.2 ships the list + per-instance panel; no action verbs.
+export interface FlowableEventSubscription {
+  id: string;
+  /** "message" | "signal" | "timer" | "compensate" | "error" | future-shape */
+  eventType?: string;
+  /** Business-meaningful name (e.g., "payment-confirmed"). Empty for typeless subs. */
+  eventName?: string;
+  executionId?: string;
+  processInstanceId?: string;
+  processDefinitionId?: string;
+  activityId?: string;
+  created?: string;
+  tenantId?: string;
+  configuration?: string;
+  url?: string;
+}
+
 export interface FlowableJob {
   id: string;
   processInstanceId?: string;
