@@ -146,7 +146,10 @@ test.describe("/events list + <InstanceEventSubscriptionsPanel> (Story 24.2)", (
 
   test("Sidebar nav: Events link routes to /events", async ({ page }) => {
     await page.goto("/");
-    const navLink = page.getByRole("link", { name: /^Events$/ });
+    // Target by href — Sidebar `<Link>` renders <a href="/events">. The
+    // accessible-name match would include the count-badge digit
+    // ("Events 0"), so href is the stable identifier.
+    const navLink = page.locator('aside.sidebar a[href="/events"]');
     await expect(navLink).toBeVisible();
     await navLink.click();
     await expect(page).toHaveURL(/\/events$/);
