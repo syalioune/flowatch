@@ -29,6 +29,8 @@ export type {
   ApiLogEntry,
   ExecuteDecisionBody,
   FlowableAttachment,
+  FlowableBatch,
+  FlowableBatchPart,
   FlowableConfig,
   FlowableDecision,
   FlowableDecisionExecutionInputVariable,
@@ -69,6 +71,8 @@ import type {
   ApiLogEntry,
   ExecuteDecisionBody,
   FlowableAttachment,
+  FlowableBatch,
+  FlowableBatchPart,
   FlowableConfig,
   FlowableDecision,
   FlowableDecisionResult,
@@ -693,6 +697,28 @@ const timerJobStacktrace = (id: string): Promise<string> =>
 const deadLetterJobStacktrace = (id: string): Promise<string> =>
   request<string>("GET", `/management/deadletter-jobs/${id}/exception-stacktrace`, { raw: true });
 
+// Story 24.1 (FR-53): batch operations + per-part stacktrace. Read-only.
+// `batchPartStacktrace` uses `raw: true` — engine returns the stacktrace as
+// text/plain (mirrors `jobStacktrace` shape). 404 → FlowableError with
+// status === 404 → mapped to null at the panel via `fetchBatchPartStacktrace
+// OrNull` (status-aware error-probe per Epic 11 retro §4.4). Path ids are
+// `encodeURIComponent`-wrapped — defensive against engine-supplied ids that
+// might contain reserved characters (mirrors `deleteInstanceVariable` shape).
+const listBatches = (params?: QueryParams) =>
+  request<FlowablePage<FlowableBatch>>("GET", "/management/batches", { params });
+const getBatch = (id: string) =>
+  request<FlowableBatch>("GET", `/management/batches/${encodeURIComponent(id)}`);
+const listBatchParts = (batchId: string, params?: QueryParams) =>
+  request<FlowablePage<FlowableBatchPart>>(
+    "GET",
+    `/management/batches/${encodeURIComponent(batchId)}/batch-parts`,
+    { params },
+  );
+const batchPartStacktrace = (id: string): Promise<string> =>
+  request<string>("GET", `/management/batch-parts/${encodeURIComponent(id)}/exception-stacktrace`, {
+    raw: true,
+  });
+
 // ── History ──────────────────────────────────────────────────────────────
 const listHistoricInstances = (params?: QueryParams) =>
   request<FlowablePage<FlowableHistoricProcessInstance>>(
@@ -987,6 +1013,10 @@ export const api = {
   jobStacktrace,
   timerJobStacktrace,
   deadLetterJobStacktrace,
+  listBatches,
+  getBatch,
+  listBatchParts,
+  batchPartStacktrace,
   // History
   listHistoricInstances,
   getHistoricProcessInstance,
