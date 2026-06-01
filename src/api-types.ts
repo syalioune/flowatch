@@ -122,6 +122,25 @@ export interface FlowableTask {
 // Story 21.2: task attachment DTO. Optional fields per the Flowable REST
 // task-attachments spec — the engine derives `id` / `time` / `userId` and
 // echoes the operator-supplied `name` / `description` / `type` / `externalUrl`.
+// Story 25.1: Flowable App definition DTO (FR-55 scope-reduced). Returned by
+// /app-api/app-repository/app-definitions. Permissive optional fields — the
+// engine omits fields on single-tenant deployments / archives without a
+// description. Field names match the Flowable REST 7.x response keys
+// verbatim.
+export interface FlowableAppDefinition {
+  id: string;
+  key?: string;
+  name?: string;
+  description?: string;
+  version?: number;
+  deploymentId?: string;
+  deploymentTime?: string;
+  tenantId?: string;
+  resourceName?: string;
+  category?: string;
+  url?: string;
+}
+
 // `url` is the engine-side content URL for file attachments (e.g.
 // /runtime/tasks/{id}/attachments/{aid}/content).
 export interface FlowableAttachment {

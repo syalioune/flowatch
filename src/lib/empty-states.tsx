@@ -47,10 +47,12 @@ export interface EmptyStateEntry {
 
 export type ScreenKey =
   | "activeActivities"
+  | "appDefinitions"
   | "attachments"
   | "batches"
   | "batchParts"
   | "batchPartStacktrace"
+  | "bundledProcesses"
   | "decisions"
   | "decisionResource"
   | "definitions"
@@ -108,6 +110,10 @@ export const emptyStates = {
     title: "No active activities right now.",
     body: "This instance is idle (awaiting a timer, a message, or a parallel branch to converge) — or all branches have completed.",
   },
+  appDefinitions: {
+    title: "No app definitions.",
+    body: "App definitions appear here when you upload a Flowable App archive (.bar or .zip) on the Deployments screen. The archive's bundled processes, decisions, and forms are listed on the deployment-detail page. App-runtime (running app sessions) is not exposed in this engine image — see compat.md FR-55.",
+  },
   attachments: {
     title: "No attachments on this task.",
     body: "Attach a file (PDF, screenshot, log dump) or paste a link to external evidence. The engine stores file content; URL attachments are declarative pointers.",
@@ -123,6 +129,10 @@ export const emptyStates = {
   batchPartStacktrace: {
     title: "No stacktrace available.",
     body: "This part completed without raising an exception, or the engine has not yet flushed its error record. If the part status is 'failed', retry the panel refresh in a moment.",
+  },
+  bundledProcesses: {
+    title: "No bundled processes.",
+    body: "This deployment did not include any BPMN process definitions. App archives can carry processes, decisions, forms, or any subset — non-process bundles still register as deployments.",
   },
   deploymentResources: {
     title: "No resources.",

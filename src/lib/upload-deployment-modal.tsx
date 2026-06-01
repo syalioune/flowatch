@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * Upload-deployment modal (Story 9.2).
+ * Upload-deployment modal (Story 9.2; .bar / .zip extension Story 25.1).
  *
- * Renders a file-picker modal for BPMN uploads. The submit path calls
- * `api.deployBpmn(name, xml)` which routes through `uploadDeployment`
- * (the project's single multipart helper). On success the modal closes
- * and the caller is responsible for refreshing the deployments loader
- * (Story 9.2 wires this via TanStack Router's scoped invalidate). On
- * failure the modal stays open and renders the verbatim engine error
- * via `<ErrorBox>` per Pattern P-003.
+ * Renders a file-picker modal accepting `.bpmn`, `.bpmn20.xml`, `.bar`,
+ * or `.zip`. The submit path branches on extension:
+ *   - .bpmn / .bpmn20.xml → reads as text, calls `api.deployBpmn`.
+ *   - .bar / .zip          → passes the File blob directly, calls
+ *                            `api.deployBar` (multipart, application/zip).
  *
- * The modal is intentionally BPMN-specific. A sibling DMN modal arrives
- * with Story 15.2 — extraction into a generic UploadModal waits for the
- * second concrete consumer (Epic 8 retro §3.2: don't pre-abstract).
+ * Both paths route through the project's single multipart helper
+ * `uploadDeployment`. On success the modal closes and the caller refreshes
+ * the deployments loader. On failure the modal stays open and renders the
+ * verbatim engine error via `<ErrorBox>` per Pattern P-003.
  */
 
 import React from "react";
@@ -26,18 +25,21 @@ export interface UploadDeploymentModalProps {
   onClose: () => void;
   onSuccess: (deployment: FlowableDeployment) => void;
   /**
-   * Focus-restore target (Epic 9 retro A-4, Story 10.2 AC-7). When set, the
-   * trigger element is re-focused on modal close. When omitted, no
-   * restoration happens (the previous focus-snapshot pattern is gone — it
-   * was fragile when the trigger unmounted during the modal's lifecycle).
+   * Focus-restore target (Epic 9 retro A-4, Story 10.2 AC-7).
    */
   triggerRef?: React.RefObject<HTMLElement | null>;
 }
 
-// Exported for direct unit testing — the regex is the source of truth for
-// AC-2's `.bpmn` / `.bpmn20.xml` filter; the `accept` attribute on the input
-// is a hint to the OS picker only.
-export const isValidBpmnExtension = (name: string): boolean => /\.(bpmn|bpmn20\.xml)$/i.test(name);
+// Story 25.1: renamed from `isValidBpmnExtension`; regex widened to
+// .bpmn|.bpmn20.xml|.bar|.zip. No alias kept (per CLAUDE.md "no
+// backwards-compat hacks").
+export const isValidDeploymentExtension = (name: string): boolean =>
+  /\.(bpmn|bpmn20\.xml|bar|zip)$/i.test(name);
+
+// Story 25.1: discriminate which deployBar/deployBpmn branch to take on
+// submit. Exported for unit testing.
+export const detectArchiveKind = (filename: string): "bpmn" | "bar" =>
+  /\.(bar|zip)$/i.test(filename) ? "bar" : "bpmn";
 
 export const UploadDeploymentModal: React.FC<UploadDeploymentModalProps> = ({
   open,
@@ -91,8 +93,8 @@ export const UploadDeploymentModal: React.FC<UploadDeploymentModalProps> = ({
       setValidationMsg(null);
       return;
     }
-    if (!isValidBpmnExtension(picked.name)) {
-      setValidationMsg("Please choose a .bpmn or .bpmn20.xml file.");
+    if (!isValidDeploymentExtension(picked.name)) {
+      setValidationMsg("Please choose a .bpmn, .bpmn20.xml, .bar, or .zip file.");
       setFile(null);
       return;
     }
@@ -105,8 +107,11 @@ export const UploadDeploymentModal: React.FC<UploadDeploymentModalProps> = ({
     setBusy(true);
     setError(null);
     try {
-      const content = await file.text();
-      const deployment = await api.deployBpmn(file.name, content);
+      const kind = detectArchiveKind(file.name);
+      const deployment =
+        kind === "bar"
+          ? await api.deployBar(file.name, file)
+          : await api.deployBpmn(file.name, await file.text());
       setBusy(false);
       onSuccess(deployment);
       closeWithFocus();
@@ -115,6 +120,8 @@ export const UploadDeploymentModal: React.FC<UploadDeploymentModalProps> = ({
       setBusy(false);
     }
   };
+
+  const barPicked = file !== null && detectArchiveKind(file.name) === "bar";
 
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop is mouse-dismissal; keyboard Escape handler lives on the document
@@ -137,7 +144,7 @@ export const UploadDeploymentModal: React.FC<UploadDeploymentModalProps> = ({
         style={{ width: 480 }}
       >
         <div className="modal-hd">
-          <h3 id="upload-deployment-title">Upload BPMN deployment</h3>
+          <h3 id="upload-deployment-title">Upload deployment</h3>
           <button
             type="button"
             className="icon-btn"
@@ -153,11 +160,17 @@ export const UploadDeploymentModal: React.FC<UploadDeploymentModalProps> = ({
           <input
             ref={inputRef}
             type="file"
-            accept=".bpmn,.bpmn20.xml,application/xml,text/xml"
+            accept=".bpmn,.bpmn20.xml,.bar,.zip,application/xml,text/xml,application/zip"
             data-testid="upload-deployment-input"
             onChange={onPick}
             disabled={busy}
           />
+          {barPicked && (
+            <p className="mute text-xs" data-testid="upload-bar-hint" style={{ marginTop: 8 }}>
+              Recognized as a Flowable App archive — bundled processes / decisions / forms will be
+              parsed by the engine.
+            </p>
+          )}
           {validationMsg && (
             <p className="mute text-xs" data-testid="upload-validation" style={{ marginTop: 8 }}>
               {validationMsg}
