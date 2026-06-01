@@ -23,6 +23,7 @@ import { Route as DeploymentsIndexRouteImport } from "./routes/deployments/index
 import { Route as DefinitionsIndexRouteImport } from "./routes/definitions/index"
 import { Route as DecisionsIndexRouteImport } from "./routes/decisions/index"
 import { Route as BatchesIndexRouteImport } from "./routes/batches/index"
+import { Route as AppDefinitionsIndexRouteImport } from "./routes/app-definitions/index"
 import { Route as TasksIdRouteImport } from "./routes/tasks/$id"
 import { Route as InstancesIdRouteImport } from "./routes/instances/$id"
 import { Route as DeploymentsIdRouteImport } from "./routes/deployments/$id"
@@ -102,6 +103,11 @@ const BatchesIndexRoute = BatchesIndexRouteImport.update({
   path: "/batches/",
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppDefinitionsIndexRoute = AppDefinitionsIndexRouteImport.update({
+  id: "/app-definitions/",
+  path: "/app-definitions/",
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TasksIdRoute = TasksIdRouteImport.update({
   id: "/tasks/$id",
   path: "/tasks/$id",
@@ -154,6 +160,7 @@ export interface FileRoutesByFullPath {
   "/deployments/$id": typeof DeploymentsIdRoute
   "/instances/$id": typeof InstancesIdRoute
   "/tasks/$id": typeof TasksIdRoute
+  "/app-definitions/": typeof AppDefinitionsIndexRoute
   "/batches/": typeof BatchesIndexRoute
   "/decisions/": typeof DecisionsIndexRoute
   "/definitions/": typeof DefinitionsIndexRoute
@@ -178,6 +185,7 @@ export interface FileRoutesByTo {
   "/deployments/$id": typeof DeploymentsIdRoute
   "/instances/$id": typeof InstancesIdRoute
   "/tasks/$id": typeof TasksIdRoute
+  "/app-definitions": typeof AppDefinitionsIndexRoute
   "/batches": typeof BatchesIndexRoute
   "/decisions": typeof DecisionsIndexRoute
   "/definitions": typeof DefinitionsIndexRoute
@@ -203,6 +211,7 @@ export interface FileRoutesById {
   "/deployments/$id": typeof DeploymentsIdRoute
   "/instances/$id": typeof InstancesIdRoute
   "/tasks/$id": typeof TasksIdRoute
+  "/app-definitions/": typeof AppDefinitionsIndexRoute
   "/batches/": typeof BatchesIndexRoute
   "/decisions/": typeof DecisionsIndexRoute
   "/definitions/": typeof DefinitionsIndexRoute
@@ -229,6 +238,7 @@ export interface FileRouteTypes {
     | "/deployments/$id"
     | "/instances/$id"
     | "/tasks/$id"
+    | "/app-definitions/"
     | "/batches/"
     | "/decisions/"
     | "/definitions/"
@@ -253,6 +263,7 @@ export interface FileRouteTypes {
     | "/deployments/$id"
     | "/instances/$id"
     | "/tasks/$id"
+    | "/app-definitions"
     | "/batches"
     | "/decisions"
     | "/definitions"
@@ -277,6 +288,7 @@ export interface FileRouteTypes {
     | "/deployments/$id"
     | "/instances/$id"
     | "/tasks/$id"
+    | "/app-definitions/"
     | "/batches/"
     | "/decisions/"
     | "/definitions/"
@@ -302,6 +314,7 @@ export interface RootRouteChildren {
   DeploymentsIdRoute: typeof DeploymentsIdRoute
   InstancesIdRoute: typeof InstancesIdRoute
   TasksIdRoute: typeof TasksIdRoute
+  AppDefinitionsIndexRoute: typeof AppDefinitionsIndexRoute
   BatchesIndexRoute: typeof BatchesIndexRoute
   DecisionsIndexRoute: typeof DecisionsIndexRoute
   DefinitionsIndexRoute: typeof DefinitionsIndexRoute
@@ -416,6 +429,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof BatchesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    "/app-definitions/": {
+      id: "/app-definitions/"
+      path: "/app-definitions"
+      fullPath: "/app-definitions/"
+      preLoaderRoute: typeof AppDefinitionsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     "/tasks/$id": {
       id: "/tasks/$id"
       path: "/tasks/$id"
@@ -486,6 +506,7 @@ const rootRouteChildren: RootRouteChildren = {
   DeploymentsIdRoute: DeploymentsIdRoute,
   InstancesIdRoute: InstancesIdRoute,
   TasksIdRoute: TasksIdRoute,
+  AppDefinitionsIndexRoute: AppDefinitionsIndexRoute,
   BatchesIndexRoute: BatchesIndexRoute,
   DecisionsIndexRoute: DecisionsIndexRoute,
   DefinitionsIndexRoute: DefinitionsIndexRoute,

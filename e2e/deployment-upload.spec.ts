@@ -85,7 +85,7 @@ test.describe("Upload BPMN deployment (Story 9.2)", () => {
       .setInputFiles({ name: "junk.txt", mimeType: "text/plain", buffer: Buffer.from("nope") });
 
     await expect(page.locator('[data-testid="upload-validation"]')).toContainText(
-      /\.bpmn or \.bpmn20\.xml/,
+      /\.bpmn, \.bpmn20\.xml, \.bar, or \.zip/,
     );
     await expect(page.locator('[data-testid="upload-deployment-submit"]')).toBeDisabled();
 

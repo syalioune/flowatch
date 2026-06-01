@@ -26,6 +26,8 @@ import { EmptyState, emptyStates } from "../lib/empty-states";
 import { ErrorBox } from "../lib/error-box";
 import { TableSkeleton } from "../lib/table-skeleton";
 import { useApi } from "../lib/useApi";
+import { DeploymentAppDefinitionsPanel } from "./DeploymentAppDefinitionsPanel";
+import { DeploymentBundledProcessesPanel } from "./DeploymentBundledProcessesPanel";
 
 interface Props {
   deployment: FlowableDeployment;
@@ -116,6 +118,8 @@ export function DeploymentDetail({ deployment, kind = "bpmn" }: Props) {
         </div>
       </div>
 
+      <DeploymentAppDefinitionsPanel deploymentId={d.id} />
+      <DeploymentBundledProcessesPanel deploymentId={d.id} />
       {isDmn ? (
         <DmnDecisionsPanel deploymentId={d.id} />
       ) : (

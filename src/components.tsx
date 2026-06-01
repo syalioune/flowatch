@@ -310,6 +310,7 @@ const NAV: NavGroup[] = [
     group: "Repository",
     items: [
       { path: "/deployments", label: "Deployments", icon: "deploy" },
+      { path: "/app-definitions", label: "App definitions", icon: "deploy" },
       { path: "/definitions", label: "Process definitions", icon: "def" },
       { path: "/decisions", label: "Decisions", icon: "decision" },
     ],

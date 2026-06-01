@@ -470,6 +470,37 @@ Filed downstream notes for follow-up:
 
 ---
 
+## RC-17 — Flowable App `.bar` archives do NOT cross-register across BPMN and App sub-apps
+
+**Naive intuition:** uploading a `.bar` archive (zip carrying `<n>.app` JSON manifest + bundled BPMN / DMN / form files) to `POST /repository/deployments` (BPMN sub-app) registers BOTH the bundled BPMN processes (in BPMN sub-app) AND the app-definition (in App sub-app, via the `.app` manifest). Symmetrically for `POST /app-api/app-repository/deployments`.
+
+**Actual behaviour:** the two sub-apps are independent deployment surfaces. The same `.bar` produces different outcomes depending on which endpoint receives it:
+
+- `POST /repository/deployments` + `.bar` → succeeds, registers bundled BPMN processes for runtime, treats `<n>.app` as a passthrough resource (NOT parsed). `/app-api/app-repository/app-definitions?deploymentId=<id>` returns empty.
+- `POST /app-api/app-repository/deployments` + `.bar` → succeeds, registers the app-definition. Bundled BPMN processes are stored as `type: "resource"` rows under that app-deployment's `/resources` listing, but they DO NOT appear in `/repository/process-definitions?deploymentId=<id>` (the BPMN sub-app doesn't know about them). `/app-api/app-repository/process-definitions` returns "No endpoint" — there is no app-side process listing.
+- The deployment ID returned by the App sub-app is NOT queryable via `/repository/deployments/<id>` (returns 404).
+
+**The `.app` manifest MUST be JSON, not XML.** An XML `<appModel>` shape (which the published "Flowable App Model" XSDs describe) returns `"Error reading app resource"` on upload. The working shape mirrors Flowable Modeler's exported JSON:
+
+```json
+{
+  "key": "loanApp",
+  "name": "Loan App",
+  "description": "...",
+  "theme": "theme-1",
+  "icon": "glyphicon-asterisk",
+  "models": [
+    { "id": 1, "name": "Loan Process", "key": "loanProcess", "modelType": 0, "version": 1 }
+  ]
+}
+```
+
+**Workaround:** Flowatch's Story 25.1 `.bar` upload modal routes through `POST /repository/deployments` so the operator gets immediate runtime access to bundled processes (visible in the new `<DeploymentBundledProcessesPanel>` on `/deployments/$id`). App-definition registration is OUT OF SCOPE for the modal — operators who want app-defs registered today use the Flowable Modeler's "Publish" action (which targets the App sub-app's deployment endpoint). The new `<DeploymentAppDefinitionsPanel>` returns `null` for `.bar`-via-BPMN deployments because the app-def doesn't get registered; it WILL render for any deployment that DID register an app-def via the App sub-app endpoint (e.g., a Flowable-Modeler push). The `/app-definitions` standalone route browses the App-sub-app's full app-def catalogue regardless of which path registered them.
+
+**Surfaced by:** Story 25.1 live-engine probe (2026-06-01). The story spec assumed a single multipart upload would register both halves; the probe revealed the engine treats them as separate deployment lifecycles. Documented inline at `<DeploymentAppDefinitionsPanel>` + the E2E build-bar fixture (`e2e/fixtures/build-bar.mjs`). Future story 25.x or 28.x could add a dedicated `<AppApiUploadModal>` that posts to `/app-api/app-repository/deployments` for operators who want full registration via Flowatch — out of scope for FR-55 (scope-reduced) close.
+
+---
+
 ## How to extend this file
 
 When a review surfaces a runtime quirk that meets all three of:

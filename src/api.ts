@@ -28,6 +28,7 @@ export type {
   AddAttachmentPayload,
   ApiLogEntry,
   ExecuteDecisionBody,
+  FlowableAppDefinition,
   FlowableAttachment,
   FlowableBatch,
   FlowableBatchPart,
@@ -71,6 +72,7 @@ import type {
   AddAttachmentPayload,
   ApiLogEntry,
   ExecuteDecisionBody,
+  FlowableAppDefinition,
   FlowableAttachment,
   FlowableBatch,
   FlowableBatchPart,
@@ -134,6 +136,11 @@ let cfg: FlowableConfig = loadCfg();
 // live under `/flowable-rest/service`, but DMN is mounted at `/flowable-rest/dmn-api`.
 // We derive the DMN root from the configured base URL.
 const dmnBase = (): string => cfg.baseUrl.replace(/\/service\/?$/, "/dmn-api");
+// Story 25.1: Flowable App API sub-app — mirrors the `dmnBase()` shape per
+// compat.md row 28. /service → /app-api. Read-only at this story; app-runtime
+// (app-instances) is not exposed in flowable-rest:7.2.0 (PRD FR-55
+// scope-reduced).
+const appBase = (): string => cfg.baseUrl.replace(/\/service\/?$/, "/app-api");
 
 export const API_LOG: ApiLogEntry[] = [];
 const MAX_LOG = 60;
@@ -902,6 +909,15 @@ const removeDmnDeployment = (id: string, params?: { cascade?: boolean }) =>
     params?.cascade ? { params: { cascade: true }, base: dmnBase() } : { base: dmnBase() },
   );
 
+// ── App (mounted under /flowable-rest/app-api, not /service) ─────────────
+// Story 25.1: FR-55 scope-reduced — repository side only. The /app-runtime
+// half (app-instances) is unmounted in flowable-rest:7.2.0 (compat.md row 28).
+const listAppDefinitions = (params?: QueryParams) =>
+  request<FlowablePage<FlowableAppDefinition>>("GET", "/app-repository/app-definitions", {
+    params,
+    base: appBase(),
+  });
+
 // ── Deployment helpers (multipart upload) ────────────────────────────────
 // Flowable expects multipart/form-data, not the JSON-with-base64 shape we used
 // in mock mode. We build a FormData and send via raw fetch (bypassing request()
@@ -918,9 +934,14 @@ interface UploadOpts {
    */
   path?: string;
 }
+// Story 25.1: `content` widened from `string` to `string | Blob` so .bar /
+// .zip archives can be uploaded as binary Blob/File directly. Blob branch
+// pass-throughs without re-wrapping (wrapping a Blob in `new Blob([blob])`
+// works but is a wasteful copy). Existing `deployBpmn` / `deployDmn` callers
+// pass strings and are unaffected.
 const uploadDeployment = async (
   filename: string,
-  content: string,
+  content: string | Blob,
   type: string,
   opts: UploadOpts = {},
 ): Promise<FlowableDeployment> => {
@@ -930,7 +951,8 @@ const uploadDeployment = async (
   // Blob constructor throw lands in API_LOG with status=0.
   const res = await multipartFetch(root, path, () => {
     const fd = new FormData();
-    fd.append("file", new Blob([content], { type }), filename);
+    const blob = content instanceof Blob ? content : new Blob([content], { type });
+    fd.append("file", blob, filename);
     if (cfg.tenantId) fd.append("tenantId", cfg.tenantId);
     if (opts.deploymentName) fd.append("deploymentName", opts.deploymentName);
     return fd;
@@ -946,6 +968,13 @@ const deployDmn = (name: string, xml: string) =>
     base: dmnBase(),
     path: "/dmn-repository/deployments",
   });
+// Story 25.1: deploy a Flowable App archive (.bar / .zip) to the engine.
+// Flowable's /repository/deployments endpoint accepts any of .bpmn /
+// .bpmn20.xml / .bar / .zip — the archive extension triggers multi-artefact
+// parsing (processes + decisions + forms + app.xml). FR-55 scope-reduced;
+// compat.md row 72.
+const deployBar = (filename: string, file: Blob | File) =>
+  uploadDeployment(filename, file, "application/zip", { deploymentName: filename });
 
 const ping = () => request<FlowableEngineInfo>("GET", "/management/engine");
 
@@ -1062,8 +1091,11 @@ export const api = {
   removeDmnDeployment,
   listDmnHistoryExecutions,
   getDmnHistoryAuditdata,
+  // App (FR-55 scope-reduced)
+  listAppDefinitions,
   deployBpmn,
   deployDmn,
+  deployBar,
   ping,
   runRaw,
 };
