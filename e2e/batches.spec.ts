@@ -140,7 +140,10 @@ test.describe("/batches list + detail (Story 24.1)", () => {
 
   test("Sidebar nav: Batches link routes to /batches", async ({ page }) => {
     await page.goto("/");
-    const navLink = page.getByRole("link", { name: /^Batches$/ });
+    // Target by href — the Sidebar `<Link>` renders <a href="/batches">. The
+    // accessible-name strategy would match "Batches" plus the count-badge
+    // digit (e.g. "Batches 0"), so href is the load-bearing identifier.
+    const navLink = page.locator('aside.sidebar a[href="/batches"]');
     await expect(navLink).toBeVisible();
     await navLink.click();
     await expect(page).toHaveURL(/\/batches$/);
