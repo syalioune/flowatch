@@ -363,7 +363,12 @@ export const Sidebar = ({ connection, onConnClick, counts }: SidebarProps) => (
               >
                 <Icon name={it.icon} />
                 <span>{it.label}</span>
-                {count != null && <span className="nav-count">{count}</span>}
+                {count != null && (
+                  <span className="nav-count">
+                    <span className="sr-only">Count: </span>
+                    {count}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -954,6 +959,7 @@ export const ApiInspector = ({
         >
           Recent calls
           <span className="nav-count" style={{ marginLeft: 6 }}>
+            <span className="sr-only">Count: </span>
             {log.length}
           </span>
         </div>
