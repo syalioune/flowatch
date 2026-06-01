@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI"
+             targetNamespace="http://flowatch.test/e2e">
+  <!--
+    Trivial auto-completing process used to seed historic instances for
+    Story 24.1's bulk-delete batch test. Start → end with no user task,
+    no async behaviour — each `startProcessInstance` call writes a
+    historic row immediately. The Playwright spec starts several
+    instances, then issues POST /history/historic-process-instances/
+    delete-batch to trigger a real Flowable batch operation.
+  -->
+  <process id="batchTargetE2E" name="Batch target E2E" isExecutable="true">
+    <startEvent id="start" name="Start"/>
+    <sequenceFlow id="flow1" sourceRef="start" targetRef="end"/>
+    <endEvent id="end" name="End"/>
+  </process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_batchTarget">
+    <bpmndi:BPMNPlane id="BPMNPlane_batchTarget" bpmnElement="batchTargetE2E">
+      <bpmndi:BPMNShape id="start_di" bpmnElement="start">
+        <omgdc:Bounds x="100" y="100" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end_di" bpmnElement="end">
+        <omgdc:Bounds x="200" y="100" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow1_di" bpmnElement="flow1">
+        <omgdi:waypoint x="136" y="118"/>
+        <omgdi:waypoint x="200" y="118"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>

@@ -165,6 +165,44 @@ export interface FlowableTaskForm {
   formProperties?: FlowableFormProperty[];
 }
 
+// Story 24.1: Flowable batch operations DTO (FR-53). Permissive optional
+// fields — engine may omit fields on empty / interim batch shapes; downstream
+// callers cast via `Loose<T>` when consuming non-typed fields. Field names
+// match the Flowable REST 7.x response keys verbatim.
+export interface FlowableBatch {
+  id: string;
+  type?: string;
+  status?: string;
+  searchKey?: string;
+  searchKey2?: string;
+  createTime?: string;
+  completeTime?: string;
+  batchDocumentJson?: string;
+  totalBatchParts?: number;
+  succeededBatchParts?: number;
+  failedBatchParts?: number;
+  completedBatchParts?: number;
+  tenantId?: string;
+  url?: string;
+}
+
+export interface FlowableBatchPart {
+  id: string;
+  batchId?: string;
+  type?: string;
+  status?: string;
+  scopeId?: string;
+  scopeType?: string;
+  subScopeId?: string;
+  searchKey?: string;
+  searchKey2?: string;
+  createTime?: string;
+  completeTime?: string;
+  resultDocumentJson?: string;
+  tenantId?: string;
+  url?: string;
+}
+
 export interface FlowableJob {
   id: string;
   processInstanceId?: string;

@@ -48,6 +48,9 @@ export interface EmptyStateEntry {
 export type ScreenKey =
   | "activeActivities"
   | "attachments"
+  | "batches"
+  | "batchParts"
+  | "batchPartStacktrace"
   | "decisions"
   | "decisionResource"
   | "definitions"
@@ -106,6 +109,18 @@ export const emptyStates = {
   attachments: {
     title: "No attachments on this task.",
     body: "Attach a file (PDF, screenshot, log dump) or paste a link to external evidence. The engine stores file content; URL attachments are declarative pointers.",
+  },
+  batches: {
+    title: "No batches yet.",
+    body: "Batch operations appear here when a bulk delete, bulk migration, or admin-initiated async housekeeping job runs. Trigger one via the Flowable Modeler's bulk actions, or via REST (e.g., POST /history/historic-process-instances/delete-batch).",
+  },
+  batchParts: {
+    title: "No parts for this batch.",
+    body: "Parts appear here as the engine schedules them. An empty parts list usually means the batch failed to plan — check the batch status above for the failure reason.",
+  },
+  batchPartStacktrace: {
+    title: "No stacktrace available.",
+    body: "This part completed without raising an exception, or the engine has not yet flushed its error record. If the part status is 'failed', retry the panel refresh in a moment.",
   },
   deploymentResources: {
     title: "No resources.",

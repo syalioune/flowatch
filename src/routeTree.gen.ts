@@ -21,11 +21,13 @@ import { Route as HistoryIndexRouteImport } from "./routes/history/index"
 import { Route as DeploymentsIndexRouteImport } from "./routes/deployments/index"
 import { Route as DefinitionsIndexRouteImport } from "./routes/definitions/index"
 import { Route as DecisionsIndexRouteImport } from "./routes/decisions/index"
+import { Route as BatchesIndexRouteImport } from "./routes/batches/index"
 import { Route as TasksIdRouteImport } from "./routes/tasks/$id"
 import { Route as InstancesIdRouteImport } from "./routes/instances/$id"
 import { Route as DeploymentsIdRouteImport } from "./routes/deployments/$id"
 import { Route as DefinitionsIdRouteImport } from "./routes/definitions/$id"
 import { Route as DecisionsKeyRouteImport } from "./routes/decisions/$key"
+import { Route as BatchesIdRouteImport } from "./routes/batches/$id"
 import { Route as IdentityUsersIdRouteImport } from "./routes/identity/users/$id"
 import { Route as IdentityGroupsIdRouteImport } from "./routes/identity/groups/$id"
 
@@ -89,6 +91,11 @@ const DecisionsIndexRoute = DecisionsIndexRouteImport.update({
   path: "/decisions/",
   getParentRoute: () => rootRouteImport,
 } as any)
+const BatchesIndexRoute = BatchesIndexRouteImport.update({
+  id: "/batches/",
+  path: "/batches/",
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TasksIdRoute = TasksIdRouteImport.update({
   id: "/tasks/$id",
   path: "/tasks/$id",
@@ -114,6 +121,11 @@ const DecisionsKeyRoute = DecisionsKeyRouteImport.update({
   path: "/decisions/$key",
   getParentRoute: () => rootRouteImport,
 } as any)
+const BatchesIdRoute = BatchesIdRouteImport.update({
+  id: "/batches/$id",
+  path: "/batches/$id",
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IdentityUsersIdRoute = IdentityUsersIdRouteImport.update({
   id: "/identity/users/$id",
   path: "/identity/users/$id",
@@ -130,11 +142,13 @@ export interface FileRoutesByFullPath {
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
   "/tenants": typeof TenantsRoute
+  "/batches/$id": typeof BatchesIdRoute
   "/decisions/$key": typeof DecisionsKeyRoute
   "/definitions/$id": typeof DefinitionsIdRoute
   "/deployments/$id": typeof DeploymentsIdRoute
   "/instances/$id": typeof InstancesIdRoute
   "/tasks/$id": typeof TasksIdRoute
+  "/batches/": typeof BatchesIndexRoute
   "/decisions/": typeof DecisionsIndexRoute
   "/definitions/": typeof DefinitionsIndexRoute
   "/deployments/": typeof DeploymentsIndexRoute
@@ -151,11 +165,13 @@ export interface FileRoutesByTo {
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
   "/tenants": typeof TenantsRoute
+  "/batches/$id": typeof BatchesIdRoute
   "/decisions/$key": typeof DecisionsKeyRoute
   "/definitions/$id": typeof DefinitionsIdRoute
   "/deployments/$id": typeof DeploymentsIdRoute
   "/instances/$id": typeof InstancesIdRoute
   "/tasks/$id": typeof TasksIdRoute
+  "/batches": typeof BatchesIndexRoute
   "/decisions": typeof DecisionsIndexRoute
   "/definitions": typeof DefinitionsIndexRoute
   "/deployments": typeof DeploymentsIndexRoute
@@ -173,11 +189,13 @@ export interface FileRoutesById {
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
   "/tenants": typeof TenantsRoute
+  "/batches/$id": typeof BatchesIdRoute
   "/decisions/$key": typeof DecisionsKeyRoute
   "/definitions/$id": typeof DefinitionsIdRoute
   "/deployments/$id": typeof DeploymentsIdRoute
   "/instances/$id": typeof InstancesIdRoute
   "/tasks/$id": typeof TasksIdRoute
+  "/batches/": typeof BatchesIndexRoute
   "/decisions/": typeof DecisionsIndexRoute
   "/definitions/": typeof DefinitionsIndexRoute
   "/deployments/": typeof DeploymentsIndexRoute
@@ -196,11 +214,13 @@ export interface FileRouteTypes {
     | "/bpmn"
     | "/dmn"
     | "/tenants"
+    | "/batches/$id"
     | "/decisions/$key"
     | "/definitions/$id"
     | "/deployments/$id"
     | "/instances/$id"
     | "/tasks/$id"
+    | "/batches/"
     | "/decisions/"
     | "/definitions/"
     | "/deployments/"
@@ -217,11 +237,13 @@ export interface FileRouteTypes {
     | "/bpmn"
     | "/dmn"
     | "/tenants"
+    | "/batches/$id"
     | "/decisions/$key"
     | "/definitions/$id"
     | "/deployments/$id"
     | "/instances/$id"
     | "/tasks/$id"
+    | "/batches"
     | "/decisions"
     | "/definitions"
     | "/deployments"
@@ -238,11 +260,13 @@ export interface FileRouteTypes {
     | "/bpmn"
     | "/dmn"
     | "/tenants"
+    | "/batches/$id"
     | "/decisions/$key"
     | "/definitions/$id"
     | "/deployments/$id"
     | "/instances/$id"
     | "/tasks/$id"
+    | "/batches/"
     | "/decisions/"
     | "/definitions/"
     | "/deployments/"
@@ -260,11 +284,13 @@ export interface RootRouteChildren {
   BpmnRoute: typeof BpmnRoute
   DmnRoute: typeof DmnRoute
   TenantsRoute: typeof TenantsRoute
+  BatchesIdRoute: typeof BatchesIdRoute
   DecisionsKeyRoute: typeof DecisionsKeyRoute
   DefinitionsIdRoute: typeof DefinitionsIdRoute
   DeploymentsIdRoute: typeof DeploymentsIdRoute
   InstancesIdRoute: typeof InstancesIdRoute
   TasksIdRoute: typeof TasksIdRoute
+  BatchesIndexRoute: typeof BatchesIndexRoute
   DecisionsIndexRoute: typeof DecisionsIndexRoute
   DefinitionsIndexRoute: typeof DefinitionsIndexRoute
   DeploymentsIndexRoute: typeof DeploymentsIndexRoute
@@ -363,6 +389,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof DecisionsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    "/batches/": {
+      id: "/batches/"
+      path: "/batches"
+      fullPath: "/batches/"
+      preLoaderRoute: typeof BatchesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     "/tasks/$id": {
       id: "/tasks/$id"
       path: "/tasks/$id"
@@ -398,6 +431,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof DecisionsKeyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    "/batches/$id": {
+      id: "/batches/$id"
+      path: "/batches/$id"
+      fullPath: "/batches/$id"
+      preLoaderRoute: typeof BatchesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     "/identity/users/$id": {
       id: "/identity/users/$id"
       path: "/identity/users/$id"
@@ -420,11 +460,13 @@ const rootRouteChildren: RootRouteChildren = {
   BpmnRoute: BpmnRoute,
   DmnRoute: DmnRoute,
   TenantsRoute: TenantsRoute,
+  BatchesIdRoute: BatchesIdRoute,
   DecisionsKeyRoute: DecisionsKeyRoute,
   DefinitionsIdRoute: DefinitionsIdRoute,
   DeploymentsIdRoute: DeploymentsIdRoute,
   InstancesIdRoute: InstancesIdRoute,
   TasksIdRoute: TasksIdRoute,
+  BatchesIndexRoute: BatchesIndexRoute,
   DecisionsIndexRoute: DecisionsIndexRoute,
   DefinitionsIndexRoute: DefinitionsIndexRoute,
   DeploymentsIndexRoute: DeploymentsIndexRoute,
