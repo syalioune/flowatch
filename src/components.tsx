@@ -278,7 +278,7 @@ interface NavItem {
   label: string;
   icon: string;
   /** Key into the `counts` map (only set for items that show a count badge). */
-  countsKey?: "tasks" | "jobs" | "instances";
+  countsKey?: "tasks" | "jobs" | "instances" | "batches" | "events";
 }
 
 interface NavGroup {
@@ -301,8 +301,8 @@ const NAV: NavGroup[] = [
       { path: "/tasks", label: "Tasks", icon: "task", countsKey: "tasks" },
       { path: "/instances", label: "Process instances", icon: "instance", countsKey: "instances" },
       { path: "/jobs", label: "Jobs", icon: "job", countsKey: "jobs" },
-      { path: "/batches", label: "Batches", icon: "job" },
-      { path: "/events", label: "Events", icon: "bell" },
+      { path: "/batches", label: "Batches", icon: "job", countsKey: "batches" },
+      { path: "/events", label: "Events", icon: "bell", countsKey: "events" },
       { path: "/history", label: "History", icon: "history" },
     ],
   },
@@ -331,7 +331,9 @@ interface ConnectionState {
 interface SidebarProps {
   connection: ConnectionState;
   onConnClick: () => void;
-  counts?: Partial<Record<"tasks" | "jobs" | "instances", number | null | undefined>>;
+  counts?: Partial<
+    Record<"tasks" | "jobs" | "instances" | "batches" | "events", number | null | undefined>
+  >;
 }
 
 // @migration-any: TanStack Router's LinkProps does not expose data-* attribute pass-through. Tracked in #119.

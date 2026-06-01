@@ -79,7 +79,7 @@ function App() {
     host: "connecting…",
   });
   const [navCounts, setNavCounts] = React.useState<
-    Partial<Record<"tasks" | "jobs" | "instances", number | null>>
+    Partial<Record<"tasks" | "jobs" | "instances" | "batches" | "events", number | null>>
   >({});
 
   React.useEffect(() => {
@@ -187,12 +187,17 @@ function App() {
     // /jobs tabs (executable + timer + dead-letter) so the operator's
     // mental model matches the /jobs screen surface. Pre-Epic-12 this was
     // just listJobs.total (executable only).
-    const [tasks, jobs, timerJobs, deadJobs, instances] = await Promise.all([
+    // Story 24.1 / 24.2 follow-up: batches + events surfaces gain count
+    // badges. `size: 0` returns just `total` per Flowable's pagination
+    // contract (matches the existing tasks/jobs/instances shape).
+    const [tasks, jobs, timerJobs, deadJobs, instances, batches, events] = await Promise.all([
       api.listTasks({ size: 0 }).catch(() => null),
       api.listJobs({ size: 0 }).catch(() => null),
       api.listTimerJobs({ size: 0 }).catch(() => null),
       api.listDeadLetterJobs({ size: 0 }).catch(() => null),
       api.listProcessInstances({ size: 0 }).catch(() => null),
+      api.listBatches({ size: 0 }).catch(() => null),
+      api.listEventSubscriptions({ size: 0 }).catch(() => null),
     ]);
     if (seq !== refreshNavCountsSeq.current) return; // stale fetch — newer call in flight
     const totalJobs =
@@ -203,6 +208,8 @@ function App() {
       tasks: tasks?.total ?? null,
       jobs: totalJobs,
       instances: instances?.total ?? null,
+      batches: batches?.total ?? null,
+      events: events?.total ?? null,
     });
     // tenant.id is read indirectly via api.config() inside the API calls;
     // include it so the callback identity changes on tenant switch.
