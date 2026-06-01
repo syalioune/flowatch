@@ -18,6 +18,7 @@ import { Route as JobsIndexRouteImport } from "./routes/jobs/index"
 import { Route as InstancesIndexRouteImport } from "./routes/instances/index"
 import { Route as IdentityIndexRouteImport } from "./routes/identity/index"
 import { Route as HistoryIndexRouteImport } from "./routes/history/index"
+import { Route as EventsIndexRouteImport } from "./routes/events/index"
 import { Route as DeploymentsIndexRouteImport } from "./routes/deployments/index"
 import { Route as DefinitionsIndexRouteImport } from "./routes/definitions/index"
 import { Route as DecisionsIndexRouteImport } from "./routes/decisions/index"
@@ -74,6 +75,11 @@ const IdentityIndexRoute = IdentityIndexRouteImport.update({
 const HistoryIndexRoute = HistoryIndexRouteImport.update({
   id: "/history/",
   path: "/history/",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsIndexRoute = EventsIndexRouteImport.update({
+  id: "/events/",
+  path: "/events/",
   getParentRoute: () => rootRouteImport,
 } as any)
 const DeploymentsIndexRoute = DeploymentsIndexRouteImport.update({
@@ -152,6 +158,7 @@ export interface FileRoutesByFullPath {
   "/decisions/": typeof DecisionsIndexRoute
   "/definitions/": typeof DefinitionsIndexRoute
   "/deployments/": typeof DeploymentsIndexRoute
+  "/events/": typeof EventsIndexRoute
   "/history/": typeof HistoryIndexRoute
   "/identity/": typeof IdentityIndexRoute
   "/instances/": typeof InstancesIndexRoute
@@ -175,6 +182,7 @@ export interface FileRoutesByTo {
   "/decisions": typeof DecisionsIndexRoute
   "/definitions": typeof DefinitionsIndexRoute
   "/deployments": typeof DeploymentsIndexRoute
+  "/events": typeof EventsIndexRoute
   "/history": typeof HistoryIndexRoute
   "/identity": typeof IdentityIndexRoute
   "/instances": typeof InstancesIndexRoute
@@ -199,6 +207,7 @@ export interface FileRoutesById {
   "/decisions/": typeof DecisionsIndexRoute
   "/definitions/": typeof DefinitionsIndexRoute
   "/deployments/": typeof DeploymentsIndexRoute
+  "/events/": typeof EventsIndexRoute
   "/history/": typeof HistoryIndexRoute
   "/identity/": typeof IdentityIndexRoute
   "/instances/": typeof InstancesIndexRoute
@@ -224,6 +233,7 @@ export interface FileRouteTypes {
     | "/decisions/"
     | "/definitions/"
     | "/deployments/"
+    | "/events/"
     | "/history/"
     | "/identity/"
     | "/instances/"
@@ -247,6 +257,7 @@ export interface FileRouteTypes {
     | "/decisions"
     | "/definitions"
     | "/deployments"
+    | "/events"
     | "/history"
     | "/identity"
     | "/instances"
@@ -270,6 +281,7 @@ export interface FileRouteTypes {
     | "/decisions/"
     | "/definitions/"
     | "/deployments/"
+    | "/events/"
     | "/history/"
     | "/identity/"
     | "/instances/"
@@ -294,6 +306,7 @@ export interface RootRouteChildren {
   DecisionsIndexRoute: typeof DecisionsIndexRoute
   DefinitionsIndexRoute: typeof DefinitionsIndexRoute
   DeploymentsIndexRoute: typeof DeploymentsIndexRoute
+  EventsIndexRoute: typeof EventsIndexRoute
   HistoryIndexRoute: typeof HistoryIndexRoute
   IdentityIndexRoute: typeof IdentityIndexRoute
   InstancesIndexRoute: typeof InstancesIndexRoute
@@ -366,6 +379,13 @@ declare module "@tanstack/react-router" {
       path: "/history"
       fullPath: "/history/"
       preLoaderRoute: typeof HistoryIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/events/": {
+      id: "/events/"
+      path: "/events"
+      fullPath: "/events/"
+      preLoaderRoute: typeof EventsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/deployments/": {
@@ -470,6 +490,7 @@ const rootRouteChildren: RootRouteChildren = {
   DecisionsIndexRoute: DecisionsIndexRoute,
   DefinitionsIndexRoute: DefinitionsIndexRoute,
   DeploymentsIndexRoute: DeploymentsIndexRoute,
+  EventsIndexRoute: EventsIndexRoute,
   HistoryIndexRoute: HistoryIndexRoute,
   IdentityIndexRoute: IdentityIndexRoute,
   InstancesIndexRoute: InstancesIndexRoute,

@@ -41,6 +41,7 @@ export type {
   FlowableDmnRuleConditionResult,
   FlowableDmnRuleExecution,
   FlowableEngineInfo,
+  FlowableEventSubscription,
   FlowableFormProperty,
   FlowableGroup,
   FlowableHistoricActivity,
@@ -79,6 +80,7 @@ import type {
   FlowableDeployment,
   FlowableDmnExecutionAudit,
   FlowableEngineInfo,
+  FlowableEventSubscription,
   FlowableHistoricActivity,
   FlowableHistoricDecisionExecution,
   FlowableHistoricProcessInstance,
@@ -649,6 +651,16 @@ const addTaskAttachment = async (
   return (await res.json()) as FlowableAttachment;
 };
 
+// Story 24.2: event subscriptions are runtime engine state (what messages /
+// signals / timers the engine is waiting on per running instance).
+// `/runtime/event-subscriptions` accepts processInstanceId, eventType,
+// eventName, tenantId, size, start, sort, order. Read-only — no per-id
+// mutation surface verified in compat.md.
+const listEventSubscriptions = (params?: QueryParams) =>
+  request<FlowablePage<FlowableEventSubscription>>("GET", "/runtime/event-subscriptions", {
+    params,
+  });
+
 // ── Form ──────────────────────────────────────────────────────────────────
 const getTaskForm = (taskId: string) =>
   request<FlowableTaskForm>("GET", "/form/form-data", { params: { taskId } });
@@ -998,6 +1010,7 @@ export const api = {
   addTaskAttachment,
   getTaskAttachmentContent,
   deleteTaskAttachment,
+  listEventSubscriptions,
   // Form
   getTaskForm,
   submitTaskForm,
