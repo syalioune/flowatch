@@ -980,23 +980,14 @@ const deployDmn = (name: string, xml: string | Blob) =>
     base: dmnBase(),
     path: "/dmn-repository/deployments",
   });
-// Story 25.1: deploy a Flowable App archive (.bar / .zip) through the BPMN
-// sub-app. The endpoint extracts and REGISTERS bundled BPMN processes for
-// runtime, but DOES NOT cross-register the .app file (app-def registration
-// requires the App sub-app endpoint via `deployBarAppApi`) NOR bundled .dmn
-// files (which are extracted as resources but not registered for execution
-// — DMN registration requires per-file POST to /dmn-repository/deployments
-// via the existing `deployDmn` wrapper). See RC-17.
+// Story 25.1: deploy a Flowable App archive (.bar / .zip) through the App
+// sub-app. The AppDeployer cascades into BpmnDeployer + DmnDeployer for
+// bundled .bpmn / .dmn entries — a single POST registers the app-def AND
+// every bundled artefact. The child BPMN / DMN deployments are linked to
+// the app deployment via `parentDeploymentId` (the BPMN child appears in
+// /repository/deployments with parentDeploymentId pointing at this
+// app-deployment id, NOT at itself like a standalone BPMN deploy). RC-17.
 const deployBar = (filename: string, file: Blob | File) =>
-  uploadDeployment(filename, file, "application/zip", { deploymentName: filename });
-// Story 25.1: deploy the same .bar archive through the App sub-app so the
-// `.app` manifest registers an app-definition row in
-// /app-api/app-repository/app-definitions. The bundled BPMN / DMN files
-// INSIDE the archive land as resources (type=resource) on this
-// app-deployment but are NOT registered into the BPMN / DMN sub-apps —
-// the modal's full-coverage path calls all three deploy variants in
-// parallel. See RC-17.
-const deployBarAppApi = (filename: string, file: Blob | File) =>
   uploadDeployment(filename, file, "application/zip", {
     deploymentName: filename,
     base: appBase(),
@@ -1124,7 +1115,6 @@ export const api = {
   deployBpmn,
   deployDmn,
   deployBar,
-  deployBarAppApi,
   ping,
   runRaw,
 };

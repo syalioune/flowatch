@@ -82,6 +82,10 @@ export interface FlowableDeployment {
   deploymentTime: string;
   tenantId: string;
   category?: string;
+  // Story 25.1: Flowable sets this to `id` for standalone deploys and to
+  // the parent App-sub-app deployment id when a .bar upload spawned a
+  // child BPMN/DMN deployment via AppDeployer.
+  parentDeploymentId?: string;
 }
 
 export interface FlowableProcessDefinition {
