@@ -16,10 +16,17 @@ import { EmptyState, getEmptyState } from "../../lib/empty-states";
 import { ErrorBox } from "../../lib/error-box";
 import { TableSkeleton } from "../../lib/table-skeleton";
 
+// `z.coerce.boolean()` treats ANY non-empty string as true (e.g.
+// "?latest=false" → true). Use an explicit transform so the URL string
+// "false" round-trips to the boolean `false`.
+const boolish = z
+  .union([z.boolean(), z.literal("true"), z.literal("false")])
+  .transform((v) => (typeof v === "boolean" ? v : v === "true"));
+
 const appDefsSearch = z.object({
   key: z.string().optional(),
   tenantId: z.string().optional(),
-  latest: z.coerce.boolean().optional().default(true),
+  latest: boolish.optional().default(true),
 });
 
 export type AppDefsSearch = z.infer<typeof appDefsSearch>;
@@ -165,9 +172,15 @@ function AppDefinitionsRoute() {
           }}
         >
           <input
+            // `key` forces remount when URL state changes — keeps the
+            // checkbox in sync with the validated search.latest without
+            // becoming a fully-controlled input (which Playwright's
+            // `uncheck()` can't transition because the controlled
+            // `checked` re-asserts before the test reads the next state).
+            key={`latest-${search.latest === true ? "on" : "off"}`}
             type="checkbox"
             data-testid="app-definitions-latest-filter"
-            checked={search.latest === true}
+            defaultChecked={search.latest === true}
             onChange={(e) => toggleLatest(e.currentTarget.checked)}
           />
           Latest version only
@@ -190,7 +203,17 @@ function AppDefinitionsRoute() {
             </thead>
             <tbody>
               {rows.map((a) => (
-                <tr key={a.id} data-testid={`app-definition-row-${a.id}`}>
+                <tr
+                  key={a.id}
+                  data-testid={`app-definition-row-${a.id}`}
+                  tabIndex={0}
+                  style={{ cursor: "pointer" }}
+                  onClick={() => navigate({ to: "/app-definitions/$id", params: { id: a.id } })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter")
+                      navigate({ to: "/app-definitions/$id", params: { id: a.id } });
+                  }}
+                >
                   <td>
                     <b style={{ fontWeight: 500 }}>{a.name || "—"}</b>
                   </td>
@@ -198,13 +221,11 @@ function AppDefinitionsRoute() {
                   <td className="mono">{a.version !== undefined ? `v${a.version}` : "—"}</td>
                   <td className="mono">
                     {a.deploymentId ? (
-                      <Link
-                        to="/deployments/$id"
-                        params={{ id: a.deploymentId }}
-                        search={{ kind: "bpmn" }}
-                      >
-                        {a.deploymentId}
-                      </Link>
+                      <span onClick={(e) => e.stopPropagation()}>
+                        <Link to="/app-definitions/$id" params={{ id: a.id }}>
+                          {a.deploymentId}
+                        </Link>
+                      </span>
                     ) : (
                       <span className="mute">—</span>
                     )}

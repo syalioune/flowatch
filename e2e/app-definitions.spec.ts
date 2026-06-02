@@ -124,11 +124,30 @@ async function uploadBarViaModal(page: import("@playwright/test").Page): Promise
   await expect(page.getByText(E2E_DEPLOYMENT_NAME).first()).toBeVisible({ timeout: 8000 });
 }
 
+// Direct seed via app-api curl — used in beforeAll so each "browse" test
+// has predictable state independent of modal-upload test ordering.
+async function seedBarViaAppApi(): Promise<void> {
+  const archive = await buildE2eBar();
+  const fd = new FormData();
+  fd.append(
+    "file",
+    new Blob([new Uint8Array(archive)], { type: "application/zip" }),
+    `${E2E_DEPLOYMENT_NAME}.bar`,
+  );
+  const res = await fetch(`${FLOWABLE_APP}/app-repository/deployments`, {
+    method: "POST",
+    headers: { Authorization: BASIC },
+    body: fd,
+  });
+  if (!res.ok) throw new Error(`Seed failed: ${res.status} ${await res.text()}`);
+}
+
 test.describe("Story 25.1 — .bar upload recognition + App definitions", () => {
   test.beforeAll(async () => {
     await cleanupBpmnDeployments();
     await cleanupAppDeployments();
     await cleanupDmnDeployments();
+    await seedBarViaAppApi();
   });
 
   test.afterAll(async () => {
@@ -207,18 +226,41 @@ test.describe("Story 25.1 — .bar upload recognition + App definitions", () => 
     page,
   }) => {
     await page.goto("/deployments");
-    await expect(page.getByText(E2E_DEPLOYMENT_NAME).first()).toBeVisible();
-    await page.getByText(E2E_DEPLOYMENT_NAME).first().click();
+    // /deployments merges BPMN+DMN — the .bar seed creates BOTH a BPMN child
+    // and a DMN child both named "e2e-story-25-1-app". Scope to the BAR-tagged
+    // row to exercise the BPMN-side bundled-processes panel.
+    const row = page
+      .locator('tr[data-kind="bar"]')
+      .filter({ hasText: E2E_DEPLOYMENT_NAME })
+      .first();
+    await expect(row).toBeVisible();
+    await row.click();
     await expect(page.getByTestId("deployment-bundled-processes-panel")).toBeVisible();
     await expect(page.locator('[data-testid^="bundled-process-row-"]').first()).toBeVisible();
   });
 
+  test("clicking an app-definition row opens the detail route + lists bundled resources", async ({
+    page,
+  }) => {
+    await page.goto("/app-definitions");
+    const row = page.locator('[data-testid^="app-definition-row-"]').first();
+    await expect(row).toBeVisible();
+    await row.click();
+    await expect(page).toHaveURL(/\/app-definitions\/[^/]+$/);
+    await expect(page.getByTestId("app-deployment-resources-table")).toBeVisible();
+    await expect(page.getByText("e2eApp.app")).toBeVisible();
+    await expect(page.getByText("e2eAppProcess.bpmn20.xml")).toBeVisible();
+    await expect(page.getByText("e2eAppDecision.dmn")).toBeVisible();
+  });
+
   test("BAR deployment row announces kind='BAR' on /deployments (Story 25.1)", async ({ page }) => {
     await page.goto("/deployments");
-    const row = page.locator(`tr[data-deployment-id]`).filter({ hasText: E2E_DEPLOYMENT_NAME });
+    const row = page
+      .locator('tr[data-kind="bar"]')
+      .filter({ hasText: E2E_DEPLOYMENT_NAME })
+      .first();
     await expect(row).toBeVisible();
     await expect(row).toContainText("BAR");
-    await expect(row).toHaveAttribute("data-kind", "bar");
   });
 
   test("deployment-app-definitions-panel does NOT render on a deployment without an app-def", async ({
