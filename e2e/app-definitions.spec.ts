@@ -4,29 +4,56 @@
  * E2E — Story 25.1 (FR-55 scope-reduced): .bar upload recognition + App
  * definition browse.
  *
- * Live-engine probe T-9 revealed that the two Flowable sub-apps DO NOT
- * cross-register a .bar deployment: uploading via `/repository/deployments`
- * extracts the bundled BPMN process for runtime but skips the .app file;
- * uploading via `/app-api/app-repository/deployments` registers the
- * app-definition but the BPMN process does not appear in the BPMN sub-app.
- *
- * Test strategy:
- *   - The "modal recognition + BPMN-deploy + bundled-processes panel"
- *     surface tests upload .bar via the BPMN endpoint (the path Flowatch's
- *     modal uses).
- *   - The "/app-definitions list + app-def panel on deployment-detail"
- *     surface tests seed via the app-api endpoint (operator-feel: a parallel
- *     deployment that registered the app-def the way Flowable Modeler does).
+ * The modal's submit fans the same .bar out to THREE deploy endpoints
+ * (RC-17): /repository/deployments (BPMN procs), /app-api/app-repository
+ * /deployments (app-def), and per-.dmn /dmn-repository/deployments. The
+ * E2E uses the modal as the seed — no parallel curl seeding needed.
  *
  * Per Pattern P-009: real engine calls, no mocks.
  */
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
-// @ts-expect-error — sibling .mjs fixture without declaration file.
-import { buildE2eBar, E2E_APP_KEY, E2E_DEPLOYMENT_NAME } from "./fixtures/build-bar.mjs";
+import JSZip from "jszip";
+
+const BPMN = `<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:flowable="http://flowable.org/bpmn"
+  targetNamespace="http://flowable.org/bpmn">
+  <process id="e2eAppProcess" name="E2E App Process" isExecutable="true">
+    <startEvent id="start"/>
+    <sequenceFlow id="f1" sourceRef="start" targetRef="end"/>
+    <endEvent id="end"/>
+  </process>
+</definitions>`;
+
+const DMN = readFileSync(resolve("e2e/fixtures/sample.dmn"), "utf8");
+
+const APP_JSON = JSON.stringify({
+  key: "e2eApp",
+  name: "E2E App",
+  description: "Story 25.1 e2e fixture",
+  theme: "theme-1",
+  icon: "glyphicon-asterisk",
+  models: [{ id: 1, name: "E2E App Process", key: "e2eAppProcess", modelType: 0, version: 1 }],
+});
+
+async function buildE2eBar(): Promise<Buffer> {
+  const zip = new JSZip();
+  zip.file("e2eAppProcess.bpmn20.xml", BPMN);
+  zip.file("e2eAppDecision.dmn", DMN);
+  zip.file("e2eApp.app", APP_JSON);
+  return await zip.generateAsync({ type: "nodebuffer" });
+}
+
+const E2E_APP_KEY = "e2eApp";
+const E2E_DECISION_KEY = "e2eSampleDecision";
+const E2E_DEPLOYMENT_NAME = "e2e-story-25-1-app";
 
 const FLOWABLE = "http://localhost:8080/flowable-rest/service";
 const FLOWABLE_APP = "http://localhost:8080/flowable-rest/app-api";
+const FLOWABLE_DMN = "http://localhost:8080/flowable-rest/dmn-api";
 const BASIC = `Basic ${Buffer.from("rest-admin:test").toString("base64")}`;
 
 interface DeploymentRow {
@@ -64,33 +91,50 @@ async function cleanupAppDeployments(): Promise<void> {
   }
 }
 
-async function seedAppDeployment(): Promise<string> {
-  const archive = await buildE2eBar();
-  const fd = new FormData();
-  fd.append("file", new Blob([archive], { type: "application/zip" }), `${E2E_DEPLOYMENT_NAME}.bar`);
-  fd.append("deploymentName", E2E_DEPLOYMENT_NAME);
-  const res = await fetch(`${FLOWABLE_APP}/app-repository/deployments`, {
-    method: "POST",
+async function cleanupDmnDeployments(): Promise<void> {
+  // DMN sub-app deployments are named after the .dmn file extracted from the
+  // .bar (e.g. "e2eAppDecision.dmn"), not after E2E_DEPLOYMENT_NAME — filter
+  // broadly and delete those whose decision key matches the seed.
+  const res = await fetch(`${FLOWABLE_DMN}/dmn-repository/deployments?size=100`, {
     headers: { Authorization: BASIC },
-    body: fd,
   });
-  if (!res.ok) throw new Error(`App seed failed: ${res.status} ${await res.text()}`);
-  const body = (await res.json()) as { id: string };
-  return body.id;
+  if (!res.ok) return;
+  const body = (await res.json()) as { data: DeploymentRow[] };
+  for (const dep of body.data) {
+    if (dep.name && dep.name.startsWith("e2eAppDecision")) {
+      await fetch(`${FLOWABLE_DMN}/dmn-repository/deployments/${dep.id}?cascade=true`, {
+        method: "DELETE",
+        headers: { Authorization: BASIC },
+      });
+    }
+  }
+}
+
+async function uploadBarViaModal(page: import("@playwright/test").Page): Promise<void> {
+  const archive = await buildE2eBar();
+  await page.goto("/deployments");
+  await page.getByTestId("upload-deployment").click();
+  await page.getByTestId("upload-deployment-input").setInputFiles({
+    name: `${E2E_DEPLOYMENT_NAME}.bar`,
+    mimeType: "application/zip",
+    buffer: Buffer.from(archive),
+  });
+  await expect(page.getByTestId("upload-bar-hint")).toBeVisible();
+  await page.getByTestId("upload-deployment-submit").click();
+  await expect(page.getByText(E2E_DEPLOYMENT_NAME).first()).toBeVisible({ timeout: 8000 });
 }
 
 test.describe("Story 25.1 — .bar upload recognition + App definitions", () => {
-  let appDeploymentId: string;
-
   test.beforeAll(async () => {
     await cleanupBpmnDeployments();
     await cleanupAppDeployments();
-    appDeploymentId = await seedAppDeployment();
+    await cleanupDmnDeployments();
   });
 
   test.afterAll(async () => {
     await cleanupBpmnDeployments();
     await cleanupAppDeployments();
+    await cleanupDmnDeployments();
   });
 
   test("Sidebar nav exposes App definitions link in the Repository group", async ({ page }) => {
@@ -98,18 +142,48 @@ test.describe("Story 25.1 — .bar upload recognition + App definitions", () => 
     await expect(page.locator('a[href="/app-definitions"]')).toBeVisible();
   });
 
-  test("/app-definitions renders the seeded row with all 6 columns", async ({ page }) => {
-    await page.goto("/app-definitions");
-    await expect(page.getByTestId("app-definitions-table")).toBeVisible();
-    await expect(page.getByText("E2E App")).toBeVisible();
-    await expect(page.getByText(E2E_APP_KEY, { exact: true })).toBeVisible();
-  });
-
   test("scope-reduction note renders inline above the filter strip", async ({ page }) => {
     await page.goto("/app-definitions");
     const note = page.getByTestId("app-runtime-scope-note");
     await expect(note).toBeVisible();
     await expect(note).toContainText(/App-instances .* not exposed/);
+  });
+
+  test("/deployments upload modal recognizes .bar and fans out to all three sub-apps", async ({
+    page,
+  }) => {
+    await uploadBarViaModal(page);
+
+    // BPMN sub-app registered the bundled process.
+    const bpmnRes = await fetch(
+      `${FLOWABLE}/repository/deployments?name=${E2E_DEPLOYMENT_NAME}&size=10`,
+      { headers: { Authorization: BASIC } },
+    );
+    const bpmnBody = (await bpmnRes.json()) as { data: DeploymentRow[] };
+    expect(bpmnBody.data.length).toBeGreaterThan(0);
+
+    // App sub-app registered the app-def.
+    const appRes = await fetch(
+      `${FLOWABLE_APP}/app-repository/app-definitions?key=${E2E_APP_KEY}&size=10`,
+      { headers: { Authorization: BASIC } },
+    );
+    const appBody = (await appRes.json()) as { data: Array<{ key: string }> };
+    expect(appBody.data.some((row) => row.key === E2E_APP_KEY)).toBe(true);
+
+    // DMN sub-app registered the bundled decision.
+    const dmnRes = await fetch(
+      `${FLOWABLE_DMN}/dmn-repository/decisions?key=${E2E_DECISION_KEY}&size=10`,
+      { headers: { Authorization: BASIC } },
+    );
+    const dmnBody = (await dmnRes.json()) as { data: Array<{ key: string }> };
+    expect(dmnBody.data.some((row) => row.key === E2E_DECISION_KEY)).toBe(true);
+  });
+
+  test("/app-definitions list renders the modal-seeded row", async ({ page }) => {
+    await page.goto("/app-definitions");
+    await expect(page.getByTestId("app-definitions-table")).toBeVisible();
+    await expect(page.getByText("E2E App")).toBeVisible();
+    await expect(page.getByText(E2E_APP_KEY, { exact: true })).toBeVisible();
   });
 
   test("filter by key updates URL and narrows the table", async ({ page }) => {
@@ -129,28 +203,7 @@ test.describe("Story 25.1 — .bar upload recognition + App definitions", () => 
     await expect(checkbox).not.toBeChecked();
   });
 
-  test("/deployments upload modal accepts .bar and shows the recognition hint", async ({
-    page,
-  }) => {
-    const archive = await buildE2eBar();
-    await page.goto("/deployments");
-    await page.getByTestId("upload-deployment").click();
-    const fileInput = page.getByTestId("upload-deployment-input");
-    await fileInput.setInputFiles({
-      name: `${E2E_DEPLOYMENT_NAME}.bar`,
-      mimeType: "application/zip",
-      buffer: Buffer.from(archive),
-    });
-    await expect(page.getByTestId("upload-bar-hint")).toBeVisible();
-    await expect(page.getByTestId("upload-bar-hint")).toContainText(/Flowable App archive/);
-    await page.getByTestId("upload-deployment-submit").click();
-    // BPMN sub-app deploy succeeds (returns a deployment row); the engine
-    // ignores the .app file on this endpoint — bundled BPMN processes
-    // register and surface on /deployments/$id.
-    await expect(page.getByText(E2E_DEPLOYMENT_NAME)).toBeVisible({ timeout: 5000 });
-  });
-
-  test("deployment-detail surfaces the bundled-processes panel for a .bar upload", async ({
+  test("deployment-detail surfaces the bundled-processes panel for the .bar upload", async ({
     page,
   }) => {
     await page.goto("/deployments");
@@ -163,10 +216,7 @@ test.describe("Story 25.1 — .bar upload recognition + App definitions", () => 
   test("deployment-app-definitions-panel does NOT render on a deployment without an app-def", async ({
     page,
   }) => {
-    // A pre-existing BPMN-only deployment seeded by a sibling spec (golden-path)
-    // shouldn't show the app-def panel — the panel's null-return invariant.
     await page.goto("/deployments");
-    // Pick the first BPMN row that is NOT the .bar one.
     const rows = page.locator("tr[data-deployment-id]");
     const count = await rows.count();
     let opened = false;
@@ -193,14 +243,9 @@ test.describe("Story 25.1 — .bar upload recognition + App definitions", () => 
     await page.goto("/app-definitions");
     const req = await requestPromise;
     expect(req.url()).toMatch(/\/app-api\/app-repository\/app-definitions/);
-    // Authorization header IS sent (Basic auth) — redaction happens in the
-    // client-side API_LOG, not on the wire. The wire-level header is the
-    // proof that Pattern P-001 funnel fired.
     expect(req.headers().authorization ?? "").toMatch(/^Basic /);
   });
 
-  // Probe 11 regression-guard: the scope-reduction note's premise — app-runtime
-  // remains unmounted on this engine image.
   test("app-runtime/app-instances stays unmounted (FR-55 scope-reduction premise)", async () => {
     const res = await fetch(`${FLOWABLE_APP}/app-runtime/app-instances`, {
       headers: { Authorization: BASIC },
@@ -208,17 +253,5 @@ test.describe("Story 25.1 — .bar upload recognition + App definitions", () => 
     expect(res.ok).toBe(false);
     const body = (await res.text()) ?? "";
     expect(body).toMatch(/No endpoint/);
-  });
-
-  // Smoke that the seeded app-deployment id is queryable directly — proves
-  // the appBase() route-prefix rewrite worked.
-  test("appBase() rewrite resolves /app-repository/app-definitions filtered by deploymentId", async () => {
-    const res = await fetch(
-      `${FLOWABLE_APP}/app-repository/app-definitions?deploymentId=${appDeploymentId}`,
-      { headers: { Authorization: BASIC } },
-    );
-    expect(res.ok).toBe(true);
-    const body = (await res.json()) as { data: Array<{ key: string }> };
-    expect(body.data.some((row) => row.key === E2E_APP_KEY)).toBe(true);
   });
 });

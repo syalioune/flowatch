@@ -15,6 +15,7 @@
  * verbatim engine error via `<ErrorBox>` per Pattern P-003.
  */
 
+import JSZip from "jszip";
 import React from "react";
 import { api, type FlowableDeployment } from "../api";
 import { Icon } from "../components";
@@ -40,6 +41,70 @@ export const isValidDeploymentExtension = (name: string): boolean =>
 // submit. Exported for unit testing.
 export const detectArchiveKind = (filename: string): "bpmn" | "bar" =>
   /\.(bar|zip)$/i.test(filename) ? "bar" : "bpmn";
+
+// Story 25.1: full-coverage .bar deploy — fans the archive across the three
+// Flowable sub-apps because they do NOT cross-register (RC-17):
+//   - POST /repository/deployments      → BPMN procs register for runtime.
+//   - POST /dmn-repository/deployments  → per .dmn entry (DMN sub-app
+//                                         rejects .bar with
+//                                         "File must be of type .dmn").
+//   - POST /app-api/app-repository/deployments → app-def registers.
+// Exported for unit testing. Returns the BPMN-side deployment (the primary
+// row that appears in /deployments) plus the optional app-deployment id
+// and the list of DMN deployment ids for downstream observability.
+export interface BarDeployResult {
+  bpmn: FlowableDeployment;
+  appApi: FlowableDeployment | null;
+  dmnDeployments: FlowableDeployment[];
+}
+
+export const deployBarFanOut = async (filename: string, file: File): Promise<BarDeployResult> => {
+  const zip = await JSZip.loadAsync(file);
+  const dmnEntries: Array<{ name: string; blob: Blob }> = [];
+  await Promise.all(
+    Object.values(zip.files)
+      .filter((entry) => !entry.dir && /\.dmn$/i.test(entry.name))
+      .map(async (entry) => {
+        const blob = await entry.async("blob");
+        dmnEntries.push({ name: entry.name.replace(/.*\//, ""), blob });
+      }),
+  );
+
+  // Strip executable BPMN / DMN entries from the archive before POSTing to
+  // /app-api/app-repository/deployments. The app-engine parses bundled
+  // .bpmn20.xml / .dmn files and attempts to register them in the BPMN /
+  // DMN sub-app tables, which collides with the parallel BPMN-side deploy
+  // (PostgreSQL `act_uniq_procdef` unique-key violation). The .app manifest
+  // alone is sufficient for app-definition registration. RC-17.
+  const appOnlyZip = new JSZip();
+  for (const entry of Object.values(zip.files)) {
+    if (entry.dir) continue;
+    if (/\.(bpmn|bpmn20\.xml|dmn)$/i.test(entry.name)) continue;
+    appOnlyZip.file(entry.name, await entry.async("uint8array"));
+  }
+  const appOnlyBuf = await appOnlyZip.generateAsync({ type: "blob" });
+  const appOnlyFile = new File([appOnlyBuf], filename, { type: "application/zip" });
+
+  const [bpmnRes, appRes, ...dmnResults] = await Promise.allSettled([
+    api.deployBar(filename, file),
+    api.deployBarAppApi(filename, appOnlyFile),
+    ...dmnEntries.map((e) =>
+      api.deployDmn(e.name, new Blob([e.blob], { type: "application/xml" })),
+    ),
+  ]);
+
+  // BPMN deploy is the primary contract — the deployment that appears in
+  // /deployments. Its failure aborts the whole fan-out.
+  if (bpmnRes.status === "rejected") throw bpmnRes.reason;
+
+  const appApi = appRes.status === "fulfilled" ? appRes.value : null;
+  const dmnDeployments: FlowableDeployment[] = [];
+  for (const r of dmnResults) {
+    if (r.status === "fulfilled") dmnDeployments.push(r.value);
+  }
+
+  return { bpmn: bpmnRes.value, appApi, dmnDeployments };
+};
 
 export const UploadDeploymentModal: React.FC<UploadDeploymentModalProps> = ({
   open,
@@ -108,10 +173,13 @@ export const UploadDeploymentModal: React.FC<UploadDeploymentModalProps> = ({
     setError(null);
     try {
       const kind = detectArchiveKind(file.name);
-      const deployment =
-        kind === "bar"
-          ? await api.deployBar(file.name, file)
-          : await api.deployBpmn(file.name, await file.text());
+      let deployment: FlowableDeployment;
+      if (kind === "bar") {
+        const result = await deployBarFanOut(file.name, file);
+        deployment = result.bpmn;
+      } else {
+        deployment = await api.deployBpmn(file.name, await file.text());
+      }
       setBusy(false);
       onSuccess(deployment);
       closeWithFocus();
@@ -167,8 +235,8 @@ export const UploadDeploymentModal: React.FC<UploadDeploymentModalProps> = ({
           />
           {barPicked && (
             <p className="mute text-xs" data-testid="upload-bar-hint" style={{ marginTop: 8 }}>
-              Recognized as a Flowable App archive — bundled processes / decisions / forms will be
-              parsed by the engine.
+              Recognized as a Flowable App archive — Flowatch will deploy bundled BPMN processes,
+              register DMN decisions individually, and create the app definition.
             </p>
           )}
           {validationMsg && (
