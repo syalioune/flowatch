@@ -918,15 +918,36 @@ const listAppDefinitions = (params?: QueryParams) =>
     base: appBase(),
   });
 
-// Story 25.1: list App-sub-app deployments — used by the /deployments
-// loader to cross-tag BPMN-side rows as kind="bar" when the same .bar
-// upload also created an app-deployment (the engine strips .bar/.zip from
-// the deploymentName, so we can't detect via name suffix alone).
+// Story 25.1: list App-sub-app deployments.
 const listAppDeployments = (params?: QueryParams) =>
   request<FlowablePage<FlowableDeployment>>("GET", "/app-repository/deployments", {
     params,
     base: appBase(),
   });
+
+// Story 25.1: get a single app-definition by id — backs the
+// /app-definitions/$id detail route.
+const getAppDefinition = (id: string) =>
+  request<FlowableAppDefinition>("GET", `/app-repository/app-definitions/${id}`, {
+    base: appBase(),
+  });
+
+// Story 25.1: list resources bundled in an app-deployment. Returns an array
+// of { id, mediaType, type, url, contentUrl } where `type` is either
+// "appDefinition" (for the .app manifest) or "resource" (everything else).
+const listAppDeploymentResources = (deploymentId: string) =>
+  request<FlowableResource[]>("GET", `/app-repository/deployments/${deploymentId}/resources`, {
+    base: appBase(),
+  });
+
+// Story 25.1: binary content fetch for an app-deployment resource. Returns
+// the raw Response so callers pick .blob() / .text().
+const getAppDeploymentResource = (deploymentId: string, resourceName: string) =>
+  request<Response>(
+    "GET",
+    `/app-repository/deployments/${deploymentId}/resourcedata/${encodeURIComponent(resourceName)}`,
+    { asResponse: true, base: appBase() },
+  );
 
 // ── Deployment helpers (multipart upload) ────────────────────────────────
 // Flowable expects multipart/form-data, not the JSON-with-base64 shape we used
@@ -1111,7 +1132,10 @@ export const api = {
   getDmnHistoryAuditdata,
   // App (FR-55 scope-reduced)
   listAppDefinitions,
+  getAppDefinition,
   listAppDeployments,
+  listAppDeploymentResources,
+  getAppDeploymentResource,
   deployBpmn,
   deployDmn,
   deployBar,

@@ -30,6 +30,7 @@ import { Route as DeploymentsIdRouteImport } from "./routes/deployments/$id"
 import { Route as DefinitionsIdRouteImport } from "./routes/definitions/$id"
 import { Route as DecisionsKeyRouteImport } from "./routes/decisions/$key"
 import { Route as BatchesIdRouteImport } from "./routes/batches/$id"
+import { Route as AppDefinitionsIdRouteImport } from "./routes/app-definitions/$id"
 import { Route as IdentityUsersIdRouteImport } from "./routes/identity/users/$id"
 import { Route as IdentityGroupsIdRouteImport } from "./routes/identity/groups/$id"
 
@@ -138,6 +139,11 @@ const BatchesIdRoute = BatchesIdRouteImport.update({
   path: "/batches/$id",
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppDefinitionsIdRoute = AppDefinitionsIdRouteImport.update({
+  id: "/app-definitions/$id",
+  path: "/app-definitions/$id",
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IdentityUsersIdRoute = IdentityUsersIdRouteImport.update({
   id: "/identity/users/$id",
   path: "/identity/users/$id",
@@ -154,6 +160,7 @@ export interface FileRoutesByFullPath {
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
   "/tenants": typeof TenantsRoute
+  "/app-definitions/$id": typeof AppDefinitionsIdRoute
   "/batches/$id": typeof BatchesIdRoute
   "/decisions/$key": typeof DecisionsKeyRoute
   "/definitions/$id": typeof DefinitionsIdRoute
@@ -179,6 +186,7 @@ export interface FileRoutesByTo {
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
   "/tenants": typeof TenantsRoute
+  "/app-definitions/$id": typeof AppDefinitionsIdRoute
   "/batches/$id": typeof BatchesIdRoute
   "/decisions/$key": typeof DecisionsKeyRoute
   "/definitions/$id": typeof DefinitionsIdRoute
@@ -205,6 +213,7 @@ export interface FileRoutesById {
   "/bpmn": typeof BpmnRoute
   "/dmn": typeof DmnRoute
   "/tenants": typeof TenantsRoute
+  "/app-definitions/$id": typeof AppDefinitionsIdRoute
   "/batches/$id": typeof BatchesIdRoute
   "/decisions/$key": typeof DecisionsKeyRoute
   "/definitions/$id": typeof DefinitionsIdRoute
@@ -232,6 +241,7 @@ export interface FileRouteTypes {
     | "/bpmn"
     | "/dmn"
     | "/tenants"
+    | "/app-definitions/$id"
     | "/batches/$id"
     | "/decisions/$key"
     | "/definitions/$id"
@@ -257,6 +267,7 @@ export interface FileRouteTypes {
     | "/bpmn"
     | "/dmn"
     | "/tenants"
+    | "/app-definitions/$id"
     | "/batches/$id"
     | "/decisions/$key"
     | "/definitions/$id"
@@ -282,6 +293,7 @@ export interface FileRouteTypes {
     | "/bpmn"
     | "/dmn"
     | "/tenants"
+    | "/app-definitions/$id"
     | "/batches/$id"
     | "/decisions/$key"
     | "/definitions/$id"
@@ -308,6 +320,7 @@ export interface RootRouteChildren {
   BpmnRoute: typeof BpmnRoute
   DmnRoute: typeof DmnRoute
   TenantsRoute: typeof TenantsRoute
+  AppDefinitionsIdRoute: typeof AppDefinitionsIdRoute
   BatchesIdRoute: typeof BatchesIdRoute
   DecisionsKeyRoute: typeof DecisionsKeyRoute
   DefinitionsIdRoute: typeof DefinitionsIdRoute
@@ -478,6 +491,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof BatchesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    "/app-definitions/$id": {
+      id: "/app-definitions/$id"
+      path: "/app-definitions/$id"
+      fullPath: "/app-definitions/$id"
+      preLoaderRoute: typeof AppDefinitionsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     "/identity/users/$id": {
       id: "/identity/users/$id"
       path: "/identity/users/$id"
@@ -500,6 +520,7 @@ const rootRouteChildren: RootRouteChildren = {
   BpmnRoute: BpmnRoute,
   DmnRoute: DmnRoute,
   TenantsRoute: TenantsRoute,
+  AppDefinitionsIdRoute: AppDefinitionsIdRoute,
   BatchesIdRoute: BatchesIdRoute,
   DecisionsKeyRoute: DecisionsKeyRoute,
   DefinitionsIdRoute: DefinitionsIdRoute,
