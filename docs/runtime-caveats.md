@@ -470,15 +470,13 @@ Filed downstream notes for follow-up:
 
 ---
 
-## RC-17 — Flowable App `.bar` archives do NOT cross-register across BPMN and App sub-apps
+## RC-17 — Flowable App `.bar` archives MUST be deployed via the App sub-app, not the BPMN sub-app
 
-**Naive intuition:** uploading a `.bar` archive (zip carrying `<n>.app` JSON manifest + bundled BPMN / DMN / form files) to `POST /repository/deployments` (BPMN sub-app) registers BOTH the bundled BPMN processes (in BPMN sub-app) AND the app-definition (in App sub-app, via the `.app` manifest). Symmetrically for `POST /app-api/app-repository/deployments`.
+**Naive intuition:** any of the Flowable sub-app deployment endpoints will fully process a `.bar` archive (extracting bundled BPMN + DMN + app metadata).
 
-**Actual behaviour:** the two sub-apps are independent deployment surfaces. The same `.bar` produces different outcomes depending on which endpoint receives it:
+**Actual behaviour:** only `POST /flowable-rest/app-api/app-repository/deployments` triggers the full chain. The App engine's `AppDeployer` cascades into `BpmnDeployer` and `DmnDeployer` for bundled `.bpmn20.xml` / `.dmn` entries, AND creates corresponding child deployments in the BPMN and DMN sub-apps with `parentDeploymentId` pointing back at the original app-deployment id. The bundled processes / decisions become queryable via `/repository/process-definitions` and `/dmn-repository/decisions` in the normal way.
 
-- `POST /repository/deployments` + `.bar` → succeeds, registers bundled BPMN processes for runtime, treats `<n>.app` as a passthrough resource (NOT parsed). `/app-api/app-repository/app-definitions?deploymentId=<id>` returns empty.
-- `POST /app-api/app-repository/deployments` + `.bar` → succeeds, registers the app-definition. Bundled BPMN processes are stored as `type: "resource"` rows under that app-deployment's `/resources` listing, but they DO NOT appear in `/repository/process-definitions?deploymentId=<id>` (the BPMN sub-app doesn't know about them). `/app-api/app-repository/process-definitions` returns "No endpoint" — there is no app-side process listing.
-- The deployment ID returned by the App sub-app is NOT queryable via `/repository/deployments/<id>` (returns 404).
+`POST /repository/deployments` (BPMN sub-app) accepts a `.bar` but only registers the bundled BPMN processes — the `.app` manifest is stored as a passthrough resource (NOT parsed); bundled `.dmn` files are NOT registered. `POST /dmn-repository/deployments` (DMN sub-app) outright rejects `.bar` with `"File must be of type .dmn"`.
 
 **The `.app` manifest MUST be JSON, not XML.** An XML `<appModel>` shape (which the published "Flowable App Model" XSDs describe) returns `"Error reading app resource"` on upload. The working shape mirrors Flowable Modeler's exported JSON:
 
@@ -495,15 +493,11 @@ Filed downstream notes for follow-up:
 }
 ```
 
-**Workaround (Story 25.1 fan-out):** Flowatch's `.bar` upload modal fans the SAME archive across THREE deploy endpoints in parallel so all halves register from one operator action:
+**The `.app` manifest's `models[].key` MUST match the bundled `.bpmn20.xml`'s `<process id="...">`.** When the keys disagree, `AppDeployer` silently skips the BPMN extraction step (the engine logs "Processing app resource" but never the matching `BpmnDeployer: processing resource` line) and no child BPMN deployment is created. The same applies to DMN entries via `modelType: 4`.
 
-1. `POST /repository/deployments` with the full `.bar` → BPMN sub-app extracts and registers bundled BPMN processes for runtime.
-2. Per `.dmn` entry extracted from the archive client-side (JSZip) → `POST /dmn-repository/deployments` (the DMN sub-app rejects `.bar` with "File must be of type .dmn", so each `.dmn` is posted individually as `application/xml`).
-3. `POST /app-api/app-repository/deployments` with a `.bar` SUBSET that has every `.bpmn` / `.bpmn20.xml` / `.dmn` STRIPPED OUT (manifest + forms / images only). The app-engine attempts to re-register bundled BPMN / DMN files in its own deployment lifecycle which collides with the BPMN-side deploy under the PostgreSQL `act_uniq_procdef` unique-key constraint ("duplicate key value violates unique constraint" → 500). Stripping the executable artefacts leaves the `.app` manifest alone, which registers cleanly.
+**Workaround:** Flowatch's `api.deployBar` wrapper ([src/api.ts](../src/api.ts)) POSTs to `/app-api/app-repository/deployments` — a single multipart upload covers app-def + BPMN + DMN registration. The child BPMN deployment that the engine spawns appears in `/repository/deployments` with `parentDeploymentId` pointing at the parent app-deployment id (standalone BPMN deploys carry `parentDeploymentId === id`); the parent-vs-self mismatch is the BAR discriminator the `/deployments` list loader uses to tag rows as `kind="bar"` ([src/routes/deployments/index.tsx](../src/routes/deployments/index.tsx)).
 
-The fan-out is implemented in `deployBarFanOut` ([src/lib/upload-deployment-modal.tsx](../src/lib/upload-deployment-modal.tsx)). The BPMN deploy is the primary contract — its failure aborts the whole fan-out and surfaces to the operator via the modal's `<ErrorBox>`. App-api and per-DMN deploys are `Promise.allSettled` — partial failures don't abort the BPMN registration. The resulting deployment row in `/deployments` is the BPMN-side one; the matching app-definition appears in `/app-definitions` and on `/deployments/$id`'s `<DeploymentAppDefinitionsPanel>` (which queries by `deploymentId` but the engine cross-references app-defs by `deploymentId` only on app-side deployments, NOT BPMN-side — so the deployment-detail panel ALSO null-returns; the app-def is browsable via `/app-definitions` instead).
-
-**Surfaced by:** Story 25.1 live-engine probe (2026-06-01 / 2026-06-02). The first walkthrough revealed the cross-registration gap; the second revealed the act_uniq_procdef collision when fanning the SAME archive to both BPMN and App sub-apps in parallel. The strip-executables solution is the simplest path that keeps the modal as a single operator action covering all three halves. Documented inline at `deployBarFanOut`. Future polish candidate: if the engine adds a flag to suppress per-sub-app cross-registration on .bar deploys, the strip step becomes unnecessary.
+**Surfaced by:** Story 25.1 live-engine probes (2026-06-01 / 2026-06-02). The first walkthrough chose the BPMN endpoint (per spec) and discovered the missing app-def registration. A second walkthrough fanned the archive across all three sub-apps in parallel and hit the `act_uniq_procdef` unique-key collision. The third walkthrough — driven by an operator probe with a Flowable-Modeler-exported `orderApp.bar` — confirmed that the App sub-app alone handles the cascade correctly, and the manifest-vs-BPMN key mismatch silently suppresses the BPMN extraction (the failure mode is "no error, just no child BPMN registration"). The implementation now POSTs `.bar` archives to `/app-api/app-repository/deployments` exclusively.
 
 ---
 

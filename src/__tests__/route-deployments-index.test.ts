@@ -135,44 +135,40 @@ describe("/deployments route loader", () => {
     expect(result.dmnError).toBe("No endpoint POST /flowable-rest/dmn-api/…");
   });
 
-  it("cross-tags BPMN rows as kind='bar' when an app-deployment shares the name (Story 25.1)", async () => {
-    // Flowable strips .bar/.zip from the persisted deploymentName, so name
-    // suffix can't carry the discriminator. The .bar fan-out creates a
-    // parallel app-deployment with the SAME stripped name; the loader
-    // intersects the two name-sets to mark BPMN rows as BAR.
+  it("tags BPMN rows as kind='bar' when parentDeploymentId ≠ id (Story 25.1)", async () => {
+    // A .bar uploaded via /app-api/app-repository/deployments spawns a child
+    // BPMN deployment whose parentDeploymentId points at the app-deployment
+    // (NOT itself). Standalone BPMN deploys carry parentDeploymentId === id.
+    // The mismatch is the BAR signature.
     bpmnImpl = () =>
       Promise.resolve({
         ...emptyPage(),
         data: [
-          { id: "b1", name: "loan-app", deploymentTime: "2026-06-02T10:00:00Z", tenantId: "" },
-          { id: "b2", name: "orders-bundle", deploymentTime: "2026-06-02T09:00:00Z", tenantId: "" },
-          { id: "b3", name: "ship-it", deploymentTime: "2026-06-02T08:00:00Z", tenantId: "" },
+          {
+            id: "b1",
+            name: "loan-app",
+            deploymentTime: "2026-06-02T10:00:00Z",
+            tenantId: "",
+            parentDeploymentId: "app-1",
+          },
+          {
+            id: "b2",
+            name: "ship-it",
+            deploymentTime: "2026-06-02T08:00:00Z",
+            tenantId: "",
+            parentDeploymentId: "b2",
+          },
+          {
+            id: "b3",
+            name: "legacy-no-parent",
+            deploymentTime: "2026-06-02T07:00:00Z",
+            tenantId: "",
+          },
         ],
       });
     dmnImpl = () => Promise.resolve(emptyPage());
-    appImpl = () =>
-      Promise.resolve({
-        ...emptyPage(),
-        data: [
-          { id: "a1", name: "loan-app", deploymentTime: "2026-06-02T10:00:00Z", tenantId: "" },
-          { id: "a2", name: "orders-bundle", deploymentTime: "2026-06-02T09:00:00Z", tenantId: "" },
-        ],
-      });
     const result = await loadDeployments();
-    expect(result.data.map((r) => `${r.kind}:${r.id}`)).toEqual(["bar:b1", "bar:b2", "bpmn:b3"]);
-  });
-
-  it("falls back to kind='bpmn' when the app-deployments fetch fails (Story 25.1)", async () => {
-    bpmnImpl = () =>
-      Promise.resolve({
-        ...emptyPage(),
-        data: [
-          { id: "b1", name: "anything", deploymentTime: "2026-06-02T10:00:00Z", tenantId: "" },
-        ],
-      });
-    appImpl = () => Promise.reject(new Error("app-api unreachable"));
-    const result = await loadDeployments();
-    expect(result.data[0]?.kind).toBe("bpmn");
+    expect(result.data.map((r) => `${r.kind}:${r.id}`)).toEqual(["bar:b1", "bpmn:b2", "bpmn:b3"]);
   });
 
   it("BPMN endpoint failure THROWS — preserves the route's errorComponent slot", async () => {

@@ -27,11 +27,13 @@ export interface TaggedDeployment extends FlowableDeployment {
   kind: DeploymentKind;
 }
 
-// Story 25.1: BPMN deployments backed by a .bar upload share their
-// `name` with a parallel App-sub-app deployment (the modal's fan-out
-// creates both with the same deploymentName; the engine strips the
-// .bar/.zip extension from the persisted name). The loader cross-tags
-// any BPMN row whose name matches an app-deployment name as kind="bar".
+// Story 25.1: BPMN deployments backed by a .bar upload are CHILDREN of the
+// App-sub-app deployment that the AppDeployer spawned for them. Standalone
+// BPMN deploys carry `parentDeploymentId === id` (engine sets it = self);
+// app-spawned BPMN children carry `parentDeploymentId` pointing at the
+// app-deployment id. The mismatch is the BAR discriminator.
+const isBarChild = (d: FlowableDeployment): boolean =>
+  !!d.parentDeploymentId && d.parentDeploymentId !== d.id;
 
 export interface DeploymentsLoaderData {
   data: TaggedDeployment[];
@@ -61,20 +63,14 @@ export const loadDeployments = async (): Promise<DeploymentsLoaderData> => {
     size: 50,
     ...(tenantId ? { tenantId } : {}),
   };
-  const [bpmnRes, dmnRes, appRes] = await Promise.allSettled([
+  const [bpmnRes, dmnRes] = await Promise.allSettled([
     api.listDeployments(bpmnParams),
     api.listDmnDeployments(dmnParams),
-    api.listAppDeployments(dmnParams),
   ]);
   if (bpmnRes.status === "rejected") throw bpmnRes.reason;
-  const barNames = new Set<string>(
-    appRes.status === "fulfilled"
-      ? appRes.value.data.map((d) => d.name ?? "").filter((n) => n.length > 0)
-      : [],
-  );
   const bpmnRows: TaggedDeployment[] = bpmnRes.value.data.map((d) => ({
     ...d,
-    kind: d.name && barNames.has(d.name) ? "bar" : "bpmn",
+    kind: isBarChild(d) ? "bar" : "bpmn",
   }));
   const dmnRows: TaggedDeployment[] =
     dmnRes.status === "fulfilled" ? dmnRes.value.data.map((d) => ({ ...d, kind: "dmn" })) : [];

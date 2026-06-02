@@ -65,13 +65,13 @@ describe("api.listAppDefinitions (Story 25.1)", () => {
 });
 
 describe("api.deployBar (Story 25.1)", () => {
-  it("POSTs /repository/deployments multipart with the binary File attached", async () => {
+  it("POSTs /app-repository/deployments via appBase() with the binary File attached", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ id: "dep-bar-1", name: "loan-app.bar" }));
     const archive = new Uint8Array([0x50, 0x4b, 0x03, 0x04]); // ZIP magic
     const file = new File([archive], "loan-app.bar", { type: "application/zip" });
     await api.deployBar("loan-app.bar", file);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe(`${DEFAULT_BASE}/repository/deployments`);
+    expect(url).toBe(`${APP_BASE}/app-repository/deployments`);
     expect(init.method).toBe("POST");
     expect(init.body).toBeInstanceOf(FormData);
     const fd = init.body as FormData;
@@ -91,8 +91,6 @@ describe("api.deployBar (Story 25.1)", () => {
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const fd = init.body as FormData;
     const attached = fd.get("file");
-    // FormData wraps a non-File Blob in a synthesised File at .append time —
-    // the key invariant is the type carries through unmodified.
     expect((attached as Blob).type).toBe("application/zip");
   });
 
@@ -103,24 +101,6 @@ describe("api.deployBar (Story 25.1)", () => {
     await api.deployBar("a.bar", f);
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect((init.body as FormData).get("tenantId")).toBe("t-9");
-  });
-});
-
-describe("api.deployBarAppApi (Story 25.1)", () => {
-  it("POSTs /app-repository/deployments via appBase() with the File attached", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse({ id: "app-dep-1", name: "loan-app.bar" }));
-    const archive = new Uint8Array([0x50, 0x4b, 0x03, 0x04]);
-    const file = new File([archive], "loan-app.bar", { type: "application/zip" });
-    await api.deployBarAppApi("loan-app.bar", file);
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe(`${APP_BASE}/app-repository/deployments`);
-    expect(init.method).toBe("POST");
-    expect(init.body).toBeInstanceOf(FormData);
-    const fd = init.body as FormData;
-    const attached = fd.get("file") as File;
-    expect(attached.type).toBe("application/zip");
-    expect(attached.size).toBe(archive.length);
-    expect(fd.get("deploymentName")).toBe("loan-app.bar");
   });
 });
 
