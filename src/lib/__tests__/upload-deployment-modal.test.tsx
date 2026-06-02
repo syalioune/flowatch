@@ -15,6 +15,7 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
+import JSZip from "jszip";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, type FlowableDeployment, FlowableError } from "../../api";
 import {
@@ -79,19 +80,31 @@ describe("detectArchiveKind (Story 25.1)", () => {
 describe("<UploadDeploymentModal>", () => {
   const realDeploy = api.deployBpmn;
   const realDeployBar = api.deployBar;
+  const realDeployBarAppApi = api.deployBarAppApi;
+  const realDeployDmn = api.deployDmn;
   let deploySpy: ReturnType<typeof vi.fn>;
   let deployBarSpy: ReturnType<typeof vi.fn>;
+  let deployBarAppApiSpy: ReturnType<typeof vi.fn>;
+  let deployDmnSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     deploySpy = vi.fn();
     deployBarSpy = vi.fn();
+    deployBarAppApiSpy = vi.fn();
+    deployDmnSpy = vi.fn();
     (api as DeployHost).deployBpmn = deploySpy as unknown as DeployFn;
     (api as DeployHost).deployBar = deployBarSpy as unknown as DeployBarFn;
+    (api as unknown as { deployBarAppApi: DeployBarFn }).deployBarAppApi =
+      deployBarAppApiSpy as unknown as DeployBarFn;
+    (api as unknown as { deployDmn: DeployFn }).deployDmn = deployDmnSpy as unknown as DeployFn;
   });
 
   afterEach(() => {
     (api as DeployHost).deployBpmn = realDeploy;
     (api as DeployHost).deployBar = realDeployBar;
+    (api as unknown as { deployBarAppApi: typeof realDeployBarAppApi }).deployBarAppApi =
+      realDeployBarAppApi;
+    (api as unknown as { deployDmn: typeof realDeployDmn }).deployDmn = realDeployDmn;
     cleanup();
   });
 
@@ -137,7 +150,7 @@ describe("<UploadDeploymentModal>", () => {
     expect(screen.queryByTestId("upload-bar-hint")).toBeNull();
   });
 
-  it(".bar submit calls api.deployBar with the File (no .text() roundtrip)", async () => {
+  it(".bar submit fans out to deployBar + deployBarAppApi (Story 25.1)", async () => {
     const user = userEvent.setup();
     const onSuccess = vi.fn();
     deployBarSpy.mockResolvedValue({
@@ -146,8 +159,21 @@ describe("<UploadDeploymentModal>", () => {
       deploymentTime: "now",
       tenantId: "",
     });
+    deployBarAppApiSpy.mockResolvedValue({
+      id: "app-dep-1",
+      name: "loan-app.bar",
+      deploymentTime: "now",
+      tenantId: "",
+    });
+    // Build a REAL .bar archive — JSZip.loadAsync in the modal requires a
+    // valid zip; the test's text-content `file()` helper would fail.
+    const zip = new JSZip();
+    zip.file("proc.bpmn20.xml", "<definitions/>");
+    zip.file("rules.dmn", "<definitions/>");
+    zip.file("app.app", JSON.stringify({ key: "x" }));
+    const buf = await zip.generateAsync({ type: "arraybuffer" });
+    const barFile = new File([buf], "loan-app.bar", { type: "application/zip" });
     render(<UploadDeploymentModal open onClose={vi.fn()} onSuccess={onSuccess} />);
-    const barFile = file("loan-app.bar");
     await user.upload(screen.getByTestId("upload-deployment-input"), barFile);
     await user.click(screen.getByTestId("upload-deployment-submit"));
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
@@ -155,6 +181,11 @@ describe("<UploadDeploymentModal>", () => {
     const [filename, fileArg] = deployBarSpy.mock.calls[0] ?? [];
     expect(filename).toBe("loan-app.bar");
     expect(fileArg).toBeInstanceOf(File);
+    // App-api fan-out fires too.
+    expect(deployBarAppApiSpy).toHaveBeenCalledTimes(1);
+    // DMN extracted from the .bar fires once per .dmn entry.
+    expect(deployDmnSpy).toHaveBeenCalledTimes(1);
+    expect(deployDmnSpy.mock.calls[0]?.[0]).toBe("rules.dmn");
     // .bpmn path MUST NOT fire on .bar pick.
     expect(deploySpy).not.toHaveBeenCalled();
   });

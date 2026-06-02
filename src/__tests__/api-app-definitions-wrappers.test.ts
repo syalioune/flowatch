@@ -106,6 +106,37 @@ describe("api.deployBar (Story 25.1)", () => {
   });
 });
 
+describe("api.deployBarAppApi (Story 25.1)", () => {
+  it("POSTs /app-repository/deployments via appBase() with the File attached", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: "app-dep-1", name: "loan-app.bar" }));
+    const archive = new Uint8Array([0x50, 0x4b, 0x03, 0x04]);
+    const file = new File([archive], "loan-app.bar", { type: "application/zip" });
+    await api.deployBarAppApi("loan-app.bar", file);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${APP_BASE}/app-repository/deployments`);
+    expect(init.method).toBe("POST");
+    expect(init.body).toBeInstanceOf(FormData);
+    const fd = init.body as FormData;
+    const attached = fd.get("file") as File;
+    expect(attached.type).toBe("application/zip");
+    expect(attached.size).toBe(archive.length);
+    expect(fd.get("deploymentName")).toBe("loan-app.bar");
+  });
+});
+
+describe("api.deployDmn widened to accept Blob (Story 25.1)", () => {
+  it("POSTs /dmn-repository/deployments with a Blob (extracted from .bar)", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: "dmn-dep-1", name: "loan.dmn" }));
+    const dmnBlob = new Blob(["<definitions/>"], { type: "application/xml" });
+    await api.deployDmn("loan.dmn", dmnBlob);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/dmn-api/dmn-repository/deployments");
+    expect(init.method).toBe("POST");
+    const fd = init.body as FormData;
+    expect(fd.get("deploymentName")).toBe("loan.dmn");
+  });
+});
+
 describe("uploadDeployment widened signature (Story 25.1)", () => {
   it("string content path is unchanged — api.deployBpmn still works", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ id: "dep-bpmn-1", name: "orders.bpmn" }));

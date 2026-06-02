@@ -962,19 +962,36 @@ const uploadDeployment = async (
 
 const deployBpmn = (name: string, xml: string) =>
   uploadDeployment(name, xml, "application/xml", { deploymentName: name });
-const deployDmn = (name: string, xml: string) =>
+// Story 25.1: signature widened — `content` accepts string XML or a Blob/File
+// (used by the .bar extractor that POSTs each bundled .dmn entry as a Blob).
+const deployDmn = (name: string, xml: string | Blob) =>
   uploadDeployment(name, xml, "application/xml", {
     deploymentName: name,
     base: dmnBase(),
     path: "/dmn-repository/deployments",
   });
-// Story 25.1: deploy a Flowable App archive (.bar / .zip) to the engine.
-// Flowable's /repository/deployments endpoint accepts any of .bpmn /
-// .bpmn20.xml / .bar / .zip — the archive extension triggers multi-artefact
-// parsing (processes + decisions + forms + app.xml). FR-55 scope-reduced;
-// compat.md row 72.
+// Story 25.1: deploy a Flowable App archive (.bar / .zip) through the BPMN
+// sub-app. The endpoint extracts and REGISTERS bundled BPMN processes for
+// runtime, but DOES NOT cross-register the .app file (app-def registration
+// requires the App sub-app endpoint via `deployBarAppApi`) NOR bundled .dmn
+// files (which are extracted as resources but not registered for execution
+// — DMN registration requires per-file POST to /dmn-repository/deployments
+// via the existing `deployDmn` wrapper). See RC-17.
 const deployBar = (filename: string, file: Blob | File) =>
   uploadDeployment(filename, file, "application/zip", { deploymentName: filename });
+// Story 25.1: deploy the same .bar archive through the App sub-app so the
+// `.app` manifest registers an app-definition row in
+// /app-api/app-repository/app-definitions. The bundled BPMN / DMN files
+// INSIDE the archive land as resources (type=resource) on this
+// app-deployment but are NOT registered into the BPMN / DMN sub-apps —
+// the modal's full-coverage path calls all three deploy variants in
+// parallel. See RC-17.
+const deployBarAppApi = (filename: string, file: Blob | File) =>
+  uploadDeployment(filename, file, "application/zip", {
+    deploymentName: filename,
+    base: appBase(),
+    path: "/app-repository/deployments",
+  });
 
 const ping = () => request<FlowableEngineInfo>("GET", "/management/engine");
 
@@ -1096,6 +1113,7 @@ export const api = {
   deployBpmn,
   deployDmn,
   deployBar,
+  deployBarAppApi,
   ping,
   runRaw,
 };
