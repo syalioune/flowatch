@@ -21,11 +21,17 @@ import { RowActionMenu } from "../../lib/row-action-menu";
 import { TableSkeleton } from "../../lib/table-skeleton";
 import { UploadDeploymentModal } from "../../lib/upload-deployment-modal";
 
-export type DeploymentKind = "bpmn" | "dmn";
+export type DeploymentKind = "bpmn" | "dmn" | "bar";
 
 export interface TaggedDeployment extends FlowableDeployment {
   kind: DeploymentKind;
 }
+
+// Story 25.1: BPMN deployments backed by a .bar upload share their
+// `name` with a parallel App-sub-app deployment (the modal's fan-out
+// creates both with the same deploymentName; the engine strips the
+// .bar/.zip extension from the persisted name). The loader cross-tags
+// any BPMN row whose name matches an app-deployment name as kind="bar".
 
 export interface DeploymentsLoaderData {
   data: TaggedDeployment[];
@@ -55,12 +61,21 @@ export const loadDeployments = async (): Promise<DeploymentsLoaderData> => {
     size: 50,
     ...(tenantId ? { tenantId } : {}),
   };
-  const [bpmnRes, dmnRes] = await Promise.allSettled([
+  const [bpmnRes, dmnRes, appRes] = await Promise.allSettled([
     api.listDeployments(bpmnParams),
     api.listDmnDeployments(dmnParams),
+    api.listAppDeployments(dmnParams),
   ]);
   if (bpmnRes.status === "rejected") throw bpmnRes.reason;
-  const bpmnRows: TaggedDeployment[] = bpmnRes.value.data.map((d) => ({ ...d, kind: "bpmn" }));
+  const barNames = new Set<string>(
+    appRes.status === "fulfilled"
+      ? appRes.value.data.map((d) => d.name ?? "").filter((n) => n.length > 0)
+      : [],
+  );
+  const bpmnRows: TaggedDeployment[] = bpmnRes.value.data.map((d) => ({
+    ...d,
+    kind: d.name && barNames.has(d.name) ? "bar" : "bpmn",
+  }));
   const dmnRows: TaggedDeployment[] =
     dmnRes.status === "fulfilled" ? dmnRes.value.data.map((d) => ({ ...d, kind: "dmn" })) : [];
   const dmnError =
@@ -276,7 +291,9 @@ function DeploymentsRoute() {
                 <td>
                   <b style={{ fontWeight: 500 }}>{d.name || "—"}</b>
                 </td>
-                <td className="mono mute">{d.kind === "bpmn" ? "BPMN" : "DMN"}</td>
+                <td className="mono mute">
+                  {d.kind === "bar" ? "BAR" : d.kind === "dmn" ? "DMN" : "BPMN"}
+                </td>
                 <td className="mono mute">{d.id}</td>
                 <td className="mono">{d.tenantId || <span className="mute">—</span>}</td>
                 <td className="mute mono">{fmtTime(d.deploymentTime)}</td>

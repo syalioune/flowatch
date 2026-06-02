@@ -213,6 +213,14 @@ test.describe("Story 25.1 — .bar upload recognition + App definitions", () => 
     await expect(page.locator('[data-testid^="bundled-process-row-"]').first()).toBeVisible();
   });
 
+  test("BAR deployment row announces kind='BAR' on /deployments (Story 25.1)", async ({ page }) => {
+    await page.goto("/deployments");
+    const row = page.locator(`tr[data-deployment-id]`).filter({ hasText: E2E_DEPLOYMENT_NAME });
+    await expect(row).toBeVisible();
+    await expect(row).toContainText("BAR");
+    await expect(row).toHaveAttribute("data-kind", "bar");
+  });
+
   test("deployment-app-definitions-panel does NOT render on a deployment without an app-def", async ({
     page,
   }) => {

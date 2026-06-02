@@ -918,6 +918,16 @@ const listAppDefinitions = (params?: QueryParams) =>
     base: appBase(),
   });
 
+// Story 25.1: list App-sub-app deployments — used by the /deployments
+// loader to cross-tag BPMN-side rows as kind="bar" when the same .bar
+// upload also created an app-deployment (the engine strips .bar/.zip from
+// the deploymentName, so we can't detect via name suffix alone).
+const listAppDeployments = (params?: QueryParams) =>
+  request<FlowablePage<FlowableDeployment>>("GET", "/app-repository/deployments", {
+    params,
+    base: appBase(),
+  });
+
 // ── Deployment helpers (multipart upload) ────────────────────────────────
 // Flowable expects multipart/form-data, not the JSON-with-base64 shape we used
 // in mock mode. We build a FormData and send via raw fetch (bypassing request()
@@ -1110,6 +1120,7 @@ export const api = {
   getDmnHistoryAuditdata,
   // App (FR-55 scope-reduced)
   listAppDefinitions,
+  listAppDeployments,
   deployBpmn,
   deployDmn,
   deployBar,

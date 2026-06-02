@@ -33,7 +33,10 @@ interface Props {
   deployment: FlowableDeployment;
   // Defaults to "bpmn" so callers that don't yet thread the kind through
   // (and pre-merge deep links / older tests) keep their existing behaviour.
-  kind?: "bpmn" | "dmn";
+  // "bar" lives in the BPMN sub-app — uses the same resources panel; the
+  // discriminator only changes the subtitle copy + the bundled-artifacts
+  // panel mounts (which already null-return on non-app deployments).
+  kind?: "bpmn" | "dmn" | "bar";
 }
 
 type DeploymentWide = FlowableDeployment & {
@@ -44,7 +47,9 @@ type DeploymentWide = FlowableDeployment & {
 export function DeploymentDetail({ deployment, kind = "bpmn" }: Props) {
   const navigate = useNavigate();
   const isDmn = kind === "dmn";
+  const isBar = kind === "bar";
   const d = deployment as DeploymentWide;
+  const subtitleKind = isDmn ? "DMN deployment" : isBar ? "BAR deployment" : "BPMN deployment";
 
   const remove = async () => {
     if (!confirm("Delete deployment? Cascading will remove instances too.")) return;
@@ -57,7 +62,7 @@ export function DeploymentDetail({ deployment, kind = "bpmn" }: Props) {
     <div className="page">
       <PageHead
         title={d.name || d.id}
-        subtitle={`${isDmn ? "DMN deployment" : "BPMN deployment"} · ${fmtTime(d.deploymentTime)}`}
+        subtitle={`${subtitleKind} · ${fmtTime(d.deploymentTime)}`}
         actions={
           <>
             <Link to="/deployments" className="btn" data-variant="ghost">
