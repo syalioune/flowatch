@@ -31,6 +31,15 @@ export interface DeployBpmnModalTarget {
   defaultKey: string;
   /** Echoed read-only in the modal body so the operator knows what is being deployed. */
   filename: string;
+  /**
+   * Story 27.1 — "Save as new version" mode. When true the key input is
+   * rendered read-only (the operator must NOT change the key — Flowable
+   * auto-versions per key, so changing it would fork a new v1 family).
+   * The name stays editable. `lockKey` only short-circuits operator
+   * editing; the value still flows through `onConfirm` and the KEY_RE
+   * validation path is unchanged. Additive + backward-compatible.
+   */
+  lockKey?: boolean;
 }
 
 export interface DeployBpmnModalProps {
@@ -195,8 +204,24 @@ export const DeployBpmnModal: React.FC<DeployBpmnModalProps> = ({
               if (keyError) setKeyError(null);
             }}
             disabled={busy}
-            style={{ width: "100%", fontFamily: "var(--font-mono)" }}
+            readOnly={!!target.lockKey}
+            aria-readonly={target.lockKey || undefined}
+            style={{
+              width: "100%",
+              fontFamily: "var(--font-mono)",
+              opacity: target.lockKey ? 0.7 : undefined,
+            }}
           />
+          {target.lockKey && (
+            <p
+              data-testid="deploy-bpmn-key-locked-caption"
+              className="mute"
+              style={{ margin: "6px 0 0", fontSize: 12 }}
+            >
+              Key locked — deploying under <code className="mono">{key}</code> creates the next
+              version.
+            </p>
+          )}
           {keyError && (
             <p
               data-testid="deploy-bpmn-key-error"
