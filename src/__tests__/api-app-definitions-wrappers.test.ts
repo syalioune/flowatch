@@ -64,6 +64,72 @@ describe("api.listAppDefinitions (Story 25.1)", () => {
   });
 });
 
+describe("api.listAppDeployments (Story 25.1)", () => {
+  it("GETs /app-repository/deployments via appBase()", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ data: [], total: 0 }));
+    await api.listAppDeployments();
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${APP_BASE}/app-repository/deployments`);
+    expect(init.method).toBe("GET");
+  });
+
+  it("forwards query params", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ data: [], total: 0 }));
+    await api.listAppDeployments({ tenantId: "t-1", size: 25 });
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("tenantId=t-1");
+    expect(url).toContain("size=25");
+  });
+});
+
+describe("api.getAppDefinition (Story 25.1)", () => {
+  it("GETs /app-repository/app-definitions/{id} via appBase()", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: "ad-1", key: "loan-app" }));
+    await api.getAppDefinition("ad-1");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${APP_BASE}/app-repository/app-definitions/ad-1`);
+    expect(init.method).toBe("GET");
+  });
+});
+
+describe("api.listAppDeploymentResources (Story 25.1)", () => {
+  it("GETs /app-repository/deployments/{id}/resources via appBase()", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+    await api.listAppDeploymentResources("dep-1");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${APP_BASE}/app-repository/deployments/dep-1/resources`);
+    expect(init.method).toBe("GET");
+  });
+});
+
+describe("api.getAppDeploymentResource (Story 25.1)", () => {
+  it("GETs resourcedata as raw Response, url-encoding the resource name", async () => {
+    const raw = jsonResponse({ ok: true });
+    fetchMock.mockResolvedValueOnce(raw);
+    const res = await api.getAppDeploymentResource("dep-1", "loan app.app");
+    expect(res).toBe(raw);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${APP_BASE}/app-repository/deployments/dep-1/resourcedata/loan%20app.app`);
+    expect(init.method).toBe("GET");
+  });
+});
+
+describe("api.submitTaskForm (Story 11.3)", () => {
+  it("POSTs /form/form-data with { taskId, properties } body", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({}));
+    await api.submitTaskForm("task-1", {
+      properties: [{ id: "amount", value: "100" }],
+    });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${DEFAULT_BASE}/form/form-data`);
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({
+      taskId: "task-1",
+      properties: [{ id: "amount", value: "100" }],
+    });
+  });
+});
+
 describe("api.deployBar (Story 25.1)", () => {
   it("POSTs /app-repository/deployments via appBase() with the binary File attached", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ id: "dep-bar-1", name: "loan-app.bar" }));
