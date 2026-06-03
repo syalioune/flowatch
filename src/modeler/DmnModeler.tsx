@@ -31,7 +31,7 @@
  * parity (load + dropdown + dirty + new + deploy + post-deploy nav).
  */
 
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 // @migration-any: dmn-js has no shipped .d.ts; the default export is treated as
 // a constructor and all event-bus / DI container interactions are `any`. ADR-001
 // explicitly allows this for the modeler wrappers. Future: file an upstream issue.
@@ -251,6 +251,13 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
   const [decisionsAvailable, setDecisionsAvailable] = React.useState(true);
   const [activeDecision, setActiveDecision] = React.useState<FlowableDecision | null>(null);
   const [filename, setFilename] = React.useState("loan-eligibility.dmn");
+  // Story 27.1 — "Save as new version" back-reference (mirrors BpmnModeler).
+  // Ephemeral component-local state — null until an in-session version bump.
+  const [previousVersion, setPreviousVersion] = React.useState<{
+    id: string;
+    version: number;
+  } | null>(null);
+  const saveVersionBtnRef = React.useRef<HTMLButtonElement | null>(null);
   // PR #168 follow-up: tracks the "New from scratch" authoring flow.
   // True between handleNew() and the next discard / save / deploy / load —
   // pins the dropdown so the operator can't switch decisions mid-draft.
@@ -401,6 +408,13 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
   // DMN sub-app).
   const loadDecision = React.useCallback(
     async (id: string) => {
+      // Loading any decision clears the "View previous version" back-link.
+      // The version-bump path (doDeploy) re-sets it AFTER awaiting this call.
+      // LOAD-BEARING INVARIANT (Story 27.1): version-mode in doDeploy sets
+      // activeDecision DIRECTLY and does NOT call loadDecision — precisely so
+      // this clear does not wipe the freshly-set back-link. Do NOT route
+      // version-mode through loadDecision without re-sequencing setPreviousVersion.
+      setPreviousVersion(null);
       if (!id) {
         setActiveDecision(null);
         try {
@@ -470,6 +484,7 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
       if (!ok) return;
     }
     setActiveDecision(null);
+    setPreviousVersion(null);
     setFilename("new-decision.dmn");
     try {
       await importAndFit(BLANK_DMN_XML, "decision");
@@ -578,6 +593,15 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
   const doDeploy = async (chosenName: string, chosenKey: string): Promise<void> => {
     const m = modelerRef.current;
     if (!m) throw new Error("DMN modeler not ready");
+    // Story 27.1 — version mode (lockKey) mirrors BpmnModeler.doDeploy:
+    // snapshot the loaded decision before the deploy, then auto-switch to
+    // the new version + render the back-link. Wire-level call is the SAME
+    // api.deployDmn multipart POST — Flowable auto-versions per decision key.
+    const versionMode = !!deployTarget?.lockKey;
+    const prevSnapshot =
+      versionMode && activeDecision
+        ? { id: activeDecision.id, version: activeDecision.version }
+        : null;
     const { xml: rawXml } = await m.saveXML({ format: true });
     const xml = rewriteDefinitionsIdAndName(rawXml, chosenKey, chosenName);
     const deployment = await api.deployDmn(filename, xml);
@@ -603,7 +627,32 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
     }
     await refresh;
     setCreatingNew(false);
-    if (newDecision) {
+    if (versionMode && newDecision && prevSnapshot) {
+      // AC-3/AC-5: switch active selection + URL to the new version. Set
+      // activeDecision directly from the fresh lookup — the canvas already
+      // renders the deployed content, and loadDecision would resolve from
+      // the stale-in-this-closure dropdown list (missing the new decision)
+      // and re-fetch identical XML.
+      navigate({ to: "/dmn", search: { decisionId: newDecision.id }, replace: true });
+      setActiveDecision(newDecision);
+      setFilename(`${newDecision.key}.dmn`);
+      setPreviousVersion(prevSnapshot);
+      toast({
+        kind: "success",
+        text: `Saved ${newDecision.key} v${prevSnapshot.version} → v${newDecision.version}`,
+        action: {
+          label: "Open the deployed decision",
+          testId: "open-deployed-decision",
+          onClick: () =>
+            navigate({
+              to: "/dmn",
+              search: { decisionId: newDecision.id },
+            }),
+        },
+      });
+    } else if (newDecision) {
+      // Generic deploy — clear any stale back-link from a prior bump.
+      setPreviousVersion(null);
       toast({
         kind: "success",
         text: `Deployed ${deployment.name} → ${newDecision.key} v${newDecision.version}`,
@@ -624,6 +673,45 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
         sub: "Refresh /decisions to see the new revision.",
       });
     }
+  };
+
+  // ─── Story 27.1 — "Save as new version" ────────────────────────────
+  // OPERATOR-FEEL LABEL vs WIRE-LEVEL VERB (CLAUDE.md): "Save as new
+  // version" is the operator-feel label; the wire-level action is the SAME
+  // `api.deployDmn` multipart POST as the generic Deploy. Flowable has NO
+  // distinct "new version" endpoint — versioning is emergent from
+  // redeploying with the same DECISION key (`<decision id>`).
+  //
+  // DMN nuance vs BPMN (live-engine discovery, Story 27.1): the deploy
+  // modal's "id" field maps to the `<definitions id>` WRAPPER, NOT the
+  // `<decision id>` that Flowable versions by. The decision key is already
+  // preserved in the unchanged re-exported canvas, so versioning works
+  // without touching the modal. We therefore lock the modal's id to the
+  // CURRENT `<definitions id>` (preserving it) rather than to
+  // `activeDecision.key` — forcing it to the decision key would make
+  // `<definitions id>` == `<decision id>` and the engine rejects the
+  // deploy with `cvc-id.2: multiple occurrences of ID value` (duplicate
+  // XML id). NO `api.saveNewVersion` wrapper.
+  const handleSaveNewVersion = async () => {
+    if (!activeDecision) return;
+    const m = modelerRef.current;
+    if (!m) return;
+    let defId = "";
+    let defName = activeDecision.name || dmnReadableNameFromFilename(filename);
+    try {
+      const out = await m.saveXML({ format: true });
+      const { id, name } = extractDefinitionsIdAndName(out.xml as string);
+      if (id) defId = id;
+      if (name) defName = name;
+    } catch {
+      // best-effort — fall through to filename-derived defaults below.
+    }
+    setDeployTarget({
+      defaultKey: defId || dmnIdFromFilename(filename),
+      defaultName: defName,
+      filename,
+      lockKey: true,
+    });
   };
 
   return (
@@ -658,6 +746,23 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
             </span>
           )}
           {dirty && <span style={{ color: "var(--warn)" }}>· unsaved</span>}
+          {previousVersion && activeDecision && previousVersion.id !== activeDecision.id && (
+            <Link
+              to="/dmn"
+              search={{ decisionId: previousVersion.id }}
+              className="btn"
+              data-size="sm"
+              data-variant="ghost"
+              data-testid="dmn-view-previous-version"
+              title="Load the version this one was saved from"
+              onClick={(e) => {
+                e.preventDefault();
+                handleDropdownChange(previousVersion.id);
+              }}
+            >
+              ← View previous version (v{previousVersion.version})
+            </Link>
+          )}
         </div>
         <div className="sep" />
         <select
@@ -732,6 +837,21 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
           <Icon name="upload" size={13} />
           {dirty ? "Deploy *" : "Deploy"}
         </button>
+        {activeDecision && !creatingNew && (
+          <button
+            ref={saveVersionBtnRef}
+            type="button"
+            className="btn"
+            data-size="sm"
+            data-variant="ghost"
+            data-testid="dmn-save-new-version"
+            onClick={handleSaveNewVersion}
+            title={`Deploy the current canvas as the next version of ${activeDecision.key}`}
+          >
+            <Icon name="upload" size={13} />
+            Save as new version
+          </button>
+        )}
         <button type="button" className="btn" data-size="sm" data-variant="ghost" onClick={saveXML}>
           <Icon name="download" size={13} />
           Export
@@ -817,7 +937,7 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
         target={deployTarget}
         onConfirm={doDeploy}
         onClose={() => setDeployTarget(null)}
-        triggerRef={deployBtnRef}
+        triggerRef={deployTarget?.lockKey ? saveVersionBtnRef : deployBtnRef}
       />
       <ExecuteDecisionModal
         decision={executeOpen ? activeDecision : null}
