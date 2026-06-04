@@ -29,13 +29,47 @@ export VERSION=0.0.2   # set once, reused throughout the runbook
   # expect: "The next release version is $VERSION-beta.N" (e.g. "0.0.2-beta.3")
   # STOP if the X.Y.Z portion does not match $VERSION.
   ```
-- [ ] No `[skip release]` commit is the current HEAD of develop. (Bot-authored commits would interfere with next-release detection.)
+- [ ] No `[skip release]` commit is the current HEAD of develop. (After every beta the bot leaves a `chore(release): $VERSION-beta.N [skip release]` commit on develop's tip — the steady state, see Epic 21 retro AI-1. Cutting `release/$VERSION` from that tip makes the release branch's HEAD a `[skip release]` commit, so [release.yml:33](../.github/workflows/release.yml#L33)'s `if:` short-circuits and **no `rc.1` is ever published** — the push fires the workflow but it self-skips. This is the single most common reason a release cut silently produces nothing.)
   ```bash
-  git log -1 origin/develop --pretty=%B | grep -F '[skip release]' && echo "STOP: HEAD is a [skip release] commit" || echo "OK"
+  git log -1 origin/develop --pretty=%B | grep -F '[skip release]' && echo "STOP: HEAD is a [skip release] commit — run §1.5 to unfreeze develop's tip" || echo "OK"
   # expect: OK
   ```
+  > **Expected to fail right after a beta** — and the remedy is **not** to fix-and-restart but to run **§1.5** (update the milestone headline + commit), which lands a real non-`[skip release]` commit on develop's tip and flips this box to `OK`. §1.5 is a mandatory step on the happy path, not just a recovery.
 
-**If any box fails, stop. Fix the failing item, then restart this checklist from the top.**
+**If any box fails, stop. Fix the failing item, then restart this checklist from the top** — except the `[skip release]`-HEAD box, whose fix is §1.5 below.
+
+## 1.5 Update the milestone headline & unfreeze develop's tip
+
+**Always run this immediately before §2, every release, no exceptions.** It does two jobs at once: (a) writes the milestone's editorial headline that the release notes render, and (b) leaves a real (non-`[skip release]`) commit on develop's tip so the §2 cut produces a real `rc.1` (see the §1 box above).
+
+1. Uncomment — and edit — the `$VERSION` entry in the `HEADLINES` map in [release.config.mjs](../release.config.mjs). For `0.0.3` that is the commented line ~156. Replace the placeholder text with the milestone's actual shipped scope (mirror the prose style of the `0.0.1` / `0.0.2` entries already present).
+   ```bash
+   $EDITOR release.config.mjs   # uncomment the '$VERSION': '...' line in HEADLINES; rewrite the scope summary
+   ```
+   The headline is the **only** hand-edit semantic-release needs per release — every other line of the notes derives from the conventional-commits range and the milestone state on GitHub (see the `HEADLINES` comment block in the config).
+
+2. While here, sanity-check the GitHub milestone itself is ready to close: its title/description reflect the shipped scope, and its open-issue count is what you expect to defer. (Definitions live in [scripts/bootstrap-gh/milestones.json](../scripts/bootstrap-gh/milestones.json); the live milestone is what `release.config.mjs` queries for the issue tally + known-issues footer.)
+   ```bash
+   gh issue list --milestone $VERSION --state open   # expect: only issues intentionally deferred past this milestone
+   ```
+
+3. Commit to develop. The commit message MUST NOT carry `[skip release]` — that marker is the exact thing we're clearing off the tip. `chore(release-prep):` is a no-release type (not in `commit-analyzer`'s `releaseRules`), so this push does **not** mint a new beta; it only un-freezes the tip.
+   ```bash
+   git switch develop
+   git pull --ff-only origin develop
+   git add release.config.mjs
+   git commit -s -m "chore(release-prep): milestone headline for $VERSION"
+   git push origin develop
+   ```
+
+4. Re-run the §1 `[skip release]`-HEAD check — it now prints `OK`. Proceed to §2.
+   ```bash
+   git fetch origin --prune --quiet
+   git log -1 origin/develop --pretty=%B | grep -F '[skip release]' && echo "STILL FROZEN — step 3 did not land" || echo "OK"
+   # expect: OK
+   ```
+
+> **Why a real commit and not an empty `--allow-empty` one?** Either clears the `[skip release]` tip, but the headline edit is work you owe the release anyway — folding it here means develop's tip is a *meaningful* unfreeze commit, not a no-op, and the headline is guaranteed present before the rc/stable notes render. Don't split it into a separate empty commit.
 
 ## 2. Cut the release branch
 
