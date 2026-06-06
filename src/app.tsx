@@ -4,8 +4,9 @@ import { Outlet, useNavigate, useRouter } from "@tanstack/react-router";
 import React from "react";
 import { api } from "./api";
 import { ApiInspector, SettingsModal, Sidebar, Toaster, Topbar } from "./components";
+import { installStrategyForActiveConnection } from "./lib/install-auth-strategy";
 import { KeyboardCheatsheetModal } from "./lib/keyboard-cheatsheet-modal";
-import { NAV_INVALIDATE_COUNTS } from "./lib/nav-events";
+import { NAV_INVALIDATE_COUNTS, SAVED_CONNECTIONS_CHANGED } from "./lib/nav-events";
 import { useRouteMeta } from "./lib/route-meta";
 import { listShortcutsByCategory } from "./lib/shortcuts";
 import "./lib/window-events";
@@ -146,6 +147,18 @@ function App() {
     void probe();
     void refetchTenants();
   }, [probe, refetchTenants]);
+
+  // Story 28.2: install the AuthStrategy matching the active connection's
+  // authStrategyConfig.kind at app mount (honour the persisted kind at first
+  // paint) AND on every connection switch (SAVED_CONNECTIONS_CHANGED — the
+  // Topbar quick-switch / Manage dropdown). The Auth-tab Save calls the
+  // dispatcher itself; this listener covers the switch path.
+  React.useEffect(() => {
+    installStrategyForActiveConnection();
+    const handler = (): void => installStrategyForActiveConnection();
+    window.addEventListener(SAVED_CONNECTIONS_CHANGED, handler);
+    return () => window.removeEventListener(SAVED_CONNECTIONS_CHANGED, handler);
+  }, []);
 
   // Story 23.1: a connection switch (Topbar `.connection-switch` chip OR the
   // SettingsModal Manage section dropdown) funnels through `api.setConfig` →

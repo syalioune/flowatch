@@ -161,9 +161,12 @@ describe("<AddConnectionModal>", () => {
   it("dormancy note + bearer help text render conditionally on kind", async () => {
     const user = userEvent.setup();
     render(<AddConnectionModal open onClose={() => undefined} onSuccess={() => undefined} />);
-    expect(await screen.findByTestId("auth-dormancy-note")).toBeInTheDocument();
+    // Story 28.2: Basic is now LIVE — the dormancy note is bearer/OIDC-only.
+    await screen.findByTestId("auth-kind-basic");
+    expect(screen.queryByTestId("auth-dormancy-note")).not.toBeInTheDocument();
     expect(screen.queryByTestId("auth-bearer-help")).not.toBeInTheDocument();
     await user.click(screen.getByTestId("auth-kind-bearer"));
+    expect(await screen.findByTestId("auth-dormancy-note")).toBeInTheDocument();
     expect(await screen.findByTestId("auth-bearer-help")).toBeInTheDocument();
   });
 
