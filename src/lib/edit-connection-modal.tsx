@@ -17,6 +17,7 @@
 
 import React from "react";
 import { Icon } from "../components";
+import { AuthStrategyFields } from "../components/AuthStrategyFields";
 import {
   type AuthStrategyKind,
   formatErrors,
@@ -357,198 +358,26 @@ export const EditConnectionModal: React.FC<EditConnectionModalProps> = ({
                   style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: 12 }}
                 />
               </div>
-              <div>
-                <label
-                  style={{ display: "block", marginBottom: 4, fontSize: 12 }}
-                  htmlFor="edit-connection-auth-kind-basic"
-                >
-                  Authentication
-                </label>
-                {/* Segmented-control archetype N=2 (after <AddAttachmentModal> Story 21.2).
-                    Per CLAUDE.md "Segmented-control mode-toggle inside a modal" the shape is
-                    inline-keep-not-extract until N=3 (projected: Story 27 new-version-from
-                    vs from-current). Do NOT extract a <SegmentedControl> helper here. */}
-                <div
-                  role="radiogroup"
-                  aria-label="Authentication method"
-                  style={{ display: "flex", gap: 6 }}
-                >
-                  <button
-                    id="edit-connection-auth-kind-basic"
-                    type="button"
-                    className="btn"
-                    data-variant={inputs.kind === "basic" ? "primary" : "ghost"}
-                    aria-pressed={inputs.kind === "basic"}
-                    data-testid="auth-kind-basic"
-                    onClick={() => switchKind("basic")}
-                    disabled={busy}
-                  >
-                    Basic
-                  </button>
-                  <button
-                    type="button"
-                    className="btn"
-                    data-variant={inputs.kind === "bearer" ? "primary" : "ghost"}
-                    aria-pressed={inputs.kind === "bearer"}
-                    data-testid="auth-kind-bearer"
-                    onClick={() => switchKind("bearer")}
-                    disabled={busy}
-                  >
-                    Bearer
-                  </button>
-                  <button
-                    type="button"
-                    className="btn"
-                    data-variant={inputs.kind === "oidc" ? "primary" : "ghost"}
-                    aria-pressed={inputs.kind === "oidc"}
-                    data-testid="auth-kind-oidc"
-                    onClick={() => switchKind("oidc")}
-                    disabled={busy}
-                  >
-                    OIDC
-                  </button>
-                </div>
-                <p
-                  className="mute"
-                  data-testid="auth-dormancy-note"
-                  style={{ marginTop: 6, fontSize: 11 }}
-                >
-                  Persists per-connection config only — activation lands in v1.0.0 (Story 28).
-                </p>
-              </div>
-              {inputs.kind === "bearer" && (
-                <div>
-                  <label
-                    htmlFor="edit-connection-bearer-token"
-                    style={{ display: "block", marginBottom: 4, fontSize: 12 }}
-                  >
-                    Bearer token
-                  </label>
-                  <textarea
-                    id="edit-connection-bearer-token"
-                    data-testid="auth-bearer-token"
-                    rows={3}
-                    maxLength={4096}
-                    value={inputs.bearerToken}
-                    onChange={(e) => setField("bearerToken", e.target.value)}
-                    disabled={busy}
-                    style={{
-                      width: "100%",
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 12,
-                      resize: "vertical",
-                    }}
-                  />
-                  <p
-                    className="mute"
-                    data-testid="auth-bearer-help"
-                    style={{ marginTop: 4, fontSize: 11 }}
-                  >
-                    Stored locally in plaintext — only paste tokens you'd treat as you treat a
-                    password.
-                  </p>
-                </div>
-              )}
-              {inputs.kind === "oidc" && (
-                <>
-                  <div>
-                    <label
-                      htmlFor="edit-connection-oidc-issuer"
-                      style={{ display: "block", marginBottom: 4, fontSize: 12 }}
-                    >
-                      Issuer URL
-                    </label>
-                    <input
-                      id="edit-connection-oidc-issuer"
-                      data-testid="auth-oidc-issuer"
-                      type="text"
-                      value={inputs.oidcIssuer}
-                      onChange={(e) => setField("oidcIssuer", e.target.value)}
-                      disabled={busy}
-                      style={{
-                        width: "100%",
-                        fontFamily: "var(--font-mono)",
-                        fontSize: 12,
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="edit-connection-oidc-client-id"
-                      style={{ display: "block", marginBottom: 4, fontSize: 12 }}
-                    >
-                      Client ID
-                    </label>
-                    <input
-                      id="edit-connection-oidc-client-id"
-                      data-testid="auth-oidc-client-id"
-                      type="text"
-                      value={inputs.oidcClientId}
-                      onChange={(e) => setField("oidcClientId", e.target.value)}
-                      disabled={busy}
-                      style={{ width: "100%", fontSize: 12 }}
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="edit-connection-oidc-scopes"
-                      style={{ display: "block", marginBottom: 4, fontSize: 12 }}
-                    >
-                      Scopes
-                    </label>
-                    <input
-                      id="edit-connection-oidc-scopes"
-                      data-testid="auth-oidc-scopes"
-                      type="text"
-                      value={inputs.oidcScopes}
-                      onChange={(e) => setField("oidcScopes", e.target.value)}
-                      disabled={busy}
-                      placeholder="openid, profile, email, offline_access"
-                      style={{ width: "100%", fontSize: 12 }}
-                    />
-                  </div>
-                </>
-              )}
-              {inputs.kind === "basic" && (
-                <>
-                  <div>
-                    <label
-                      htmlFor="edit-connection-username"
-                      style={{ display: "block", marginBottom: 4, fontSize: 12 }}
-                    >
-                      Username
-                    </label>
-                    <input
-                      id="edit-connection-username"
-                      data-testid="edit-connection-username"
-                      type="text"
-                      value={inputs.username}
-                      onChange={(e) => setField("username", e.target.value)}
-                      disabled={busy}
-                      maxLength={255}
-                      style={{ width: "100%", fontSize: 12 }}
-                    />
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="edit-connection-password"
-                      style={{ display: "block", marginBottom: 4, fontSize: 12 }}
-                    >
-                      Password
-                    </label>
-                    <input
-                      id="edit-connection-password"
-                      data-testid="edit-connection-password"
-                      type="password"
-                      value={inputs.password}
-                      onChange={(e) => setField("password", e.target.value)}
-                      disabled={busy}
-                      maxLength={255}
-                      style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: 12 }}
-                    />
-                  </div>
-                </>
-              )}
+              {/* Story 28.2: segmented-control + per-kind fields extracted to
+                  <AuthStrategyFields> (N=3 extraction). State + switchKind stay here. */}
+              <AuthStrategyFields
+                idPrefix="edit-connection"
+                kind={inputs.kind}
+                onKindChange={switchKind}
+                username={inputs.username}
+                onUsernameChange={(v) => setField("username", v)}
+                password={inputs.password}
+                onPasswordChange={(v) => setField("password", v)}
+                bearerToken={inputs.bearerToken}
+                onBearerTokenChange={(v) => setField("bearerToken", v)}
+                oidcIssuer={inputs.oidcIssuer}
+                onOidcIssuerChange={(v) => setField("oidcIssuer", v)}
+                oidcClientId={inputs.oidcClientId}
+                onOidcClientIdChange={(v) => setField("oidcClientId", v)}
+                oidcScopes={inputs.oidcScopes}
+                onOidcScopesChange={(v) => setField("oidcScopes", v)}
+                disabled={busy}
+              />
               <div>
                 <label
                   htmlFor="edit-connection-tenant-id"
