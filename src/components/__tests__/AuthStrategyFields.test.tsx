@@ -77,13 +77,14 @@ describe("<AuthStrategyFields>", () => {
     expect(screen.queryByTestId("auth-dormancy-note")).not.toBeInTheDocument();
   });
 
-  it("Bearer selected: textarea + help + dormancy note appear, basic fields gone", async () => {
+  it("Bearer selected: textarea + help appear, basic fields gone, NO dormancy (Bearer live in 28.3)", async () => {
     const user = userEvent.setup();
     render(<Harness />);
     await user.click(screen.getByTestId("auth-kind-bearer"));
     expect(await screen.findByTestId("auth-bearer-token")).toBeInTheDocument();
     expect(screen.getByTestId("auth-bearer-help")).toBeInTheDocument();
-    expect(screen.getByTestId("auth-dormancy-note")).toBeInTheDocument();
+    // Story 28.3: Bearer is now live — dormancy note is OIDC-only.
+    expect(screen.queryByTestId("auth-dormancy-note")).not.toBeInTheDocument();
     expect(screen.queryByTestId("harness-username")).not.toBeInTheDocument();
   });
 

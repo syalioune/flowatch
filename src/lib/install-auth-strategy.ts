@@ -26,9 +26,25 @@
  */
 
 import { api } from "../api";
-import { type AuthStrategy, BasicAuthStrategy } from "./auth-strategy";
+import { type AuthStrategy, BasicAuthStrategy, BearerAuthStrategy } from "./auth-strategy";
 import type { AuthStrategyKind } from "./auth-strategy-config";
+import { OPEN_SETTINGS_AUTH } from "./nav-events";
 import { getActiveConnection } from "./saved-connections";
+
+/** Open the Settings modal at the Authentication tab (Story 28.3 401 recovery). */
+const dispatchOpenSettingsAuth = (): void => {
+  try {
+    window.dispatchEvent(new CustomEvent(OPEN_SETTINGS_AUTH));
+  } catch {
+    /* SSR / non-DOM context */
+  }
+};
+
+/** Live-read the active connection's Bearer token (empty when not bearer-kind). */
+const activeBearerToken = (): string => {
+  const c = getActiveConnection();
+  return c?.authStrategyConfig?.kind === "bearer" ? c.authStrategyConfig.config.token : "";
+};
 
 /**
  * Placeholder for a not-yet-implemented auth kind (bearer until 28.3, oidc
@@ -59,8 +75,9 @@ export function installStrategyForActiveConnection(): void {
   let strategy: AuthStrategy;
   switch (kind) {
     case "bearer":
-      // Story 28.3 swaps this for `new BearerAuthStrategy(...)`.
-      strategy = new DormantAuthStrategy("bearer");
+      // Story 28.3: live token read (re-paste in Settings takes effect without
+      // re-install) + open-Settings-at-Auth-tab on 401.
+      strategy = new BearerAuthStrategy(activeBearerToken, dispatchOpenSettingsAuth);
       break;
     case "oidc":
       // Story 28.4 swaps this for `new OidcAuthStrategy()`.

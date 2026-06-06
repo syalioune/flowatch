@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { type AuthStrategy, BasicAuthStrategy } from "../auth-strategy";
+import { type AuthStrategy, BasicAuthStrategy, BearerAuthStrategy } from "../auth-strategy";
 
 describe("BasicAuthStrategy", () => {
   it("kind is 'basic'", () => {
@@ -54,5 +54,44 @@ describe("BasicAuthStrategy", () => {
   it("handles empty credentials (encodes ':' )", async () => {
     const s = new BasicAuthStrategy(() => ({ username: "", password: "" }));
     expect(await s.authorizationHeader()).toBe(`Basic ${btoa(":")}`);
+  });
+});
+
+describe("BearerAuthStrategy (Story 28.3)", () => {
+  const noop = () => {};
+
+  it("kind is 'bearer'", () => {
+    const s = new BearerAuthStrategy(() => "t", noop);
+    expect(s.kind).toBe("bearer");
+  });
+
+  it("authorizationHeader() returns 'Bearer <token>' for a non-empty token", async () => {
+    const s = new BearerAuthStrategy(() => "tok-123", noop);
+    expect(await s.authorizationHeader()).toBe("Bearer tok-123");
+  });
+
+  it("trims the token before producing the header", async () => {
+    const s = new BearerAuthStrategy(() => "  tok-123  ", noop);
+    expect(await s.authorizationHeader()).toBe("Bearer tok-123");
+  });
+
+  it("returns null for an empty / whitespace-only token", async () => {
+    expect(await new BearerAuthStrategy(() => "", noop).authorizationHeader()).toBeNull();
+    expect(await new BearerAuthStrategy(() => "   ", noop).authorizationHeader()).toBeNull();
+  });
+
+  it("reads the token getter LIVE each call (re-paste without re-install)", async () => {
+    let token = "tok-1";
+    const s = new BearerAuthStrategy(() => token, noop);
+    expect(await s.authorizationHeader()).toBe("Bearer tok-1");
+    token = "tok-2";
+    expect(await s.authorizationHeader()).toBe("Bearer tok-2");
+  });
+
+  it("onUnauthorized() calls the injected onAuthFailure callback once", async () => {
+    const onAuthFailure = vi.fn();
+    const s = new BearerAuthStrategy(() => "t", onAuthFailure);
+    await s.onUnauthorized();
+    expect(onAuthFailure).toHaveBeenCalledTimes(1);
   });
 });
