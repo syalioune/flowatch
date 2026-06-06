@@ -1,3 +1,117 @@
+## [0.0.3](https://github.com/syalioune/flowatch/compare/v0.0.2...v0.0.3) (2026-06-06)
+
+📊 **261 commits** · **0 breaking** changes
+
+> ⚠️ **Pre-1.0 posture.** Flowatch does **not** guarantee compatibility
+> between pre-1.0 releases. Breaking changes may land at any time.
+> Operators following the main branch should expect to rebuild state
+> between releases. **1.0.0** will be the first public,
+> compatibility-stable milestone.
+
+
+### 🎨 Modelers (BPMN & DMN)
+
+* **modeler:** Story 27.1 — "Save as new version" in BPMN/DMN modeler ([a520dd4](https://github.com/syalioune/flowatch/commit/a520dd4e188bbd62b7374332d655ca759e6edd3d))
+
+
+### 🚀 Deployments & Definitions
+
+* **definitions:** Story 20.1 — edit category on a process definition ([ebcc9b4](https://github.com/syalioune/flowatch/commit/ebcc9b4774c96fffbe495cfb3dca60727b93d958))
+* **definitions:** Story 20.1 review patches — 10 fixes from code-review pass ([b8c6024](https://github.com/syalioune/flowatch/commit/b8c6024646c7c9e05d52255eda3bd78826eeb502))
+* **deployments:** Story 25.1 — .bar fan-out across BPMN + DMN + App sub-apps ([075ec92](https://github.com/syalioune/flowatch/commit/075ec92eae406e21301025a950b51e718218584a))
+* **deployments:** Story 25.1 — .bar upload recognition + browse, closes FR-55 (scope-reduced) ([531201b](https://github.com/syalioune/flowatch/commit/531201b39cbc2a60ded7224ff0fa6e3e77a87f50))
+* **deployments:** Story 25.1 — single POST to /app-api/app-repository/deployments ([82ff938](https://github.com/syalioune/flowatch/commit/82ff9388fbe60bae3379cc211199944be589be55))
+* **deployments:** Story 25.1 — surface .bar uploads with kind="BAR" ([bbeb652](https://github.com/syalioune/flowatch/commit/bbeb65298de1f995bee552f3eede66ac5a52eec6))
+* **deployments:** Story 25.1 — surface .bar uploads with kind="BAR" ([b8276d3](https://github.com/syalioune/flowatch/commit/b8276d3b2b930d7c3f8d238b7bc5ba2457e82b75))
+
+
+### ▶️ Runtime, Tasks & Forms
+
+* **instances:** biome import-sort on InstanceDiagramPanel ([52fa076](https://github.com/syalioune/flowatch/commit/52fa0763ba0c345669540a4adae8fa4d6301014a))
+* **instances:** Epic 26 polish — diagram sizing, marker colors, tab restructure ([607849d](https://github.com/syalioune/flowatch/commit/607849d1091156646541df80aeb18d2b72c68bf0))
+* **instances:** Story 19.1 — edit a variable on a running instance ([91cc2df](https://github.com/syalioune/flowatch/commit/91cc2df95167928f561c24f832f515d72e5362c1))
+* **instances:** Story 19.2 — add + delete a variable on a running instance ([5ca3e47](https://github.com/syalioune/flowatch/commit/5ca3e47fa4e93a263198a1f36d06ae87d84c0f18))
+* **instances:** Story 26.1 — render BPMN diagram on instance detail ([c1d283b](https://github.com/syalioune/flowatch/commit/c1d283b2014ea44aef41f488c00053bd1d3a7fc0))
+* **instances:** Story 26.2 — highlight current and historic activities on the diagram ([baa0c87](https://github.com/syalioune/flowatch/commit/baa0c87c80483fc71107fd70a65922bdb780e60b))
+* **instances:** Story 26.2 marker CSS needs !important to override bpmn-js inline styles ([8f9ea57](https://github.com/syalioune/flowatch/commit/8f9ea578b073448b28ee5d3ff9d5758466103aa5))
+* **tasks:** Story 21.1 — edit task priority, due date, owner, assignee ([3d29aee](https://github.com/syalioune/flowatch/commit/3d29aee212d02a6eb1d132ceb164975d53b2bbf7))
+* **tasks:** Story 21.2 — add attachment (file or URL) to a task ([8c7ac6f](https://github.com/syalioune/flowatch/commit/8c7ac6f783ee62476dcfbf8e60b666230b738312))
+* **tasks:** Story 21.3 — download + delete task attachments, closes FR-45 ([f994d1f](https://github.com/syalioune/flowatch/commit/f994d1fbb70bbe7fadefe68330d92fe6dcc08294))
+
+
+### ⚙️ Jobs, Batches & Events
+
+* **batches:** Story 24.1 — list + detail + per-part stacktrace, closes FR-53 ([d69ea7d](https://github.com/syalioune/flowatch/commit/d69ea7d1a34b4b0d513a0bac3b5cfacd2ee9f9e0))
+* **events:** Story 24.2 — event subscriptions panel + standalone list, closes FR-54 ([f86fc49](https://github.com/syalioune/flowatch/commit/f86fc49b80228d174302f995c9e358fa90525308))
+
+
+### 👥 Identity & Tenants
+
+* **identity:** Story 22.1 — create user via POST /identity/users ([0cd8bcc](https://github.com/syalioune/flowatch/commit/0cd8bcca20790961aa88b68de20c385b33784327))
+* **identity:** Story 22.2 — edit + delete user (FR-46 close) ([303f6a3](https://github.com/syalioune/flowatch/commit/303f6a360c09175634cd10b0b9fb3c9dc46a1c3a))
+* **identity:** Story 22.3 — group CRUD (FR-47 close) + codification ([ea61df9](https://github.com/syalioune/flowatch/commit/ea61df91016610f6b4667dbd5b532d33c0eb6282))
+
+
+### 🧭 Routing & Navigation
+
+* **chrome:** Story 23.1 — saved connections list + Topbar quick-switch (FR-49) ([a96af7f](https://github.com/syalioune/flowatch/commit/a96af7fae3a92cb80be2b79f0258276be6854375))
+* **chrome:** Story 23.2 — per-connection auth-strategy config (FR-49 close) ([3bf8336](https://github.com/syalioune/flowatch/commit/3bf833613a827841ee78e2402c50c250d33704aa))
+* **chrome:** Story 23.2 follow-up — username/password are Basic-exclusive ([f91c238](https://github.com/syalioune/flowatch/commit/f91c23862eec1d420b4d6415177a4777dfec7034))
+* **sidebar:** count badges for Batches + Events nav items ([bb6c0dd](https://github.com/syalioune/flowatch/commit/bb6c0dde8b117f37085334d89809e3a179d76e79))
+
+
+### 🌐 Flowable REST contract
+
+* **api:** cover Story 20.1 wrappers — restore src/api.ts coverage above 96% floor ([02eee64](https://github.com/syalioune/flowatch/commit/02eee644bba964fbe2d58df77a2ae57fe49fd212))
+* **api:** split DTOs into src/api-types.ts + dedupe multipart envelope (NFR-21) ([dc5396d](https://github.com/syalioune/flowatch/commit/dc5396d6c439d41ffac9204695af700dce3f991d))
+* **api:** split identity wrappers + Story 22 tests for NFR-21 (PR-176 fixup) ([3abd1b2](https://github.com/syalioune/flowatch/commit/3abd1b2c2314246793aecd37a752edacbfb3353f))
+* **api:** Story 25.1 — api-pin coverage for new App-sub-app wrappers ([848f21b](https://github.com/syalioune/flowatch/commit/848f21b0b63be00dda0b07e8eff75af2d7543ac8))
+
+
+### 🛡️ Quality Gates
+
+* **e2e:** drop perpetually-skipped failure-path stub on definition-edit-category ([0955086](https://github.com/syalioune/flowatch/commit/09550863b743529d71bd8bdd3ae5eddd97c439ee))
+* **e2e:** regenerate visual baseline for /identity?tab=users ([016c6bf](https://github.com/syalioune/flowatch/commit/016c6bf1bd0207901e6a02e79590bb4efd6ef55a))
+* **e2e:** Sidebar nav-link selectors target href, not accessible name ([df07751](https://github.com/syalioune/flowatch/commit/df0775193889a306f3f54e4f1fffb90f437a7b8e))
+* **test:** skip static mutants in Stryker (ignoreStatic: true) ([3fe72fe](https://github.com/syalioune/flowatch/commit/3fe72fe7417be94c4e6cbbd2c6ad4276e17e5574))
+
+
+### 🛠️ DevEx & Tooling
+
+* **bmad:** close Epic 18 retro AI-1 + AI-2 (DAR-block hook + bake-commit calibration) ([53bf928](https://github.com/syalioune/flowatch/commit/53bf9282b719e83b22b317e33096ddcc21bb2593))
+* **bmad:** close Epic 26 retro AI-1 + AI-2 + AI-3 + AI-4 ([1df9441](https://github.com/syalioune/flowatch/commit/1df9441e247916a5eb25ea9e95ba1839e5ee1c03))
+* **claude:** codify Epic 21 retro AI-1 + AI-4 paragraphs ([a188b43](https://github.com/syalioune/flowatch/commit/a188b43a84a1a1f7fbef5b031b046473dfd6e6e8))
+* **claude:** codify fallbackRef pattern at N=4 cross-domain (Epic 23 retro AI-3) ([6a7d1d3](https://github.com/syalioune/flowatch/commit/6a7d1d35b9591f51ef7da8e9baf221c4e1c564b1))
+* **release-prep:** milestone headline for 0.0.3 + runbook §1.5 ([6a4aa6f](https://github.com/syalioune/flowatch/commit/6a4aa6f1ce785f532b5a2512f03256e6467553e8))
+* **release:** 0.0.3-beta.1 [skip release] ([b2e6c0a](https://github.com/syalioune/flowatch/commit/b2e6c0a387a655cf702215dd4f273e9c6d33f5ad))
+* **release:** 0.0.3-beta.2 [skip release] ([fe229b1](https://github.com/syalioune/flowatch/commit/fe229b189fa72214c9903edd3d041bbab12a8b6c))
+* **release:** 0.0.3-beta.3 [skip release] ([f6f4898](https://github.com/syalioune/flowatch/commit/f6f489872594a446f40e33d35bdb309f851abde5))
+* **release:** 0.0.3-beta.4 [skip release] ([5d4c979](https://github.com/syalioune/flowatch/commit/5d4c97979a693e9b26c949ecdcc9d86e10a52af3))
+* **release:** 0.0.3-beta.5 [skip release] ([5d1eb30](https://github.com/syalioune/flowatch/commit/5d1eb30c6053b73ab6e83bb4186ca62df738bca5))
+* **release:** 0.0.3-beta.6 [skip release] ([ddfa84b](https://github.com/syalioune/flowatch/commit/ddfa84b8d7e7e870453e4f678fad5413cd793140))
+* **release:** 0.0.3-beta.7 [skip release] ([0e74b87](https://github.com/syalioune/flowatch/commit/0e74b87a2a6ec9a7ea4125325a0c1c3c9d023caa))
+* **release:** 0.0.3-beta.8 [skip release] ([812c91e](https://github.com/syalioune/flowatch/commit/812c91eae5c715e731d3c287c3087dfbd24ec676))
+* **release:** 0.0.3-beta.9 [skip release] ([b7f2edc](https://github.com/syalioune/flowatch/commit/b7f2edcab0396998337251641bf755e06b977eb5))
+* **release:** 0.0.3-rc.1 [skip release] ([6f9bb4e](https://github.com/syalioune/flowatch/commit/6f9bb4ed8f0510a08611808001459284eeb6eb1d))
+* **release:** back-merge v0.0.2 into develop [skip release] ([d164af7](https://github.com/syalioune/flowatch/commit/d164af731eb2311659b0fa552e5fb0b3d511d2bb))
+
+
+### 📝 Documentation
+
+* **security:** replace Math.random ID generation with crypto.getRandomValues ([2213119](https://github.com/syalioune/flowatch/commit/2213119bbbe593a7cbd0a486cc3ecb7df5e38006))
+
+
+### 🌍 i18n & Accessibility
+
+* **a11y:** Sidebar nav-count + Inspector counter gain sr-only "Count: " prefix ([2fa765c](https://github.com/syalioune/flowatch/commit/2fa765ca5c2353a5451e704e9e7422d4901b9a58))
+
+
+
+
+---
+
+_Auto-generated by [semantic-release](https://github.com/semantic-release/semantic-release)._
+
 ## [0.0.3-rc.1](https://github.com/syalioune/flowatch/compare/v0.0.2...v0.0.3-rc.1) (2026-06-04)
 
 📊 **0 issues** closed · **260 commits** · **0 breaking** changes
