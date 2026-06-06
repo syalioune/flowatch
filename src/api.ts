@@ -18,333 +18,92 @@
  * See ADR-001 / P-001 / P-003 / P-004 in _bmad-output/planning-artifacts/architecture.md.
  */
 
-// ── Type vocabulary ───────────────────────────────────────────────────────
+// ── Type vocabulary + DTOs ────────────────────────────────────────────────
+//
+// Extracted to src/api-types.ts at Story 21.x to satisfy the 50 KB NFR-21
+// navigability limit. Every symbol is re-exported below so existing
+// `import { FlowableTask } from "../api"` call sites resolve unchanged.
 
-export type HTTPMethod = "GET" | "POST" | "PUT" | "DELETE";
+export type {
+  AddAttachmentPayload,
+  ApiLogEntry,
+  ExecuteDecisionBody,
+  FlowableAppDefinition,
+  FlowableAttachment,
+  FlowableBatch,
+  FlowableBatchPart,
+  FlowableConfig,
+  FlowableDecision,
+  FlowableDecisionExecutionInputVariable,
+  FlowableDecisionResult,
+  FlowableDecisionResultVariable,
+  FlowableDeployment,
+  FlowableDmnExecutionAudit,
+  FlowableDmnRuleConditionResult,
+  FlowableDmnRuleExecution,
+  FlowableEngineInfo,
+  FlowableEventSubscription,
+  FlowableFormProperty,
+  FlowableGroup,
+  FlowableHistoricActivity,
+  FlowableHistoricDecisionExecution,
+  FlowableHistoricProcessInstance,
+  FlowableHistoricTask,
+  FlowableHistoricVariable,
+  FlowableHistoricVariableValue,
+  FlowableJob,
+  FlowablePage,
+  FlowableProcessDefinition,
+  FlowableProcessInstance,
+  FlowableResource,
+  FlowableTask,
+  FlowableTaskForm,
+  FlowableTenant,
+  FlowableUser,
+  FlowableVariable,
+  FlowableVariableInput,
+  HTTPMethod,
+  QueryParams,
+  RequestOpts,
+} from "./api-types";
+export { FlowableError } from "./api-types";
 
-export interface FlowableConfig {
-  baseUrl: string;
-  username: string;
-  password: string;
-  tenantId: string;
-}
-
-export interface FlowablePage<T> {
-  data: T[];
-  total: number;
-  start: number;
-  size: number;
-  sort: string;
-  order: string;
-}
-
-export interface FlowableEngineInfo {
-  name: string;
-  version: string;
-  resourceUrl?: string;
-  exception?: string | null;
-}
-
-export interface ApiLogEntry {
-  id: string;
-  method: HTTPMethod;
-  path: string;
-  url: string;
-  status: number;
-  ms: number;
-  at: string;
-  headers?: Record<string, string>;
-  body?: unknown;
-  error?: string;
-}
-
-export type QueryParams = Record<string, string | number | boolean | null | undefined>;
-
-export interface RequestOpts {
-  params?: QueryParams | undefined;
-  body?: unknown;
-  base?: string | undefined;
-  raw?: boolean | undefined;
-  // Story 9.6: when set, request() returns the raw `Response` object instead
-  // of a parsed body. Used by binary downloads where the caller picks the body
-  // method (`.blob()` / `.arrayBuffer()`). Mutually exclusive with `raw` — if
-  // both are set, `asResponse` wins.
-  asResponse?: boolean | undefined;
-}
-
-export class FlowableError extends Error {
-  readonly status: number;
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = "FlowableError";
-    this.status = status;
-  }
-}
-
-// ── Minimal Flowable DTOs (fields the UI consumes today) ──────────────────
-
-export interface FlowableDeployment {
-  id: string;
-  name: string;
-  deploymentTime: string;
-  tenantId: string;
-  category?: string;
-}
-
-export interface FlowableProcessDefinition {
-  id: string;
-  key: string;
-  name: string;
-  version: number;
-  deploymentId: string;
-  category?: string;
-  suspended?: boolean;
-  tenantId?: string;
-}
-
-export interface FlowableProcessInstance {
-  id: string;
-  processDefinitionId: string;
-  processDefinitionKey: string;
-  businessKey?: string;
-  startTime: string;
-  ended?: boolean;
-  tenantId?: string;
-  suspended?: boolean;
-}
-
-export interface FlowableTask {
-  id: string;
-  name: string;
-  assignee?: string;
-  owner?: string;
-  priority: number;
-  dueDate?: string;
-  createTime: string;
-  processInstanceId?: string;
-  processDefinitionId?: string;
-  tenantId?: string;
-}
-
-// Story 11.3 (closes the Story 1.1 deferred-work entry for FlowableTaskForm).
-// Per the Flowable FormProperty contract, `type` is a curated union; the
-// trailing `string` keeps unknown engine-extension types type-checking so
-// the form panel can fall through to a text-input render.
-export interface FlowableFormProperty {
-  id: string;
-  name?: string;
-  type: "string" | "long" | "double" | "enum" | "date" | "boolean" | string;
-  value?: string;
-  required?: boolean;
-  readable?: boolean;
-  writable?: boolean;
-  enumValues?: Array<string | { id?: string; name?: string }>;
-}
-
-export interface FlowableTaskForm {
-  formKey?: string;
-  formProperties?: FlowableFormProperty[];
-}
-
-export interface FlowableJob {
-  id: string;
-  processInstanceId?: string;
-  processDefinitionId?: string;
-  executionId?: string;
-  retries: number;
-  exceptionMessage?: string;
-  dueDate?: string;
-  tenantId?: string;
-}
-
-export interface FlowableUser {
-  id: string;
-  firstName?: string;
-  lastName?: string;
-  email?: string;
-  tenantId?: string;
-}
-
-export interface FlowableGroup {
-  id: string;
-  name?: string;
-  type?: string;
-}
-
-export interface FlowableVariable {
-  name: string;
-  value: unknown;
-  type?: string;
-  scope?: string;
-}
-
-export interface FlowableResource {
-  // Per the live flowable-rest 7.2 response: `id` is the filename
-  // (e.g. "Helpdesk.bpmn20.xml") and there is NO `name` field. Earlier DTO
-  // versions declared `name: string` — that field never existed on the wire.
-  id: string;
-  mediaType: string;
-  type?: string;
-  url?: string;
-  contentUrl?: string;
-}
-
-// Story 15.3: typed input variable shape for POST /dmn-rule/execute.
-export interface FlowableDecisionExecutionInputVariable {
-  name: string;
-  type?: "string" | "number" | "long" | "double" | "boolean" | "date" | "json" | string;
-  value: unknown;
-}
-
-export interface ExecuteDecisionBody {
-  decisionKey: string;
-  inputVariables: FlowableDecisionExecutionInputVariable[];
-  parentDeploymentId?: string;
-}
-
-// Per the live Flowable 7.2 DMN-rule/execute response, `resultVariables` is
-// an Array<Array<{name, type, value}>> — the OUTER array is one entry per
-// result row (for COLLECT / RULE_ORDER hit policies; length 1 for
-// UNIQUE / FIRST), the INNER array carries the typed output variables.
-// The engine does NOT surface matchedRules over the REST API — Story 15.3's
-// defensive widening assumed it might; live probing showed it never does.
-export interface FlowableDecisionResultVariable {
-  name: string;
-  // Flowable emits the engine-side type label directly: "string" / "double"
-  // / "long" / "boolean" / "date" / "json". Kept open as `string` so future
-  // type additions don't break the DTO.
-  type: string;
-  value: unknown;
-}
-
-export interface FlowableDecisionResult {
-  resultVariables?: FlowableDecisionResultVariable[][];
-  url?: string;
-}
-
-export interface FlowableTenant {
-  id: string;
-  name: string;
-}
-
-export interface FlowableDecision {
-  id: string;
-  key: string;
-  name?: string;
-  version: number;
-  deploymentId: string;
-  category?: string;
-  tenantId?: string;
-}
-
-// Story 15.4: historic decision-execution DTO. All fields defensive
-// (every new field optional) per the Epic 15 DTO-widening discipline.
-// The actual response shape may vary across Flowable versions; the
-// renderer treats missing fields as "—".
-export interface FlowableHistoricDecisionExecution {
-  id: string;
-  decisionDefinitionId?: string;
-  decisionKey?: string;
-  decisionName?: string;
-  // Per flowable-rest 7.2 historic-decision-executions response, the process
-  // instance id is named `instanceId` (NOT `processInstanceId`) and `failed`
-  // (NOT `executionFailed`). The list endpoint does not surface hitPolicy,
-  // durationInMillis, inputVariables, or outputVariables — those live on
-  // the auditdata endpoint per-execution.
-  instanceId?: string | null;
-  executionId?: string | null;
-  activityId?: string | null;
-  scopeType?: string | null;
-  scopeId?: string | null;
-  deploymentId?: string;
-  decisionVersion?: string;
-  startTime?: string;
-  endTime?: string;
-  failed?: boolean;
-  tenantId?: string;
-}
-
-// Per-execution audit response from
-// `/dmn-history/historic-decision-executions/{id}/auditdata`. Far richer
-// than the list row — surfaces the hit policy, typed input/result maps,
-// and the per-rule execution trace (which rule fired, condition+conclusion
-// results). Every field defensive (optional) because Flowable versions
-// vary on which fields are present.
-export interface FlowableDmnRuleConditionResult {
-  id?: string;
-  result?: unknown;
-}
-export interface FlowableDmnRuleExecution {
-  ruleNumber?: number;
-  startTime?: string;
-  endTime?: string;
-  valid?: boolean;
-  conditionResults?: FlowableDmnRuleConditionResult[];
-  conclusionResults?: FlowableDmnRuleConditionResult[];
-}
-export interface FlowableDmnExecutionAudit {
-  decisionKey?: string;
-  decisionName?: string;
-  decisionVersion?: number;
-  hitPolicy?: string;
-  startTime?: string;
-  endTime?: string;
-  inputVariables?: Record<string, unknown>;
-  inputVariableTypes?: Record<string, string>;
-  // decisionResult is an array of result rows (one per matched rule for
-  // COLLECT / RULE_ORDER / OUTPUT_ORDER; length 1 for UNIQUE / FIRST).
-  decisionResult?: Array<Record<string, unknown>>;
-  decisionResultTypes?: Record<string, string>;
-  multipleResults?: boolean;
-  // Keyed by rule number as a string ("1", "2", …).
-  ruleExecutions?: Record<string, FlowableDmnRuleExecution>;
-  failed?: boolean;
-  strictMode?: boolean;
-}
-
-// Historic equivalents — UI shape is close to the runtime DTOs.
-export interface FlowableHistoricProcessInstance extends FlowableProcessInstance {
-  endTime?: string;
-  durationInMillis?: number;
-}
-
-export interface FlowableHistoricActivity {
-  id: string;
-  activityId: string;
-  activityName?: string;
-  activityType: string;
-  processInstanceId?: string;
-  startTime: string;
-  endTime?: string;
-  durationInMillis?: number;
-}
-
-// Flowable 7.x returns historic variables with the variable payload nested
-// under a `variable` object — `{id, processInstanceId, taskId, executionId,
-// variable: {name, type, value, scope}}` — NOT flattened with top-level
-// `variableName` / `variableType` like the runtime variable endpoint
-// (`/runtime/process-instances/{id}/variables`). Operator-side render code
-// must read `entry.variable.name` / `entry.variable.type` / `entry.variable.value`.
-// See RC-12 in docs/runtime-caveats.md.
-export interface FlowableHistoricVariableValue {
-  name: string;
-  type?: string;
-  value: unknown;
-  scope?: string;
-}
-
-export interface FlowableHistoricVariable {
-  id: string;
-  variable: FlowableHistoricVariableValue;
-  processInstanceId?: string;
-  taskId?: string;
-  executionId?: string;
-}
-
-export interface FlowableHistoricTask extends FlowableTask {
-  endTime?: string;
-  durationInMillis?: number;
-}
+import type {
+  AddAttachmentPayload,
+  ApiLogEntry,
+  ExecuteDecisionBody,
+  FlowableAppDefinition,
+  FlowableAttachment,
+  FlowableBatch,
+  FlowableBatchPart,
+  FlowableConfig,
+  FlowableDecision,
+  FlowableDecisionResult,
+  FlowableDeployment,
+  FlowableDmnExecutionAudit,
+  FlowableEngineInfo,
+  FlowableEventSubscription,
+  FlowableHistoricActivity,
+  FlowableHistoricDecisionExecution,
+  FlowableHistoricProcessInstance,
+  FlowableHistoricTask,
+  FlowableHistoricVariable,
+  FlowableJob,
+  FlowablePage,
+  FlowableProcessDefinition,
+  FlowableProcessInstance,
+  FlowableResource,
+  FlowableTask,
+  FlowableTaskForm,
+  FlowableTenant,
+  FlowableVariable,
+  FlowableVariableInput,
+  HTTPMethod,
+  QueryParams,
+  RequestOpts,
+} from "./api-types";
+import { FlowableError } from "./api-types";
+import { randomId } from "./lib/random-id";
 
 // ── Config + storage ──────────────────────────────────────────────────────
 
@@ -377,6 +136,11 @@ let cfg: FlowableConfig = loadCfg();
 // live under `/flowable-rest/service`, but DMN is mounted at `/flowable-rest/dmn-api`.
 // We derive the DMN root from the configured base URL.
 const dmnBase = (): string => cfg.baseUrl.replace(/\/service\/?$/, "/dmn-api");
+// Story 25.1: Flowable App API sub-app — mirrors the `dmnBase()` shape per
+// compat.md row 28. /service → /app-api. Read-only at this story; app-runtime
+// (app-instances) is not exposed in flowable-rest:7.2.0 (PRD FR-55
+// scope-reduced).
+const appBase = (): string => cfg.baseUrl.replace(/\/service\/?$/, "/app-api");
 
 export const API_LOG: ApiLogEntry[] = [];
 const MAX_LOG = 60;
@@ -468,6 +232,53 @@ const qs = (params?: QueryParams): string => {
 
 const basicAuth = (): string => "Basic " + btoa(`${cfg.username}:${cfg.password}`);
 
+// Shared multipart POST envelope used by `uploadDeployment` (Story 9.2) and
+// `addTaskAttachment` file path (Story 21.2). Bypasses `request()` because the
+// body is FormData (non-JSON) but logs via API_LOG identically. `buildFd` is a
+// callback so FormData / Blob constructor throws land in the API_LOG entry
+// with status=0 (Story 9.2 AC-7 + Story 8.1 deferred-work closure). Returns
+// the raw Response — caller parses via `.json()`.
+const multipartFetch = async (
+  root: string,
+  path: string,
+  buildFd: () => FormData,
+): Promise<Response> => {
+  const url = root.replace(/\/$/, "") + path;
+  const t0 = performance.now();
+  const entry: ApiLogEntry = {
+    id: randomId(),
+    method: "POST",
+    path,
+    url,
+    status: 0,
+    ms: 0,
+    at: new Date().toISOString(),
+  };
+  try {
+    const fd = buildFd();
+    const headers: Record<string, string> = { Authorization: basicAuth() };
+    entry.headers = redactAuthHeader(headers);
+    const res = await fetch(url, { method: "POST", headers, body: fd });
+    entry.status = res.status;
+    entry.ms = Math.round(performance.now() - t0);
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      entry.error = text || `HTTP ${res.status}`;
+      logCall(entry);
+      throw new FlowableError(entry.error, res.status);
+    }
+    logCall(entry);
+    return res;
+  } catch (err) {
+    if (entry.status === 0) {
+      entry.error = err instanceof Error ? err.message : String(err);
+      entry.ms = Math.round(performance.now() - t0);
+      logCall(entry);
+    }
+    throw err;
+  }
+};
+
 // ── request() funnel ─────────────────────────────────────────────────────
 //
 // Generic over T (the JSON response shape). Wrappers that opt into raw text
@@ -475,7 +286,7 @@ const basicAuth = (): string => "Basic " + btoa(`${cfg.username}:${cfg.password}
 // getDmnDecisionResource, jobStacktrace). Per AC-3, the runtime guarantees
 // the declared T matches when opts.raw is true.
 
-async function request<T = unknown>(
+export async function request<T = unknown>(
   method: HTTPMethod,
   path: string,
   opts: RequestOpts = {},
@@ -485,7 +296,7 @@ async function request<T = unknown>(
   const url = root + path + qs(params);
   const t0 = performance.now();
   const entry: ApiLogEntry = {
-    id: Math.random().toString(36).slice(2, 9),
+    id: randomId(),
     method,
     path: path + qs(params),
     url,
@@ -585,10 +396,70 @@ const listProcessDefinitions = (params?: QueryParams) =>
   });
 const getProcessDefinition = (id: string) =>
   request<FlowableProcessDefinition>("GET", `/repository/process-definitions/${id}`);
+/**
+ * Story 20.1 + RC-16 workaround: read a process definition via the LIST
+ * endpoint so the response reflects the DB-persisted `category` (and any
+ * other field the single-GET serves from its BPMN-model cache).
+ *
+ * Flowable 7.2.0 GET /repository/process-definitions/{id} returns
+ * `category` from the BPMN model cache (populated at deploy from the BPMN
+ * file's <targetNamespace>); the DB-persisted `act_re_procdef.category_`
+ * column — updated by `updateProcessDefinition` — is ignored. The LIST
+ * endpoint reads `category_` directly, so the post-edit value surfaces
+ * here. Engine `id`/`processDefinitionId` filters are silently ignored on
+ * the LIST endpoint; we filter by `key` (extracted from the engine's
+ * `key:version:UUID` id format) and JS-filter by id. The wrapper falls
+ * through to the single-GET if the list doesn't surface the id (defensive;
+ * should never happen for a deployed definition).
+ *
+ * Used by the /definitions/$id route loader so the detail page reflects
+ * the operator's edit. Other consumers of `getProcessDefinition` (single
+ * call) are unchanged; the wire-level contract there is documented per RC-16.
+ */
+const getProcessDefinitionFresh = async (id: string): Promise<FlowableProcessDefinition> => {
+  const [key] = id.split(":");
+  const page = await request<FlowablePage<FlowableProcessDefinition>>(
+    "GET",
+    "/repository/process-definitions",
+    { params: { key, size: 200 } },
+  );
+  const found = page.data.find((d) => d.id === id);
+  if (found) return found;
+  return request<FlowableProcessDefinition>("GET", `/repository/process-definitions/${id}`);
+};
 const suspendProcessDefinition = (id: string, suspend: boolean) =>
   request<FlowableProcessDefinition>("PUT", `/repository/process-definitions/${id}`, {
     body: { action: suspend ? "suspend" : "activate" },
   });
+/**
+ * Story 20.1: edit fields on a process definition (currently: `category`).
+ *
+ * Funnels `PUT /repository/process-definitions/{id}` through `request()` with
+ * a partial-fields body (e.g. `{category: "finance"}`). The engine accepts
+ * `{category: ""}` to clear the value (revert to default per docs/compat.md
+ * line 149). Verified live on flowable-rest 7.2.0 per docs/compat.md FR-43.
+ *
+ * Endpoint-duality with `suspendProcessDefinition` (Story 9.4): both wrappers
+ * PUT to the SAME wire URL but the engine discriminates by body shape:
+ *   - `{action: "suspend" | "activate"}` → suspend / activate path
+ *   - `{category: "…"}`                  → field-update path
+ * Per CLAUDE.md "Operator-feel UI labels can diverge from wire-level action
+ * verbs" (Story 12.2 codification), the two operator-feel actions get distinct
+ * wrappers even though they share a URL. The `fields` parameter shape allows
+ * future Epic 21 / 22 field extensions (name, description, …) to land as a
+ * type-level addition rather than a wrapper-signature churn.
+ *
+ * Engine response: `200 OK` with the full FlowableProcessDefinition body
+ * echoed back (confirmed in T-10 live probe per spec AC-13).
+ */
+const updateProcessDefinition = (id: string, fields: Partial<{ category: string }>) => {
+  // Empty body collides with the suspend/activate body discriminator on the same URL.
+  if (Object.keys(fields).length === 0)
+    throw new Error("updateProcessDefinition requires at least one field");
+  return request<FlowableProcessDefinition>("PUT", `/repository/process-definitions/${id}`, {
+    body: fields,
+  });
+};
 const getProcessDefinitionResource = (id: string): Promise<string> =>
   request<string>("GET", `/repository/process-definitions/${id}/resourcedata`, { raw: true });
 
@@ -607,13 +478,195 @@ const deleteProcessInstance = (id: string, reason?: string) =>
   );
 const getProcessInstanceVariables = (id: string) =>
   request<FlowableVariable[]>("GET", `/runtime/process-instances/${id}/variables`);
+/**
+ * Story 19.1: edit/add runtime variables on a running process instance.
+ *
+ * PUT body is ALWAYS an array — even single-variable edits pass
+ * `[{name, value, type, scope}]`. The engine returns 201 Created with a
+ * JSON-array body echoing each variable (see docs/runtime-caveats.md RC-15
+ * — every entry carries `scope: "local"` regardless of input; the GET-side
+ * read shows the actual persisted scope). The wrapper ignores the response
+ * body via `request<void>`; callers read state via the GET endpoint.
+ * 4xx errors come back as JSON `{"message":"Bad request","exception":"..."}`
+ * and are surfaced verbatim through ErrorBox per Pattern P-003. Verified
+ * live on flowable-rest 7.2.0 per docs/compat.md FR-19.
+ *
+ * The wrapper drops `scope: "global"` from the body — the engine treats an
+ * absent scope as global; only an explicit `scope: "local"` targets the
+ * current execution. Sending it both ways works (idempotent on global) but
+ * the minimum-wire convention matches Flowable's documented contract.
+ */
+const updateInstanceVariables = (instanceId: string, vars: FlowableVariableInput[]) => {
+  const body = vars.map((v) => {
+    const out: FlowableVariableInput = { name: v.name, value: v.value };
+    if (v.type !== undefined) out.type = v.type;
+    if (v.scope === "local") out.scope = "local";
+    return out;
+  });
+  return request<void>("PUT", `/runtime/process-instances/${instanceId}/variables`, { body });
+};
+/**
+ * Story 19.2: delete a single runtime variable by name from a running
+ * process instance.
+ *
+ * Funnels `DELETE /runtime/process-instances/{id}/variables/{name}` through
+ * `request()`. The variable name is `encodeURIComponent`-wrapped — variable
+ * names may contain periods, slashes, spaces, or unicode characters (e.g.
+ * `my.nested.key`, `with spaces`); without encoding, `foo/bar` would route
+ * to a different endpoint. Verified live on flowable-rest 7.2.0 per
+ * docs/compat.md FR-19 (the raw probe at line 150 deleted a variable named
+ * `probe` and reverted cleanly).
+ *
+ * Engine response on success: `204 No Content`. 4xx (e.g. variable doesn't
+ * exist) propagates verbatim through `<ErrorBox>` per Pattern P-003.
+ */
+const deleteInstanceVariable = (instanceId: string, name: string) =>
+  request<void>(
+    "DELETE",
+    `/runtime/process-instances/${instanceId}/variables/${encodeURIComponent(name)}`,
+  );
 const listTasks = (params?: QueryParams) =>
   request<FlowablePage<FlowableTask>>("GET", "/runtime/tasks", { params });
 const getTask = (id: string) => request<FlowableTask>("GET", `/runtime/tasks/${id}`);
 const taskAction = (taskId: string, action: string, body?: Record<string, unknown>) =>
   request<FlowableTask>("POST", `/runtime/tasks/${taskId}`, { body: { action, ...(body ?? {}) } });
+/**
+ * Story 21.1: edit fields on a runtime task (priority / dueDate / owner /
+ * assignee).
+ *
+ * Funnels `PUT /runtime/tasks/{id}` through `request()` with a partial-fields
+ * body (e.g. `{priority: 75, dueDate: null}`). Nullable string + datetime
+ * fields use `null` to clear — verified live on flowable-rest 7.2.0 per
+ * docs/compat.md FR-44 + the T-9 probe. Empty-string is silently coerced to
+ * `null` by the engine; the wrapper sends `null` for clarity.
+ *
+ * Two-method endpoint duality with `taskAction` (Story 11.x): both wrappers
+ * hit the SAME wire URL `/runtime/tasks/{id}`, but discriminated by HTTP
+ * method:
+ *   - POST {action: "claim" | "complete" | "delegate" | "resolve" | "unclaim"}
+ *     → action-verb path (`taskAction`)
+ *   - PUT  {<field>: <value>}
+ *     → field-patch path (`updateTask`)
+ * Per CLAUDE.md "Operator-feel UI labels can diverge from wire-level action
+ * verbs" (Story 12.2 codification), the two operator-feel actions get
+ * distinct wrappers. The `fields` parameter shape allows future scope
+ * extensions (name, description, category, parentTaskId, tenantId per
+ * compat.md line 61) to land as a type-level addition without churn.
+ *
+ * Priority is numeric (Flowable default = 50); the engine accepts 0-100 but
+ * the wrapper does NOT pre-validate — operator typos surface as engine 4xx.
+ * `dueDate` is ISO-8601 UTC; the caller is responsible for the local→UTC
+ * round-trip (see `<EditTaskModal>` + Story 12.2 `<input type="datetime-local">`
+ * convention).
+ *
+ * Engine response: `200 OK` with the echoed FlowableTask body.
+ */
+const updateTask = (
+  id: string,
+  fields: Partial<{
+    priority: number;
+    dueDate: string | null;
+    owner: string | null;
+    assignee: string | null;
+  }>,
+) => {
+  if (Object.keys(fields).length === 0) throw new Error("updateTask requires at least one field");
+  return request<FlowableTask>("PUT", `/runtime/tasks/${id}`, { body: fields });
+};
 const getTaskVariables = (taskId: string) =>
   request<FlowableVariable[]>("GET", `/runtime/tasks/${taskId}/variables`);
+
+/**
+ * Story 21.2: list a runtime task's attachments.
+ *
+ * Funnels `GET /runtime/tasks/{taskId}/attachments` through `request()`.
+ * Response shape: a BARE ARRAY of FlowableAttachment (NOT a paged envelope).
+ * Verified live on flowable-rest 7.2.0 per docs/compat.md FR-45.
+ */
+const listTaskAttachments = (taskId: string) =>
+  request<FlowableAttachment[]>("GET", `/runtime/tasks/${taskId}/attachments`);
+
+/**
+ * Story 21.2: add an attachment to a runtime task.
+ *
+ * Discriminated-union payload. The wrapper branches:
+ *   - `kind: "url"` → JSON POST through `request()` with body
+ *     `{name, description?, type?, externalUrl}`.
+ *   - `kind: "file"` → multipart POST that bypasses `request()` (FormData
+ *     body) but logs via the same envelope as `uploadDeployment`. Pattern
+ *     P-001 is preserved — the manual fetch() is intra-file.
+ *
+ * Multipart field names per Flowable's documented contract:
+ *   `name` / `description` (optional) / `type` (optional MIME) / `content`
+ *   (binary). The engine derives `id` / `time` / `userId` server-side.
+ *
+ * Engine response: `201 Created` (URL path) / `200 OK` (file path —
+ * varies per engine version; the wrapper accepts both via res.ok) with
+ * the echoed FlowableAttachment body. Verified live on flowable-rest 7.2.0
+ * per docs/compat.md FR-45.
+ */
+/**
+ * Story 21.3: fetch the binary content of a task attachment (file-mode only).
+ *
+ * Returns the raw `Response` so the caller picks the body method
+ * (`.blob()` for binary, `.text()` for text). Mirrors `getDeploymentResource`
+ * (Story 9.6) at the task-attachment level. URL-mode attachments are
+ * opened via their `externalUrl` directly — they do NOT use this wrapper.
+ *
+ * Engine response: `200 OK` with binary body. Verified live on
+ * flowable-rest 7.2.0 per docs/compat.md FR-45.
+ */
+const getTaskAttachmentContent = (taskId: string, attachmentId: string) =>
+  request<Response>("GET", `/runtime/tasks/${taskId}/attachments/${attachmentId}/content`, {
+    asResponse: true,
+  });
+
+/**
+ * Story 21.3: remove a task attachment by id.
+ *
+ * Funnels `DELETE /runtime/tasks/{taskId}/attachments/{attachmentId}` through
+ * `request()`. Symmetric pair with `addTaskAttachment` (Story 21.2).
+ *
+ * Engine response: `204 No Content`. Verified live on flowable-rest 7.2.0
+ * per docs/compat.md FR-45.
+ */
+const deleteTaskAttachment = (taskId: string, attachmentId: string) =>
+  request<void>("DELETE", `/runtime/tasks/${taskId}/attachments/${attachmentId}`);
+
+const addTaskAttachment = async (
+  taskId: string,
+  payload: AddAttachmentPayload,
+): Promise<FlowableAttachment> => {
+  if (payload.kind === "url") {
+    return request<FlowableAttachment>("POST", `/runtime/tasks/${taskId}/attachments`, {
+      body: {
+        name: payload.name,
+        description: payload.description,
+        type: payload.type,
+        externalUrl: payload.externalUrl,
+      },
+    });
+  }
+  const res = await multipartFetch(cfg.baseUrl, `/runtime/tasks/${taskId}/attachments`, () => {
+    const fd = new FormData();
+    fd.append("name", payload.name);
+    if (payload.description) fd.append("description", payload.description);
+    if (payload.type) fd.append("type", payload.type);
+    fd.append("content", payload.file, payload.name);
+    return fd;
+  });
+  return (await res.json()) as FlowableAttachment;
+};
+
+// Story 24.2: event subscriptions are runtime engine state (what messages /
+// signals / timers the engine is waiting on per running instance).
+// `/runtime/event-subscriptions` accepts processInstanceId, eventType,
+// eventName, tenantId, size, start, sort, order. Read-only — no per-id
+// mutation surface verified in compat.md.
+const listEventSubscriptions = (params?: QueryParams) =>
+  request<FlowablePage<FlowableEventSubscription>>("GET", "/runtime/event-subscriptions", {
+    params,
+  });
 
 // ── Form ──────────────────────────────────────────────────────────────────
 const getTaskForm = (taskId: string) =>
@@ -663,6 +716,28 @@ const timerJobStacktrace = (id: string): Promise<string> =>
 const deadLetterJobStacktrace = (id: string): Promise<string> =>
   request<string>("GET", `/management/deadletter-jobs/${id}/exception-stacktrace`, { raw: true });
 
+// Story 24.1 (FR-53): batch operations + per-part stacktrace. Read-only.
+// `batchPartStacktrace` uses `raw: true` — engine returns the stacktrace as
+// text/plain (mirrors `jobStacktrace` shape). 404 → FlowableError with
+// status === 404 → mapped to null at the panel via `fetchBatchPartStacktrace
+// OrNull` (status-aware error-probe per Epic 11 retro §4.4). Path ids are
+// `encodeURIComponent`-wrapped — defensive against engine-supplied ids that
+// might contain reserved characters (mirrors `deleteInstanceVariable` shape).
+const listBatches = (params?: QueryParams) =>
+  request<FlowablePage<FlowableBatch>>("GET", "/management/batches", { params });
+const getBatch = (id: string) =>
+  request<FlowableBatch>("GET", `/management/batches/${encodeURIComponent(id)}`);
+const listBatchParts = (batchId: string, params?: QueryParams) =>
+  request<FlowablePage<FlowableBatchPart>>(
+    "GET",
+    `/management/batches/${encodeURIComponent(batchId)}/batch-parts`,
+    { params },
+  );
+const batchPartStacktrace = (id: string): Promise<string> =>
+  request<string>("GET", `/management/batch-parts/${encodeURIComponent(id)}/exception-stacktrace`, {
+    raw: true,
+  });
+
 // ── History ──────────────────────────────────────────────────────────────
 const listHistoricInstances = (params?: QueryParams) =>
   request<FlowablePage<FlowableHistoricProcessInstance>>(
@@ -689,44 +764,25 @@ const listHistoricTasks = (params?: QueryParams) =>
   });
 
 // ── Identity ─────────────────────────────────────────────────────────────
-const listUsers = (params?: QueryParams) =>
-  request<FlowablePage<FlowableUser>>("GET", "/identity/users", { params });
-const getUser = (id: string) => request<FlowableUser>("GET", `/identity/users/${id}`);
-const listGroups = (params?: QueryParams) =>
-  request<FlowablePage<FlowableGroup>>("GET", "/identity/groups", { params });
-const getGroup = (id: string) => request<FlowableGroup>("GET", `/identity/groups/${id}`);
-// flowable-rest 7.2 OSS does NOT serve GET /identity/users/{userId}/groups —
-// the working recipe is GET /identity/groups?member={userId}, symmetric to
-// listGroupMembers's ?memberOfGroup={groupId} workaround above.
-const getUserGroups = (userId: string) =>
-  request<FlowablePage<FlowableGroup>>("GET", "/identity/groups", {
-    params: { member: userId },
-  });
-// flowable-rest 7.2 does not expose GET /identity/groups/{id}/members. The
-// supported recipe is GET /identity/users?memberOfGroup={id}, which returns
-// the FlowablePage<FlowableUser> in the group. Future flowable versions
-// may add the direct endpoint; if so, prefer it and deprecate this wrapper.
-const listGroupMembers = (groupId: string, params?: QueryParams) =>
-  request<FlowablePage<FlowableUser>>("GET", "/identity/users", {
-    params: { ...(params ?? {}), memberOfGroup: groupId },
-  });
-// Flowable 7.2 OSS exposes the group-centric membership-write endpoint:
-// POST /identity/groups/{groupId}/members with body {userId}. The inverse
-// user-centric route (POST /identity/users/{userId}/groups {groupId}) is
-// not honoured against a live engine — confirmed via Bruno during 14.3
-// post-closure verification.
-const addUserToGroup = (userId: string, groupId: string) =>
-  request<void>("POST", `/identity/groups/${groupId}/members`, { body: { userId } });
-// Symmetric pair to addUserToGroup. Flowable 7.2 OSS does NOT honour the
-// inverse user-centric DELETE /identity/users/{userId}/groups/{groupId}
-// path — the engine returns HTTP 500 "No endpoint DELETE ...". The working
-// recipe is DELETE /identity/groups/{groupId}/members/{userId}, mirroring
-// the group-centric POST above. Returns 204 No Content on success; 404 if
-// the membership doesn't exist; 403 if the caller lacks permission.
-// ErrorBox surfaces the verbatim engine message. First full application
-// of the Epic 13 retro §3.2 spec-symmetry discipline (14.3).
-const removeUserFromGroup = (userId: string, groupId: string) =>
-  request<void>("DELETE", `/identity/groups/${groupId}/members/${userId}`);
+// Identity-surface wrappers extracted to src/api-identity.ts per NFR-21
+// navigability (50 KB per-source-file limit). All wrappers funnel through
+// the same `request<T>` exported above; Pattern P-001 preserved.
+import {
+  addUserToGroup,
+  createGroup,
+  createUser,
+  deleteGroup,
+  deleteUser,
+  getGroup,
+  getUser,
+  getUserGroups,
+  listGroupMembers,
+  listGroups,
+  listUsers,
+  removeUserFromGroup,
+  updateGroup,
+  updateUser,
+} from "./api-identity";
 
 // Tenants are not exposed as a dedicated endpoint in flowable-rest 7.2.
 // Derive distinct tenantIds from deployments (truthy values only).
@@ -853,6 +909,46 @@ const removeDmnDeployment = (id: string, params?: { cascade?: boolean }) =>
     params?.cascade ? { params: { cascade: true }, base: dmnBase() } : { base: dmnBase() },
   );
 
+// ── App (mounted under /flowable-rest/app-api, not /service) ─────────────
+// Story 25.1: FR-55 scope-reduced — repository side only. The /app-runtime
+// half (app-instances) is unmounted in flowable-rest:7.2.0 (compat.md row 28).
+const listAppDefinitions = (params?: QueryParams) =>
+  request<FlowablePage<FlowableAppDefinition>>("GET", "/app-repository/app-definitions", {
+    params,
+    base: appBase(),
+  });
+
+// Story 25.1: list App-sub-app deployments.
+const listAppDeployments = (params?: QueryParams) =>
+  request<FlowablePage<FlowableDeployment>>("GET", "/app-repository/deployments", {
+    params,
+    base: appBase(),
+  });
+
+// Story 25.1: get a single app-definition by id — backs the
+// /app-definitions/$id detail route.
+const getAppDefinition = (id: string) =>
+  request<FlowableAppDefinition>("GET", `/app-repository/app-definitions/${id}`, {
+    base: appBase(),
+  });
+
+// Story 25.1: list resources bundled in an app-deployment. Returns an array
+// of { id, mediaType, type, url, contentUrl } where `type` is either
+// "appDefinition" (for the .app manifest) or "resource" (everything else).
+const listAppDeploymentResources = (deploymentId: string) =>
+  request<FlowableResource[]>("GET", `/app-repository/deployments/${deploymentId}/resources`, {
+    base: appBase(),
+  });
+
+// Story 25.1: binary content fetch for an app-deployment resource. Returns
+// the raw Response so callers pick .blob() / .text().
+const getAppDeploymentResource = (deploymentId: string, resourceName: string) =>
+  request<Response>(
+    "GET",
+    `/app-repository/deployments/${deploymentId}/resourcedata/${encodeURIComponent(resourceName)}`,
+    { asResponse: true, base: appBase() },
+  );
+
 // ── Deployment helpers (multipart upload) ────────────────────────────────
 // Flowable expects multipart/form-data, not the JSON-with-base64 shape we used
 // in mock mode. We build a FormData and send via raw fetch (bypassing request()
@@ -869,72 +965,54 @@ interface UploadOpts {
    */
   path?: string;
 }
+// Story 25.1: `content` widened from `string` to `string | Blob` so .bar /
+// .zip archives can be uploaded as binary Blob/File directly. Blob branch
+// pass-throughs without re-wrapping (wrapping a Blob in `new Blob([blob])`
+// works but is a wasteful copy). Existing `deployBpmn` / `deployDmn` callers
+// pass strings and are unaffected.
 const uploadDeployment = async (
   filename: string,
-  content: string,
+  content: string | Blob,
   type: string,
   opts: UploadOpts = {},
 ): Promise<FlowableDeployment> => {
-  const root = (opts.base || cfg.baseUrl).replace(/\/$/, "");
+  const root = opts.base || cfg.baseUrl;
   const path = opts.path || "/repository/deployments";
-  const url = root + path;
-  const t0 = performance.now();
-  const entry: ApiLogEntry = {
-    id: Math.random().toString(36).slice(2, 9),
-    method: "POST",
-    path,
-    url,
-    status: 0,
-    ms: 0,
-    at: new Date().toISOString(),
-  };
-  try {
-    // Multipart setup lives inside the try (Story 9.2, AC-7). FormData /
-    // Blob constructors and redactAuthHeader CAN throw — moving them inside
-    // the try ensures the entry lands in API_LOG with status=0 + the
-    // engine-visible error message even on these "throw before fetch" paths.
-    // Closes the Story 8.1 deferred-work item.
+  // FormData build happens inside multipartFetch's try (Story 9.2 AC-7) so a
+  // Blob constructor throw lands in API_LOG with status=0.
+  const res = await multipartFetch(root, path, () => {
     const fd = new FormData();
-    fd.append("file", new Blob([content], { type }), filename);
+    const blob = content instanceof Blob ? content : new Blob([content], { type });
+    fd.append("file", blob, filename);
     if (cfg.tenantId) fd.append("tenantId", cfg.tenantId);
     if (opts.deploymentName) fd.append("deploymentName", opts.deploymentName);
-
-    // Multipart uploads don't set Content-Type — fetch derives it from FormData.
-    // We mirror that in the captured headers (Authorization only), per AC-3.
-    const uploadHeaders: Record<string, string> = { Authorization: basicAuth() };
-    entry.headers = redactAuthHeader(uploadHeaders);
-    const res = await fetch(url, {
-      method: "POST",
-      headers: uploadHeaders,
-      body: fd,
-    });
-    entry.status = res.status;
-    entry.ms = Math.round(performance.now() - t0);
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      entry.error = text || `HTTP ${res.status}`;
-      logCall(entry);
-      throw new FlowableError(entry.error, res.status);
-    }
-    logCall(entry);
-    return (await res.json()) as FlowableDeployment;
-  } catch (err) {
-    if (entry.status === 0) {
-      entry.error = err instanceof Error ? err.message : String(err);
-      entry.ms = Math.round(performance.now() - t0);
-      logCall(entry);
-    }
-    throw err;
-  }
+    return fd;
+  });
+  return (await res.json()) as FlowableDeployment;
 };
 
 const deployBpmn = (name: string, xml: string) =>
   uploadDeployment(name, xml, "application/xml", { deploymentName: name });
-const deployDmn = (name: string, xml: string) =>
+// Story 25.1: signature widened — `content` accepts string XML or a Blob/File
+// (used by the .bar extractor that POSTs each bundled .dmn entry as a Blob).
+const deployDmn = (name: string, xml: string | Blob) =>
   uploadDeployment(name, xml, "application/xml", {
     deploymentName: name,
     base: dmnBase(),
     path: "/dmn-repository/deployments",
+  });
+// Story 25.1: deploy a Flowable App archive (.bar / .zip) through the App
+// sub-app. The AppDeployer cascades into BpmnDeployer + DmnDeployer for
+// bundled .bpmn / .dmn entries — a single POST registers the app-def AND
+// every bundled artefact. The child BPMN / DMN deployments are linked to
+// the app deployment via `parentDeploymentId` (the BPMN child appears in
+// /repository/deployments with parentDeploymentId pointing at this
+// app-deployment id, NOT at itself like a standalone BPMN deploy). RC-17.
+const deployBar = (filename: string, file: Blob | File) =>
+  uploadDeployment(filename, file, "application/zip", {
+    deploymentName: filename,
+    base: appBase(),
+    path: "/app-repository/deployments",
   });
 
 const ping = () => request<FlowableEngineInfo>("GET", "/management/engine");
@@ -979,7 +1057,9 @@ export const api = {
   getDeploymentResource,
   listProcessDefinitions,
   getProcessDefinition,
+  getProcessDefinitionFresh,
   suspendProcessDefinition,
+  updateProcessDefinition,
   getProcessDefinitionResource,
   // Runtime
   listProcessInstances,
@@ -987,10 +1067,18 @@ export const api = {
   startProcessInstance,
   deleteProcessInstance,
   getProcessInstanceVariables,
+  updateInstanceVariables,
+  deleteInstanceVariable,
   listTasks,
   getTask,
   taskAction,
+  updateTask,
   getTaskVariables,
+  listTaskAttachments,
+  addTaskAttachment,
+  getTaskAttachmentContent,
+  deleteTaskAttachment,
+  listEventSubscriptions,
   // Form
   getTaskForm,
   submitTaskForm,
@@ -1006,6 +1094,10 @@ export const api = {
   jobStacktrace,
   timerJobStacktrace,
   deadLetterJobStacktrace,
+  listBatches,
+  getBatch,
+  listBatchParts,
+  batchPartStacktrace,
   // History
   listHistoricInstances,
   getHistoricProcessInstance,
@@ -1021,6 +1113,12 @@ export const api = {
   listGroupMembers,
   addUserToGroup,
   removeUserFromGroup,
+  createUser,
+  updateUser,
+  deleteUser,
+  createGroup,
+  updateGroup,
+  deleteGroup,
   listTenants,
   // DMN
   listDecisions,
@@ -1032,8 +1130,15 @@ export const api = {
   removeDmnDeployment,
   listDmnHistoryExecutions,
   getDmnHistoryAuditdata,
+  // App (FR-55 scope-reduced)
+  listAppDefinitions,
+  getAppDefinition,
+  listAppDeployments,
+  listAppDeploymentResources,
+  getAppDeploymentResource,
   deployBpmn,
   deployDmn,
+  deployBar,
   ping,
   runRaw,
 };

@@ -1,0 +1,81 @@
+#!/bin/sh
+
+# Epic 26 retro AI-3 — non-blocking Row-3-splitting reminder.
+#
+# When the most recent commit has indicators of multi-row mixing (touches
+# >5 files OR mixes Row 1 bug-fixes with Row 3 scope expansion), print a
+# stderr reminder pointing to the Epic 14/15/16 retro AI-2 splitting rule.
+# Always exits 0 — non-blocking; the maintainer is the final authority.
+#
+# Trigger heuristics (ANY one fires the reminder):
+#   - File count > 5
+#   - Commit title mentions multiple distinct concerns separated by " — "
+#     AND title contains a "fix" / "feat" mix
+#   - Commit body contains a numbered enumeration of 3+ distinct concerns
+#     ("1." / "2." / "3." at line start)
+#
+# Suppress: prepend `[skip-row-check]` to the commit title to silence the
+# reminder for a known-cohesive multi-file commit (e.g., a refactor that
+# legitimately touches >5 files in one seam).
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO_ROOT" || exit 0
+
+# Skip if this is an amend / cherry-pick / rebase in progress — those
+# operations re-fire post-commit hooks and would spam the same reminder.
+if [ -f .git/CHERRY_PICK_HEAD ] || [ -f .git/REBASE_HEAD ] || [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; then
+  exit 0
+fi
+
+# Read the commit just made.
+TITLE="$(git log -1 --pretty=%s 2>/dev/null || echo '')"
+BODY="$(git log -1 --pretty=%b 2>/dev/null || echo '')"
+FILES="$(git diff-tree --no-commit-id --name-only -r HEAD 2>/dev/null || echo '')"
+FILE_COUNT="$(printf '%s\n' "$FILES" | grep -c . 2>/dev/null || echo 0)"
+
+# Suppress marker
+case "$TITLE" in
+  *"[skip-row-check]"*) exit 0 ;;
+esac
+
+# Heuristic 1: file count
+HIT_FILECOUNT=0
+[ "$FILE_COUNT" -gt 5 ] && HIT_FILECOUNT=1
+
+# Heuristic 2: title mixes "fix" + "feat" tags, or has " — " separator with multiple concerns
+HIT_TITLE_MIX=0
+case "$TITLE" in
+  *"fix"*"feat"*|*"feat"*"fix"*) HIT_TITLE_MIX=1 ;;
+esac
+# Em-dash separator + at least two clauses with " AND " / " + " connectors
+# suggests bundled concerns (e.g., "diagram sizing, marker colors, tab restructure").
+case "$TITLE" in
+  *" — "*", "*", "*) HIT_TITLE_MIX=1 ;;  # title with em-dash AND two commas → 3+ clauses
+esac
+
+# Heuristic 3: numbered enumeration in body (3+ distinct concerns)
+ENUM_COUNT=$(printf '%s\n' "$BODY" | grep -cE '^[[:space:]]*[1-9]\.[[:space:]]+[A-Z]' 2>/dev/null || echo 0)
+HIT_ENUM=0
+[ "$ENUM_COUNT" -ge 3 ] && HIT_ENUM=1
+
+# Fire?
+if [ "$HIT_FILECOUNT" = "1" ] || [ "$HIT_TITLE_MIX" = "1" ] || [ "$HIT_ENUM" = "1" ]; then
+  echo "" >&2
+  echo "⚠ Row-3-splitting reminder (Epic 14/15/16 retro AI-2 + Epic 26 retro AI-3):" >&2
+  echo "  This commit shows indicators of multi-row mixing:" >&2
+  [ "$HIT_FILECOUNT" = "1" ] && echo "    • file count: $FILE_COUNT (>5 threshold)" >&2
+  [ "$HIT_TITLE_MIX" = "1" ] && echo "    • title combines fix+feat tags OR enumerates multiple concerns" >&2
+  [ "$HIT_ENUM" = "1" ] && echo "    • body lists $ENUM_COUNT numbered concerns" >&2
+  echo "" >&2
+  echo "  Decision matrix (3 rows MUST NOT share a commit; bisect cost is high):" >&2
+  echo "    Row 1 — genuine bug-fix (engine / library surprise)" >&2
+  echo "    Row 2 — scope expansion within original story intent" >&2
+  echo "    Row 3 — scope expansion BEYOND original story intent (standalone feat:)" >&2
+  echo "" >&2
+  echo "  If this commit IS cohesive (single refactor, single migration, intentional bundle)," >&2
+  echo "  prepend '[skip-row-check]' to the commit title to silence this reminder." >&2
+  echo "  Otherwise consider: git reset --soft HEAD^ && stage + commit each row separately." >&2
+  echo "" >&2
+fi
+
+exit 0

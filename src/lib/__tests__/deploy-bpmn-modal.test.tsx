@@ -146,6 +146,34 @@ describe("<DeployBpmnModal>", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  // ─── Story 27.1 — "Save as new version" key-lock mode ──────────────
+  describe("lockKey mode (Story 27.1)", () => {
+    const lockedTarget: DeployBpmnModalTarget = { ...target, lockKey: true };
+
+    it("renders the key input read-only + a lock caption; name stays editable", () => {
+      render(<DeployBpmnModal target={lockedTarget} onConfirm={vi.fn()} onClose={vi.fn()} />);
+      const keyInput = screen.getByTestId("deploy-bpmn-key") as HTMLInputElement;
+      const nameInput = screen.getByTestId("deploy-bpmn-name") as HTMLInputElement;
+      expect(keyInput).toHaveAttribute("readonly");
+      expect(nameInput).not.toHaveAttribute("readonly");
+      expect(screen.getByTestId("deploy-bpmn-key-locked-caption")).toHaveTextContent(/Key locked/);
+    });
+
+    it("does NOT render the lock caption when lockKey is absent", () => {
+      render(<DeployBpmnModal target={target} onConfirm={vi.fn()} onClose={vi.fn()} />);
+      expect(screen.queryByTestId("deploy-bpmn-key-locked-caption")).toBeNull();
+      expect(screen.getByTestId("deploy-bpmn-key")).not.toHaveAttribute("readonly");
+    });
+
+    it("submits with the locked key + edited name (onConfirm still receives the locked key)", async () => {
+      const onConfirm = vi.fn().mockResolvedValue(undefined);
+      render(<DeployBpmnModal target={lockedTarget} onConfirm={onConfirm} onClose={vi.fn()} />);
+      fireEvent.change(screen.getByTestId("deploy-bpmn-name"), { target: { value: "v2 name" } });
+      fireEvent.click(screen.getByTestId("deploy-bpmn-submit"));
+      await waitFor(() => expect(onConfirm).toHaveBeenCalledWith("v2 name", "loanApproval"));
+    });
+  });
+
   it("restores focus to triggerRef.current on Cancel (Epic 9 retro A-4)", () => {
     const trigger = document.createElement("button");
     trigger.textContent = "Open Deploy";

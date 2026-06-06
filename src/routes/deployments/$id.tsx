@@ -6,15 +6,18 @@ import { api } from "../../api";
 import { DeploymentDetail } from "../../components/DeploymentDetail";
 import { ErrorBox } from "../../lib/error-box";
 
-// The deployments list merges BPMN + DMN rows (each tagged with `kind`).
-// DMN rows navigate here with `?kind=dmn` so the loader hits the right
-// sub-app — without it, the engine 404s for DMN ids on the BPMN namespace.
-// Default to "bpmn" so deep-link URLs from before the merge still resolve.
+// The deployments list merges BPMN + DMN + BAR rows (each tagged with
+// `kind`). DMN rows navigate here with `?kind=dmn` so the loader hits
+// the right sub-app — without it, the engine 404s for DMN ids on the
+// BPMN namespace. BAR rows live in the BPMN sub-app (Story 25.1 fan-out
+// posts the archive to /repository/deployments) so kind=bar uses the
+// same loader as kind=bpmn. Default to "bpmn" so deep-link URLs from
+// before the merge still resolve.
 const detailSearch = z.object({
-  kind: z.enum(["bpmn", "dmn"]).optional().default("bpmn"),
+  kind: z.enum(["bpmn", "dmn", "bar"]).optional().default("bpmn"),
 });
 
-export type DeploymentKind = "bpmn" | "dmn";
+export type DeploymentKind = "bpmn" | "dmn" | "bar";
 
 export const Route = createFileRoute("/deployments/$id")({
   validateSearch: detailSearch,

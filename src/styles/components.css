@@ -245,6 +245,80 @@
   color: var(--fg-mute);
 }
 
+/* Story 23.1 — connection-switch chip + popover listbox (FR-49). */
+.connection-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  font-size: 12.5px;
+  cursor: pointer;
+  color: var(--fg);
+  font-family: inherit;
+}
+.connection-switch:hover {
+  background: var(--bg-hover);
+}
+.connection-switch .caret {
+  color: var(--fg-mute);
+}
+.connection-picker-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 60;
+  min-width: 280px;
+  max-width: 420px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-md);
+}
+.connection-picker-popover ul {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.connection-picker-popover li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+.connection-picker-popover li:hover,
+.connection-picker-popover li:focus-visible {
+  background: var(--bg-hover);
+  outline: none;
+}
+.connection-picker-popover li[aria-selected="true"] {
+  border-left-color: var(--accent);
+  background: var(--bg-hover);
+}
+.connection-picker-popover li .conn-label {
+  font-weight: 500;
+  font-size: 12.5px;
+}
+.connection-picker-popover li .conn-baseurl {
+  font-size: 11px;
+  color: var(--fg-mute);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.connection-picker-popover .popover-footer {
+  border-top: 1px solid var(--line);
+  padding: 6px 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+
 .search {
   flex: 1;
   max-width: 460px;
@@ -540,6 +614,104 @@
   .skeleton-cell {
     animation: none;
   }
+}
+
+/* InstanceDiagramPanel (Story 26.1) — read-only NavigatedViewer host.
+   Explicit `height` (not `min-height`) is REQUIRED — bpmn-js' inner
+   `.djs-container` resolves `height: 100%` against the containing
+   block's height, and `min-height` does NOT establish that. With only
+   `min-height`, `.djs-container` collapses to its SVG content's
+   intrinsic size and `canvas.zoom("fit-viewport")` measures against
+   the wrong height, producing a tiny viewBox.
+   The skeleton reuses the @keyframes shimmer defined above for the
+   kpi / table skeletons (Pattern P-007 — single keyframe definition). */
+.instance-diagram-canvas {
+  height: 480px;
+  width: 100%;
+  background: var(--bg);
+  border-radius: var(--r-sm);
+  position: relative; /* gives `.djs-container`'s `position: absolute` (if set) a frame */
+}
+/* bpmn-js / diagram-js don't ship any CSS for .djs-container — host pages
+   own its sizing. Make it fill our explicit-height container so the
+   fit-viewport calculation measures against the real available area. */
+.instance-diagram-canvas .djs-container {
+  width: 100%;
+  height: 100%;
+}
+.diagram-skeleton {
+  height: 480px;
+  width: 100%;
+  background: linear-gradient(90deg, var(--bg-elev) 25%, var(--bg-hover) 50%, var(--bg-elev) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--r-sm);
+}
+@media (prefers-reduced-motion: reduce) {
+  .diagram-skeleton {
+    animation: none;
+  }
+}
+
+/* Story 26.2 — Activity overlay markers + legend.
+   `canvas.addMarker(activityId, "activity-{current,completed}")` from
+   bpmn-js applies the class to the rendered `<g class="djs-element">`
+   group. bpmn-js' BpmnRenderer sets `stroke` / `fill` via INLINE STYLE
+   attributes on the rendered SVG primitives, so CSS rules need
+   `!important` to override — consistent with diagram-js' own
+   `connect-ok` / `drop-ok` / `attach-ok` marker rules.
+   Token choice mirrors industry BPMN-tool convention: GREEN (--ok) for
+   completed + ORANGE/YELLOW (--warn) for current. Distinct hues
+   (~145° vs ~70-80°) AND distinct fill tints so the two classes pop
+   apart at-a-glance across all 8 look × theme combinations. */
+.djs-element.activity-completed .djs-visual > :nth-child(1) {
+  stroke: var(--ok) !important;
+  stroke-width: 2.5px !important;
+  fill: var(--ok) !important;
+  fill-opacity: 0.16 !important;
+}
+.djs-element.activity-current .djs-visual > :nth-child(1) {
+  stroke: var(--warn) !important;
+  stroke-width: 3.5px !important;
+  fill: var(--warn) !important;
+  fill-opacity: 0.22 !important;
+}
+/* Connections (sequence flows + message flows) — the first child of
+   `.djs-visual` is `<defs>` for the arrowhead, not the actual path.
+   Target the `<path>` directly so the stroke override paints the
+   visible line. */
+.djs-connection.activity-completed .djs-visual path {
+  stroke: var(--ok) !important;
+  stroke-width: 2.5px !important;
+}
+.djs-connection.activity-current .djs-visual path {
+  stroke: var(--warn) !important;
+  stroke-width: 3.5px !important;
+}
+
+.instance-diagram-legend {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--fg-mute);
+}
+.legend-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  vertical-align: middle;
+  margin-right: 6px;
+  border: 1.5px solid;
+}
+.legend-completed {
+  border-color: var(--ok);
+  background: color-mix(in oklch, var(--ok) 16%, transparent);
+}
+.legend-current {
+  border-color: var(--warn);
+  background: color-mix(in oklch, var(--warn) 22%, transparent);
 }
 
 /* RowActionMenu (Story 9.1) — keyboard-accessible `⋮` per-row action menu.

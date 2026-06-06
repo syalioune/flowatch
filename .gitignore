@@ -48,3 +48,6 @@ _bmad-output
 # *.local.json) are gitignored so contributors can add personal permission
 # allowlists without polluting the shared .claude/settings.json.
 .claude/*.local.json
+
+# TanStack Router generator tmp output (route codegen scratch)
+.tanstack/

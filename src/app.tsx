@@ -79,7 +79,7 @@ function App() {
     host: "connecting…",
   });
   const [navCounts, setNavCounts] = React.useState<
-    Partial<Record<"tasks" | "jobs" | "instances", number | null>>
+    Partial<Record<"tasks" | "jobs" | "instances" | "batches" | "events", number | null>>
   >({});
 
   React.useEffect(() => {
@@ -134,24 +134,41 @@ function App() {
     }
   }, []);
 
+  const refetchTenants = React.useCallback(async (): Promise<void> => {
+    try {
+      const tres = await api.listTenants();
+      const list = [DEFAULT_TENANT, ...(tres.data || [])];
+      setTenants(list);
+    } catch {}
+  }, []);
+
   React.useEffect(() => {
     void probe();
-    (async () => {
-      try {
-        const tres = await api.listTenants();
-        const list = [DEFAULT_TENANT, ...(tres.data || [])];
-        setTenants(list);
-      } catch {}
-    })();
-  }, [probe]);
+    void refetchTenants();
+  }, [probe, refetchTenants]);
 
+  // Story 23.1: a connection switch (Topbar `.connection-switch` chip OR the
+  // SettingsModal Manage section dropdown) funnels through `api.setConfig` →
+  // dispatches `conn:config-changed`. We re-probe, reset local tenant state
+  // to `All tenants` (cross-engine tenant lists differ — the previous engine's
+  // tenant id may not exist on the new one), re-fetch the tenant list, and
+  // invalidate the active route's loader (mirrors `cycleTenant`).
+  //
+  // Review patch: we do NOT call `api.setConfig({tenantId: ""})` here — that
+  // would (a) clobber the tenantId the just-selected `SavedConnection` wrote
+  // through `setActiveConnection`, and (b) re-dispatch `conn:config-changed`
+  // re-entering this same handler. The React `tenant` state reset is enough
+  // — the engine cfg's tenantId now reflects the new connection's choice.
   React.useEffect(() => {
     const handler = (): void => {
       void probe();
+      setTenant(DEFAULT_TENANT);
+      void refetchTenants();
+      void router.invalidate();
     };
     window.addEventListener("conn:config-changed", handler);
     return () => window.removeEventListener("conn:config-changed", handler);
-  }, [probe]);
+  }, [probe, refetchTenants, router]);
 
   // Sidebar count fetch — wrapped in a stable callback so the tenant-change
   // effect AND the `nav:invalidate-counts` window listener both call it.
@@ -170,12 +187,17 @@ function App() {
     // /jobs tabs (executable + timer + dead-letter) so the operator's
     // mental model matches the /jobs screen surface. Pre-Epic-12 this was
     // just listJobs.total (executable only).
-    const [tasks, jobs, timerJobs, deadJobs, instances] = await Promise.all([
+    // Story 24.1 / 24.2 follow-up: batches + events surfaces gain count
+    // badges. `size: 0` returns just `total` per Flowable's pagination
+    // contract (matches the existing tasks/jobs/instances shape).
+    const [tasks, jobs, timerJobs, deadJobs, instances, batches, events] = await Promise.all([
       api.listTasks({ size: 0 }).catch(() => null),
       api.listJobs({ size: 0 }).catch(() => null),
       api.listTimerJobs({ size: 0 }).catch(() => null),
       api.listDeadLetterJobs({ size: 0 }).catch(() => null),
       api.listProcessInstances({ size: 0 }).catch(() => null),
+      api.listBatches({ size: 0 }).catch(() => null),
+      api.listEventSubscriptions({ size: 0 }).catch(() => null),
     ]);
     if (seq !== refreshNavCountsSeq.current) return; // stale fetch — newer call in flight
     const totalJobs =
@@ -186,6 +208,8 @@ function App() {
       tasks: tasks?.total ?? null,
       jobs: totalJobs,
       instances: instances?.total ?? null,
+      batches: batches?.total ?? null,
+      events: events?.total ?? null,
     });
     // tenant.id is read indirectly via api.config() inside the API calls;
     // include it so the callback identity changes on tenant switch.

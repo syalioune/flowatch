@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * Instance Variables panel (Story 10.4).
+ * Instance Variables panel (Story 10.4 + Story 19.1 + Story 19.2).
  *
  * Replaces the inline two-column-grid panel that lived in the legacy
  * ProcessInstanceDetail component (since Story 13.1 the runtime panel is
@@ -9,9 +9,15 @@
  * contract (loading skeleton → ErrorBox → EmptyState → table) — same
  * shape Story 9.6 used for the Resources panel.
  *
- * Per Story 19.1 forward-reference: the per-row `Edit` button is a
- * disabled placeholder with `data-testid="variable-edit-placeholder"`
- * which 19.1 (milestone 0.0.3) swaps for a real edit modal.
+ * Story 19.1: per-row Edit button opens `<EditVariableModal>` and reloads
+ * the panel on success. Closed the Story 10.4 placeholder-then-real swap
+ * (CLAUDE.md "Cross-story sequencing" + Epic 10 retro §3.5).
+ *
+ * Story 19.2: the plain per-row Edit button is refactored to a
+ * `<RowActionMenu>` with Edit + Delete items; a panel-level "Add variable"
+ * button mounts an `<AddVariableModal>` that reuses
+ * `api.updateInstanceVariables` (PUT upsert semantics — same wrapper
+ * handles add + edit). Closes the Epic 19 FR-19 symmetric pair.
  *
  * Render-side truncation: variable values are bounded to 4 KB at render
  * time so a 100 KB JSON blob in `value` doesn't lock the main thread.
@@ -19,10 +25,15 @@
  * — see src/api.ts.
  */
 
+import { useRef, useState } from "react";
 import { api, type FlowableVariable } from "../api";
 import { Icon } from "../components";
+import { AddVariableModal } from "../lib/add-variable-modal";
+import { DeleteVariableModal } from "../lib/delete-variable-modal";
+import { EditVariableModal } from "../lib/edit-variable-modal";
 import { EmptyState, getEmptyState } from "../lib/empty-states";
 import { ErrorBox } from "../lib/error-box";
+import { RowActionMenu } from "../lib/row-action-menu";
 import { TableSkeleton } from "../lib/table-skeleton";
 import { useApi } from "../lib/useApi";
 
@@ -100,6 +111,15 @@ interface Props {
 export function InstanceVariablesPanel({ instance }: Props) {
   const variables = useApi(() => api.getProcessInstanceVariables(instance.id), [instance.id]);
   const list = variables.data ?? [];
+  const [editing, setEditing] = useState<FlowableVariable | null>(null);
+  const [deleting, setDeleting] = useState<FlowableVariable | null>(null);
+  const [adding, setAdding] = useState(false);
+  // Single shared row-trigger ref reassigned per RowActionMenu interaction —
+  // only one modal is open at a time (CLAUDE.md "Modal focus-restore via
+  // triggerRef"). The Add button has its own dedicated ref since it lives
+  // in the panel header (not a row that can be removed).
+  const rowTriggerRef = useRef<HTMLElement | null>(null);
+  const addBtnRef = useRef<HTMLButtonElement | null>(null);
 
   return (
     <div className="panel" style={{ marginTop: 18 }}>
@@ -117,6 +137,17 @@ export function InstanceVariablesPanel({ instance }: Props) {
         >
           GET /runtime/process-instances/{instance.id}/variables
         </span>
+        <button
+          ref={addBtnRef}
+          type="button"
+          className="btn"
+          data-size="sm"
+          data-testid="add-variable"
+          onClick={() => setAdding(true)}
+          style={{ marginLeft: 8 }}
+        >
+          Add variable
+        </button>
         <button
           type="button"
           className="icon-btn"
@@ -165,17 +196,41 @@ export function InstanceVariablesPanel({ instance }: Props) {
                     </span>
                   </td>
                   <td>{renderValue(v)}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="btn"
-                      data-size="sm"
-                      data-testid="variable-edit-placeholder"
-                      title="Available in 0.0.3 (Story 19.1)"
-                      disabled
-                    >
-                      Edit
-                    </button>
+                  <td
+                    onClick={(e) => {
+                      // Capture the row's RowActionMenu trigger so the modal
+                      // can focus-restore to it on close. The RowActionMenu's
+                      // trigger button is the click target inside this cell.
+                      const target = e.target as HTMLElement;
+                      const trigger = target.closest<HTMLButtonElement>(
+                        '[data-testid="row-action-trigger"]',
+                      );
+                      if (trigger) rowTriggerRef.current = trigger;
+                    }}
+                    onKeyDown={(e) => {
+                      const target = e.target as HTMLElement;
+                      const trigger = target.closest<HTMLButtonElement>(
+                        '[data-testid="row-action-trigger"]',
+                      );
+                      if (trigger) rowTriggerRef.current = trigger;
+                    }}
+                  >
+                    <RowActionMenu
+                      ariaLabel={`Open actions for ${v.name}`}
+                      items={[
+                        {
+                          label: "Edit",
+                          onSelect: () => setEditing(v),
+                          testId: `variable-edit-${v.name}`,
+                        },
+                        {
+                          label: "Delete",
+                          onSelect: () => setDeleting(v),
+                          danger: true,
+                          testId: `variable-delete-${v.name}`,
+                        },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}
@@ -183,6 +238,32 @@ export function InstanceVariablesPanel({ instance }: Props) {
           </table>
         )}
       </div>
+      <EditVariableModal
+        variable={editing}
+        instanceId={instance.id}
+        onClose={() => setEditing(null)}
+        onSuccess={() => variables.reload()}
+        triggerRef={rowTriggerRef}
+      />
+      <AddVariableModal
+        open={adding}
+        instanceId={instance.id}
+        existingNames={list.map((v) => v.name)}
+        onClose={() => setAdding(false)}
+        onSuccess={() => variables.reload()}
+        triggerRef={addBtnRef}
+      />
+      <DeleteVariableModal
+        variable={deleting}
+        instanceId={instance.id}
+        onClose={() => setDeleting(null)}
+        onDeleted={() => variables.reload()}
+        triggerRef={rowTriggerRef}
+        // After a successful delete, the row that owned rowTriggerRef is
+        // removed from the DOM. The modal falls back to the Add button so
+        // focus stays in the panel rather than dropping to <body>.
+        fallbackRef={addBtnRef}
+      />
     </div>
   );
 }

@@ -55,7 +55,7 @@ type Host = {
   getDmnDecisionResource: GetDmnDecisionResourceFn;
 };
 
-const renderDetail = (kind: "bpmn" | "dmn" = "bpmn") => {
+const renderDetail = (kind: "bpmn" | "dmn" | "bar" = "bpmn") => {
   const rootRoute = createRootRoute({
     component: () => <DeploymentDetail deployment={deployment} kind={kind} />,
   });

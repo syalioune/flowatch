@@ -93,6 +93,41 @@ fi
 # --- Commit + push -----------------------------------------------------------
 git -C "$PRIVATE_REPO" add -A
 
+# DAR-block discipline (Epic 18 retro AI-1): refuse to commit any story file
+# that flipped Status to review|done while DAR / Senior Developer Review (AI)
+# blocks still carry template placeholder strings. The skill-scoped lock in
+# _bmad/custom/bmad-dev-story.toml covers the skill path; this covers the
+# direct-commit path (see CLAUDE.md "Cross-story sequencing conventions").
+staged_stories=()
+while IFS= read -r rel; do
+  [ -z "$rel" ] && continue
+  case "$rel" in
+    _bmad-output/implementation-artifacts/*.md) staged_stories+=("$PRIVATE_REPO/$rel") ;;
+  esac
+done < <(git -C "$PRIVATE_REPO" diff --cached --name-only --diff-filter=ACMR)
+
+if [ ${#staged_stories[@]} -gt 0 ]; then
+  if [ -x "$REPO_ROOT/scripts/ci/check-dar-blocks.sh" ]; then
+    if ! bash "$REPO_ROOT/scripts/ci/check-dar-blocks.sh" "${staged_stories[@]}"; then
+      echo "✗ Refusing to commit — fix the violations above (CLAUDE.md / Epic 18 retro AI-1)." >&2
+      exit 1
+    fi
+  fi
+  # Closure-gate-probe discipline (Epic 26 retro AI-1 — 4th enforcement layer):
+  # refuse to commit any story file at Status: review|done that has unchecked
+  # probe paths without explicit [N/A — <reason>] deferral markers. Catches
+  # the substantive-content gap that the DAR-block hook (artifact-presence)
+  # cannot — Story 26.2 closed with the block populated but 3 of 5 probe
+  # paths deferred to "follow-up work" that immediately leaked into polish
+  # fix commits.
+  if [ -x "$REPO_ROOT/scripts/ci/check-closure-gate-probes.sh" ]; then
+    if ! bash "$REPO_ROOT/scripts/ci/check-closure-gate-probes.sh" "${staged_stories[@]}"; then
+      echo "✗ Refusing to commit — fix the violations above (CLAUDE.md / Epic 26 retro AI-1)." >&2
+      exit 1
+    fi
+  fi
+fi
+
 if git -C "$PRIVATE_REPO" diff --cached --quiet; then
   echo "✓ No staged changes in $(basename "$PRIVATE_REPO") — nothing to commit."
   exit 0

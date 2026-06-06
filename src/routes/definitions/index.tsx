@@ -46,7 +46,7 @@ export const Route = createFileRoute("/definitions/")({
   component: DefinitionsRoute,
   pendingComponent: () => (
     <PageChrome>
-      <TableSkeleton columns={6} rows={6} />
+      <TableSkeleton columns={7} rows={6} />
     </PageChrome>
   ),
   errorComponent: ({ error, reset }) => (
@@ -151,6 +151,7 @@ function DefinitionsRoute() {
             <th scope="col">Definition</th>
             <th scope="col">Key</th>
             <th scope="col">Version</th>
+            <th scope="col">Category</th>
             <th scope="col">Status</th>
             <th scope="col">Tenant</th>
             <th scope="col"></th>
@@ -179,6 +180,7 @@ function DefinitionsRoute() {
                 </td>
                 <td className="mono mute">{d.key}</td>
                 <td className="mono">v{d.version}</td>
+                <td>{d.category || <span className="mute">—</span>}</td>
                 <td>
                   <span className="badge" data-tone={isSuspended ? "warn" : "ok"}>
                     <span className="dot" />

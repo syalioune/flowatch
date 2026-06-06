@@ -14,7 +14,7 @@
  * Story 16.1 — extracted from src/modeler.tsx; established src/modeler/.
  */
 
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import BpmnModelerClass from "bpmn-js/lib/Modeler";
 import type EventBus from "diagram-js/lib/core/EventBus";
 import React from "react";
@@ -192,6 +192,16 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
   const [definitions, setDefinitions] = React.useState<FlowableProcessDefinition[]>([]);
   const [activeDef, setActiveDef] = React.useState<FlowableProcessDefinition | null>(null);
   const [filename, setFilename] = React.useState("loan-approval.bpmn20.xml");
+  // Story 27.1 — "Save as new version": after a version bump the modeler
+  // moves to the new version; this snapshot is the back-reference to the
+  // version we just came from, rendered as a "View previous version" link.
+  // Ephemeral component-local state — null on a fresh mount (no back-link
+  // until the operator performs an in-session version bump).
+  const [previousVersion, setPreviousVersion] = React.useState<{
+    id: string;
+    version: number;
+  } | null>(null);
+  const saveVersionBtnRef = React.useRef<HTMLButtonElement | null>(null);
 
   // Load list of deployed process definitions for the loader dropdown.
   React.useEffect(() => {
@@ -322,6 +332,13 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
   );
 
   const loadDefinition = async (id: string) => {
+    // Loading any definition clears the "View previous version" back-link.
+    // The version-bump path (doDeploy) re-sets it AFTER awaiting this call.
+    // LOAD-BEARING INVARIANT (Story 27.1): version-mode in doDeploy sets
+    // activeDef DIRECTLY and does NOT call loadDefinition — precisely so this
+    // clear does not wipe the freshly-set back-link. Do NOT route version-mode
+    // through loadDefinition without re-sequencing setPreviousVersion.
+    setPreviousVersion(null);
     if (!id) {
       setActiveDef(null);
       try {
@@ -450,6 +467,15 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
   const doDeploy = async (chosenName: string, chosenKey: string): Promise<void> => {
     const m = modelerRef.current;
     if (!m) throw new Error("BPMN modeler not ready");
+    // Story 27.1 — version mode is driven by the modal target's lockKey
+    // flag (set by handleSaveNewVersion). In version mode we snapshot the
+    // currently-loaded definition BEFORE the deploy swaps activeDef, then
+    // auto-switch to the new version + render the "View previous version"
+    // back-link. The wire-level call is the SAME api.deployBpmn multipart
+    // POST as the generic Deploy — Flowable auto-versions per key.
+    const versionMode = !!deployTarget?.lockKey;
+    const prevSnapshot =
+      versionMode && activeDef ? { id: activeDef.id, version: activeDef.version } : null;
     const { xml: rawXml } = await m.saveXML({ format: true });
     const xml = rewriteProcessKeyAndName(rawXml, chosenKey, chosenName);
     const deployment = await api.deployBpmn(filename, xml);
@@ -479,7 +505,33 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
     }
     await refresh;
     setCreatingNew(false);
-    if (newDef) {
+    if (versionMode && newDef && prevSnapshot) {
+      // AC-3: switch active selection + URL to the new version. The canvas
+      // already renders the content we just deployed, so we set activeDef
+      // directly from the fresh lookup rather than calling loadDefinition —
+      // loadDefinition resolves the def from the (stale-in-this-closure)
+      // dropdown list and would re-fetch identical XML. Setting state
+      // directly avoids both the stale-list miss and a redundant fetch.
+      navigate({ to: "/bpmn", search: { definitionId: newDef.id }, replace: true });
+      setActiveDef(newDef);
+      setFilename(`${newDef.key || "process"}.bpmn20.xml`);
+      setPreviousVersion(prevSnapshot);
+      toast({
+        kind: "success",
+        text: `Saved ${newDef.key} v${prevSnapshot.version} → v${newDef.version}`,
+        action: {
+          label: "Open the deployed definition",
+          testId: "open-deployed-definition",
+          onClick: () =>
+            navigate({
+              to: "/bpmn",
+              search: { definitionId: newDef.id },
+            }),
+        },
+      });
+    } else if (newDef) {
+      // Generic deploy — clear any stale back-link from a prior bump.
+      setPreviousVersion(null);
       toast({
         kind: "success",
         text: `Deployed ${deployment.name} → ${newDef.key} v${newDef.version}`,
@@ -503,6 +555,31 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
     }
   };
 
+  // ─── Story 27.1 — "Save as new version" ────────────────────────────
+  // OPERATOR-FEEL LABEL vs WIRE-LEVEL VERB (CLAUDE.md "Operator-feel UI
+  // labels can diverge from wire-level action verbs"):
+  //   - Operator-feel label: "Save as new version".
+  //   - Wire-level action: the SAME `api.deployBpmn` multipart POST as the
+  //     generic Deploy. Flowable has NO distinct "new version" endpoint —
+  //     versioning is an emergent property of redeploying under the same
+  //     process-definition key. There is intentionally NO `api.saveNewVersion`
+  //     wrapper; inventing one would imply a wire verb that does not exist.
+  // The load-bearing semantic is the KEY-LOCK: the modal opens with
+  // `lockKey: true` pinned to `activeDef.key`, so the operator cannot fork
+  // a new v1 family by editing the key. The name stays editable.
+  const handleSaveNewVersion = async () => {
+    if (!activeDef) return;
+    const m = modelerRef.current;
+    if (!m) return;
+    const fallbackName = bpmnReadableNameFromFilename(filename);
+    setDeployTarget({
+      defaultKey: activeDef.key,
+      defaultName: activeDef.name || fallbackName,
+      filename,
+      lockKey: true,
+    });
+  };
+
   // Story 16.3 AC-1: "New from scratch" — confirm-on-dirty, load BLANK,
   // clear ?definitionId= so the URL no longer points at any deployed def.
   const handleNew = async () => {
@@ -511,6 +588,7 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
       if (!ok) return;
     }
     setActiveDef(null);
+    setPreviousVersion(null);
     setFilename("new-process.bpmn20.xml");
     try {
       await importAndFit(BLANK_BPMN_XML);
@@ -596,6 +674,26 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
             </span>
           )}
           {dirty && <span style={{ color: "var(--warn)" }}>· unsaved</span>}
+          {previousVersion && activeDef && previousVersion.id !== activeDef.id && (
+            <Link
+              to="/bpmn"
+              search={{ definitionId: previousVersion.id }}
+              className="btn"
+              data-size="sm"
+              data-variant="ghost"
+              data-testid="bpmn-view-previous-version"
+              title="Load the version this one was saved from"
+              onClick={(e) => {
+                // Route through handleDropdownChange for unified confirm-on-
+                // dirty + URL sync; preventDefault stops the Link's own nav
+                // so we don't double-navigate.
+                e.preventDefault();
+                handleDropdownChange(previousVersion.id, activeDef.id);
+              }}
+            >
+              ← View previous version (v{previousVersion.version})
+            </Link>
+          )}
         </div>
         <div className="sep" />
         <select
@@ -648,6 +746,21 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
           <Icon name="upload" size={13} />
           {dirty ? "Deploy *" : "Deploy"}
         </button>
+        {activeDef && !creatingNew && (
+          <button
+            ref={saveVersionBtnRef}
+            type="button"
+            className="btn"
+            data-size="sm"
+            data-variant="ghost"
+            data-testid="bpmn-save-new-version"
+            onClick={handleSaveNewVersion}
+            title={`Deploy the current canvas as the next version of ${activeDef.key}`}
+          >
+            <Icon name="upload" size={13} />
+            Save as new version
+          </button>
+        )}
         <button type="button" className="btn" data-size="sm" data-variant="ghost" onClick={saveXML}>
           <Icon name="download" size={13} />
           Export XML
@@ -984,7 +1097,7 @@ POST /runtime/process-instances`}
         target={deployTarget}
         onConfirm={doDeploy}
         onClose={() => setDeployTarget(null)}
-        triggerRef={deployBtnRef}
+        triggerRef={deployTarget?.lockKey ? saveVersionBtnRef : deployBtnRef}
       />
     </div>
   );

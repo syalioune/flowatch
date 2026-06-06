@@ -35,6 +35,14 @@ export default {
   cleanTempDir: true,
   concurrency: 2,
   timeoutMS: 60000,
+  // Static mutants are mutations to module-top-level code that runs once
+  // at import time. Each one forces Stryker to re-import + re-execute the
+  // whole module tree per test — Stryker reported 76 static mutants (14%
+  // of total) consuming ~96% of runtime. Skipping them keeps the active
+  // mutation score honest (it still mutates every function body / branch
+  // / operator) while cutting wall time roughly 20x. See the runner
+  // warning at https://stryker-mutator.io/docs/mutation-testing-elements/static-mutants/
+  ignoreStatic: true,
   // Stryker copies the working tree into a sandbox per worker; we must
   // skip locally-only paths (symlinks, build output, prior reports) and
   // any artefacts gitignored at the repo level. Without these, `make

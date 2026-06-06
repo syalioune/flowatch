@@ -47,6 +47,12 @@ export interface EmptyStateEntry {
 
 export type ScreenKey =
   | "activeActivities"
+  | "appDefinitions"
+  | "attachments"
+  | "batches"
+  | "batchParts"
+  | "batchPartStacktrace"
+  | "bundledProcesses"
   | "decisions"
   | "decisionResource"
   | "definitions"
@@ -54,6 +60,8 @@ export type ScreenKey =
   | "deploymentResources"
   | "dmnDeployments"
   | "dmnExecutions"
+  | "eventSubscriptions"
+  | "eventSubscriptionsForInstance"
   | "groupMembers"
   | "groups"
   | "historicActivities"
@@ -62,6 +70,8 @@ export type ScreenKey =
   | "historicNoRecord"
   | "historicTasks"
   | "historicVariables"
+  | "instanceDiagram"
+  | "instanceDiagramNoXml"
   | "instances"
   | "instanceVariables"
   | "jobs"
@@ -100,6 +110,30 @@ export const emptyStates = {
     title: "No active activities right now.",
     body: "This instance is idle (awaiting a timer, a message, or a parallel branch to converge) — or all branches have completed.",
   },
+  appDefinitions: {
+    title: "No app definitions.",
+    body: "App definitions appear here when you upload a Flowable App archive (.bar or .zip) on the Deployments screen. The archive's bundled processes, decisions, and forms are listed on the deployment-detail page. App-runtime (running app sessions) is not exposed in this engine image — see compat.md FR-55.",
+  },
+  attachments: {
+    title: "No attachments on this task.",
+    body: "Attach a file (PDF, screenshot, log dump) or paste a link to external evidence. The engine stores file content; URL attachments are declarative pointers.",
+  },
+  batches: {
+    title: "No batches yet.",
+    body: "Batch operations appear here when a bulk delete, bulk migration, or admin-initiated async housekeeping job runs. Trigger one via the Flowable Modeler's bulk actions, or via REST (e.g., POST /history/historic-process-instances/delete-batch).",
+  },
+  batchParts: {
+    title: "No parts for this batch.",
+    body: "Parts appear here as the engine schedules them. An empty parts list usually means the batch failed to plan — check the batch status above for the failure reason.",
+  },
+  batchPartStacktrace: {
+    title: "No stacktrace available.",
+    body: "This part completed without raising an exception, or the engine has not yet flushed its error record. If the part status is 'failed', retry the panel refresh in a moment.",
+  },
+  bundledProcesses: {
+    title: "No bundled processes.",
+    body: "This deployment did not include any BPMN process definitions. App archives can carry processes, decisions, forms, or any subset — non-process bundles still register as deployments.",
+  },
   deploymentResources: {
     title: "No resources.",
     body: "This deployment has no files. That's unusual — deployments typically bundle at least one BPMN / DMN file.",
@@ -111,6 +145,14 @@ export const emptyStates = {
   dmnExecutions: {
     title: "No DMN executions yet.",
     body: "Decision executions appear here once you run a decision (Test execute from /decisions, or a process instance evaluates a Business Rule Task). The engine records each evaluation with inputs, outputs, hit policy, and timing.",
+  },
+  eventSubscriptions: {
+    title: "No event subscriptions.",
+    body: "Event subscriptions appear here when a running process instance is waiting on a message, signal, or timer. Deploy a BPMN with an intermediate message catch event (or signal / timer event) and start an instance to populate this list.",
+  },
+  eventSubscriptionsForInstance: {
+    title: "This instance is not waiting on any external triggers.",
+    body: "Event subscriptions appear here when the instance reaches an intermediate event catch (message, signal, timer). A purely synchronous workflow may never enter this state.",
   },
   historicActivities: {
     title: "No recorded activities for this instance yet.",
@@ -135,6 +177,14 @@ export const emptyStates = {
   historicVariables: {
     title: "No historic variables yet.",
     body: "Variables appear here once a process instance ends and the engine archives its variable history.",
+  },
+  instanceDiagram: {
+    title: "No diagram available.",
+    body: "The process definition couldn't be located — it may have been deleted, or this instance's deployment did not bundle a BPMN file.",
+  },
+  instanceDiagramNoXml: {
+    title: "No diagram resource for this definition.",
+    body: "The engine returned 404 for the BPMN XML resource. The definition exists but its source file wasn't bundled with the deployment — re-deploy the definition with the .bpmn / .bpmn20.xml file to populate the diagram.",
   },
   instances: {
     title: "No running process instances.",

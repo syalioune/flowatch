@@ -52,6 +52,14 @@ html,
 body {
   margin: 0;
   padding: 0;
+  /* Lock the document to the viewport. The `.app` shell already constrains
+     itself to 100vh + overflow:hidden, but Chromium reports an inflated
+     `documentElement.scrollHeight` (counts scrolled-internal content of
+     nested overflow:auto containers like `<main>` in some layouts), which
+     surfaces a spurious window-level scrollbar on top of `<main>`'s own
+     scrollbar. Pinning html+body to viewport height suppresses it. */
+  height: 100vh;
+  overflow: hidden;
 }
 body {
   font-family: var(--font-body);

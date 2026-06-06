@@ -1,6 +1,6 @@
 {
   "name": "flowatch",
-  "version": "0.0.2",
+  "version": "0.0.3-rc.1",
   "private": true,
   "description": "Modern Flowable 7 OSS REST GUI — BPMN/DMN modeler + runtime operations",
   "scripts": {
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome lint .",
     "format": "biome format --write .",
-    "check": "biome check .",
+    "check": "biome ci .",
     "check:p-001": "bash scripts/ci/check-fetch-funnel.sh",
     "check:p-001:test": "bash scripts/ci/__tests__/check-fetch-funnel.test.sh",
     "test": "vitest run",
@@ -63,6 +63,7 @@
     "conventional-changelog-conventionalcommits": "^7.0.2",
     "husky": "^9.1.7",
     "jsdom": "^25.0.1",
+    "jszip": "^3.10.1",
     "license-checker-rseidelsohn": "^4.4.2",
     "playwright": "^1.60.0",
     "semantic-release": "^25.0.3",

@@ -95,6 +95,9 @@ bmad-sync-no-push: ## Commit (no push) the private BMAD repo. Usage: make bmad-s
 	bash scripts/bmad-sync.sh --no-push -m "$(M)"
 bmad-status:       ## Print a one-line status of the private BMAD repo (no mutation)
 	@bash scripts/bmad-sync.sh --status-only
+.PHONY: check-dar
+check-dar:         ## Audit story files — fail if any at Status: review|done carries DAR/Senior-Dev-Review placeholder strings (Epic 18 retro AI-1)
+	@bash scripts/ci/check-dar-blocks.sh --all -d .
 
 # --- Release ---------------------------------------------------------------
 .PHONY: release release-preview release-preview-full release-dryrun

@@ -215,7 +215,11 @@ function HistoryRoute() {
   const navigate = useNavigate();
 
   const refresh = () => router.invalidate({ filter: (r) => r.routeId === "/history/" });
-  const openDetail = (id: string) => navigate({ to: "/instances/$id", params: { id } });
+  // Operator clicked a HISTORIC row → land on the History tab of the
+  // instance detail, not the default Runtime tab. The historic data is
+  // what the operator was looking at and clicked through to.
+  const openDetail = (id: string) =>
+    navigate({ to: "/instances/$id", params: { id }, search: { tab: "history" } });
 
   if (!data || data.data.length === 0) {
     const entry = emptyStateByType(type);

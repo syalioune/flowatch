@@ -19,7 +19,11 @@ import * as apiModule from "../api";
 import { loadDeployments } from "../routes/deployments/index";
 
 type ListFn = (p: unknown) => Promise<FlowablePage<FlowableDeployment>>;
-type ListHost = { listDeployments: ListFn; listDmnDeployments: ListFn };
+type ListHost = {
+  listDeployments: ListFn;
+  listDmnDeployments: ListFn;
+  listAppDeployments: ListFn;
+};
 type ConfigHost = { config: () => apiModule.FlowableConfig };
 
 function emptyPage(): FlowablePage<FlowableDeployment> {
@@ -34,10 +38,12 @@ describe("/deployments route loader", () => {
   const realConfig = apiModule.api.config;
   const realList = apiModule.api.listDeployments;
   const realListDmn = apiModule.api.listDmnDeployments;
+  const realListApp = apiModule.api.listAppDeployments;
   let bpmnParams: unknown = null;
   let dmnParams: unknown = null;
   let bpmnImpl: ListFn = () => Promise.resolve(emptyPage());
   let dmnImpl: ListFn = () => Promise.resolve(emptyPage());
+  let appImpl: ListFn = () => Promise.resolve(emptyPage());
 
   beforeEach(() => {
     bpmnParams = null;
@@ -50,6 +56,7 @@ describe("/deployments route loader", () => {
       dmnParams = p;
       return dmnImpl(p);
     });
+    (apiModule.api as unknown as ListHost).listAppDeployments = vi.fn((p: unknown) => appImpl(p));
     (apiModule.api as unknown as ConfigHost).config = () => ({
       baseUrl: "http://x/y",
       username: "u",
@@ -61,9 +68,11 @@ describe("/deployments route loader", () => {
   afterEach(() => {
     (apiModule.api as unknown as ListHost).listDeployments = realList as unknown as ListFn;
     (apiModule.api as unknown as ListHost).listDmnDeployments = realListDmn as unknown as ListFn;
+    (apiModule.api as unknown as ListHost).listAppDeployments = realListApp as unknown as ListFn;
     (apiModule.api as unknown as ConfigHost).config = realConfig;
     bpmnImpl = () => Promise.resolve(emptyPage());
     dmnImpl = () => Promise.resolve(emptyPage());
+    appImpl = () => Promise.resolve(emptyPage());
   });
 
   it("calls listDeployments with the AC-1 defaults (size 50, sort deployTime desc)", async () => {
@@ -124,6 +133,42 @@ describe("/deployments route loader", () => {
     expect(result.data.map((r) => r.id)).toEqual(["b1"]);
     expect(result.data[0]?.kind).toBe("bpmn");
     expect(result.dmnError).toBe("No endpoint POST /flowable-rest/dmn-api/…");
+  });
+
+  it("tags BPMN rows as kind='bar' when parentDeploymentId ≠ id (Story 25.1)", async () => {
+    // A .bar uploaded via /app-api/app-repository/deployments spawns a child
+    // BPMN deployment whose parentDeploymentId points at the app-deployment
+    // (NOT itself). Standalone BPMN deploys carry parentDeploymentId === id.
+    // The mismatch is the BAR signature.
+    bpmnImpl = () =>
+      Promise.resolve({
+        ...emptyPage(),
+        data: [
+          {
+            id: "b1",
+            name: "loan-app",
+            deploymentTime: "2026-06-02T10:00:00Z",
+            tenantId: "",
+            parentDeploymentId: "app-1",
+          },
+          {
+            id: "b2",
+            name: "ship-it",
+            deploymentTime: "2026-06-02T08:00:00Z",
+            tenantId: "",
+            parentDeploymentId: "b2",
+          },
+          {
+            id: "b3",
+            name: "legacy-no-parent",
+            deploymentTime: "2026-06-02T07:00:00Z",
+            tenantId: "",
+          },
+        ],
+      });
+    dmnImpl = () => Promise.resolve(emptyPage());
+    const result = await loadDeployments();
+    expect(result.data.map((r) => `${r.kind}:${r.id}`)).toEqual(["bar:b1", "bpmn:b2", "bpmn:b3"]);
   });
 
   it("BPMN endpoint failure THROWS — preserves the route's errorComponent slot", async () => {

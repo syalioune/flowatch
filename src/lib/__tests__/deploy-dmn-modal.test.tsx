@@ -140,6 +140,34 @@ describe("<DeployDmnModal>", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  // ─── Story 27.1 — "Save as new version" key-lock mode ──────────────
+  describe("lockKey mode (Story 27.1)", () => {
+    const lockedTarget: DeployDmnModalTarget = { ...target, lockKey: true };
+
+    it("renders the id input read-only + a lock caption; name stays editable", () => {
+      render(<DeployDmnModal target={lockedTarget} onConfirm={vi.fn()} onClose={vi.fn()} />);
+      const keyInput = screen.getByTestId("deploy-dmn-key") as HTMLInputElement;
+      const nameInput = screen.getByTestId("deploy-dmn-name") as HTMLInputElement;
+      expect(keyInput).toHaveAttribute("readonly");
+      expect(nameInput).not.toHaveAttribute("readonly");
+      expect(screen.getByTestId("deploy-dmn-key-locked-caption")).toHaveTextContent(/Id locked/);
+    });
+
+    it("does NOT render the lock caption when lockKey is absent", () => {
+      render(<DeployDmnModal target={target} onConfirm={vi.fn()} onClose={vi.fn()} />);
+      expect(screen.queryByTestId("deploy-dmn-key-locked-caption")).toBeNull();
+      expect(screen.getByTestId("deploy-dmn-key")).not.toHaveAttribute("readonly");
+    });
+
+    it("submits with the locked id + edited name (onConfirm still receives the locked id)", async () => {
+      const onConfirm = vi.fn().mockResolvedValue(undefined);
+      render(<DeployDmnModal target={lockedTarget} onConfirm={onConfirm} onClose={vi.fn()} />);
+      fireEvent.change(screen.getByTestId("deploy-dmn-name"), { target: { value: "v2 name" } });
+      fireEvent.click(screen.getByTestId("deploy-dmn-submit"));
+      await waitFor(() => expect(onConfirm).toHaveBeenCalledWith("v2 name", "Definitions_loan"));
+    });
+  });
+
   it("restores focus to triggerRef.current on Cancel", () => {
     const trigger = document.createElement("button");
     trigger.textContent = "Open Deploy";

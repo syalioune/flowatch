@@ -21,11 +21,19 @@ import { RowActionMenu } from "../../lib/row-action-menu";
 import { TableSkeleton } from "../../lib/table-skeleton";
 import { UploadDeploymentModal } from "../../lib/upload-deployment-modal";
 
-export type DeploymentKind = "bpmn" | "dmn";
+export type DeploymentKind = "bpmn" | "dmn" | "bar";
 
 export interface TaggedDeployment extends FlowableDeployment {
   kind: DeploymentKind;
 }
+
+// Story 25.1: BPMN deployments backed by a .bar upload are CHILDREN of the
+// App-sub-app deployment that the AppDeployer spawned for them. Standalone
+// BPMN deploys carry `parentDeploymentId === id` (engine sets it = self);
+// app-spawned BPMN children carry `parentDeploymentId` pointing at the
+// app-deployment id. The mismatch is the BAR discriminator.
+const isBarChild = (d: FlowableDeployment): boolean =>
+  !!d.parentDeploymentId && d.parentDeploymentId !== d.id;
 
 export interface DeploymentsLoaderData {
   data: TaggedDeployment[];
@@ -60,7 +68,10 @@ export const loadDeployments = async (): Promise<DeploymentsLoaderData> => {
     api.listDmnDeployments(dmnParams),
   ]);
   if (bpmnRes.status === "rejected") throw bpmnRes.reason;
-  const bpmnRows: TaggedDeployment[] = bpmnRes.value.data.map((d) => ({ ...d, kind: "bpmn" }));
+  const bpmnRows: TaggedDeployment[] = bpmnRes.value.data.map((d) => ({
+    ...d,
+    kind: isBarChild(d) ? "bar" : "bpmn",
+  }));
   const dmnRows: TaggedDeployment[] =
     dmnRes.status === "fulfilled" ? dmnRes.value.data.map((d) => ({ ...d, kind: "dmn" })) : [];
   const dmnError =
@@ -276,7 +287,9 @@ function DeploymentsRoute() {
                 <td>
                   <b style={{ fontWeight: 500 }}>{d.name || "—"}</b>
                 </td>
-                <td className="mono mute">{d.kind === "bpmn" ? "BPMN" : "DMN"}</td>
+                <td className="mono mute">
+                  {d.kind === "bar" ? "BAR" : d.kind === "dmn" ? "DMN" : "BPMN"}
+                </td>
                 <td className="mono mute">{d.id}</td>
                 <td className="mono">{d.tenantId || <span className="mute">—</span>}</td>
                 <td className="mute mono">{fmtTime(d.deploymentTime)}</td>

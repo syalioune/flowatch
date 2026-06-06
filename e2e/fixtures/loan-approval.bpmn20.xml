@@ -12,4 +12,29 @@
     <sequenceFlow id="flow2" sourceRef="approveTask" targetRef="end"/>
     <endEvent id="end" name="Decision made"/>
   </process>
+  <!-- BPMNDiagram added 2026-05-30 (Story 26.1) so bpmn-js NavigatedViewer
+       can render the diagram inside <InstanceDiagramPanel>. Coordinates are
+       minimal hand-authored placement — flow rendering is correct, exact
+       pixel positions are not load-bearing for any e2e assertion. -->
+  <bpmndi:BPMNDiagram id="BPMNDiagram_loanApproval">
+    <bpmndi:BPMNPlane id="BPMNPlane_loanApproval" bpmnElement="loanApproval">
+      <bpmndi:BPMNShape id="start_di" bpmnElement="start">
+        <omgdc:Bounds x="100" y="100" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="approveTask_di" bpmnElement="approveTask">
+        <omgdc:Bounds x="200" y="78" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end_di" bpmnElement="end">
+        <omgdc:Bounds x="360" y="100" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow1_di" bpmnElement="flow1">
+        <omgdi:waypoint x="136" y="118"/>
+        <omgdi:waypoint x="200" y="118"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow2_di" bpmnElement="flow2">
+        <omgdi:waypoint x="300" y="118"/>
+        <omgdi:waypoint x="360" y="118"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
 </definitions>

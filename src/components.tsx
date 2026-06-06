@@ -4,8 +4,11 @@ import { Link } from "@tanstack/react-router";
 import React from "react";
 import noticeContent from "../NOTICE?raw";
 import { API_LOG, type ApiLogEntry, api, type FlowableConfig, type HTTPMethod } from "./api";
+import { ConnectionSwitch } from "./components/ConnectionSwitch";
+import { ManageConnectionsPanel } from "./components/ManageConnectionsPanel";
 import { buildCurlCommand, CURL_MULTIPART, CURL_UNSERIALIZABLE } from "./lib/curl";
 import { errorStatus } from "./lib/error";
+import { randomId } from "./lib/random-id";
 import { type RouteEndpoint, useRouteMeta } from "./lib/route-meta";
 
 interface ApiLogEvent extends CustomEvent<ApiLogEntry> {}
@@ -275,7 +278,7 @@ interface NavItem {
   label: string;
   icon: string;
   /** Key into the `counts` map (only set for items that show a count badge). */
-  countsKey?: "tasks" | "jobs" | "instances";
+  countsKey?: "tasks" | "jobs" | "instances" | "batches" | "events";
 }
 
 interface NavGroup {
@@ -298,6 +301,8 @@ const NAV: NavGroup[] = [
       { path: "/tasks", label: "Tasks", icon: "task", countsKey: "tasks" },
       { path: "/instances", label: "Process instances", icon: "instance", countsKey: "instances" },
       { path: "/jobs", label: "Jobs", icon: "job", countsKey: "jobs" },
+      { path: "/batches", label: "Batches", icon: "job", countsKey: "batches" },
+      { path: "/events", label: "Events", icon: "bell", countsKey: "events" },
       { path: "/history", label: "History", icon: "history" },
     ],
   },
@@ -305,6 +310,7 @@ const NAV: NavGroup[] = [
     group: "Repository",
     items: [
       { path: "/deployments", label: "Deployments", icon: "deploy" },
+      { path: "/app-definitions", label: "App definitions", icon: "deploy" },
       { path: "/definitions", label: "Process definitions", icon: "def" },
       { path: "/decisions", label: "Decisions", icon: "decision" },
     ],
@@ -326,7 +332,9 @@ interface ConnectionState {
 interface SidebarProps {
   connection: ConnectionState;
   onConnClick: () => void;
-  counts?: Partial<Record<"tasks" | "jobs" | "instances", number | null | undefined>>;
+  counts?: Partial<
+    Record<"tasks" | "jobs" | "instances" | "batches" | "events", number | null | undefined>
+  >;
 }
 
 // @migration-any: TanStack Router's LinkProps does not expose data-* attribute pass-through. Tracked in #119.
@@ -356,7 +364,12 @@ export const Sidebar = ({ connection, onConnClick, counts }: SidebarProps) => (
               >
                 <Icon name={it.icon} />
                 <span>{it.label}</span>
-                {count != null && <span className="nav-count">{count}</span>}
+                {count != null && (
+                  <span className="nav-count">
+                    <span className="sr-only">Count: </span>
+                    {count}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -404,6 +417,7 @@ export const Topbar = ({
   onTweaks,
 }: TopbarProps) => (
   <div className="topbar">
+    <ConnectionSwitch onSettings={onSettings} />
     <div className="tenant-switch" data-testid="tenant-switch" onClick={onTenant}>
       <Icon name="tenant" size={13} />
       <span>
@@ -592,6 +606,7 @@ export const SettingsModal = ({ open, onClose }: SettingsModalProps) => {
                   </span>
                 )}
               </div>
+              <ManageConnectionsPanel onCloseSettings={onClose} />
             </div>
             <div className="modal-ft">
               <button type="button" className="btn" onClick={onClose}>
@@ -945,6 +960,7 @@ export const ApiInspector = ({
         >
           Recent calls
           <span className="nav-count" style={{ marginLeft: 6 }}>
+            <span className="sr-only">Count: </span>
             {log.length}
           </span>
         </div>
@@ -1261,7 +1277,7 @@ export const Toaster = () => {
   const [items, setItems] = React.useState<ToastItem[]>([]);
   React.useEffect(() => {
     const onToast = (e: AppToastEvent) => {
-      const id = Math.random().toString(36).slice(2);
+      const id = randomId(10);
       const t: ToastItem = { id, kind: "info", ttl: 4000, ...e.detail };
       setItems((xs) => [...xs, t]);
       setTimeout(() => setItems((xs) => xs.filter((x) => x.id !== id)), t.ttl);

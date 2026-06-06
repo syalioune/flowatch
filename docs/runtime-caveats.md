@@ -386,6 +386,121 @@ When the source is a TypeScript template literal (e.g. [src/modeler/starters.ts]
 
 ---
 
+## RC-15 — `PUT /runtime/process-instances/{id}/variables` echoes `scope:"local"` regardless of input; 4xx body is JSON, not plain text
+
+**Naive intuition:** the engine's PUT response for `/runtime/process-instances/{id}/variables` either returns `204 No Content` (typical REST PUT convention) or echoes the array exactly as sent — including a missing `scope` field when none was sent. A 4xx error body is plain text matching the engine's `RuntimeException.getMessage()`.
+
+**Actual behaviour:** flowable-rest 7.2.0 returns:
+
+1. **`201 Created` on success** (NOT 204), with a JSON body — an array echoing each variable. Every entry carries `"scope":"local"` even when no scope was sent in the request. The variable's actual stored scope (read back via `GET /runtime/process-instances/{id}/variables/{name}`) is `null` (= global). The PUT-response `scope` is a wire-level echo from the engine's pre-persist normalisation; it does NOT reflect what was persisted.
+
+2. **4xx errors are JSON objects** with the shape `{"message":"Bad request","exception":"<engine exception class + summary>"}`. Probed verbatim:
+
+```bash
+# success (note: input has NO scope; response echoes scope:"local")
+$ curl -X PUT $BASE/runtime/process-instances/$PIID/variables \
+  -d '[{"name":"amount","value":2500,"type":"integer"}]'
+# HTTP 201
+[{"name":"amount","type":"integer","value":2500,"scope":"local"}]
+
+$ curl $BASE/runtime/process-instances/$PIID/variables/amount
+# HTTP 200
+{"name":"amount","type":"integer","value":2500,"scope":null}
+
+# failure (type-coercion mismatch)
+$ curl -X PUT $BASE/runtime/process-instances/$PIID/variables \
+  -d '[{"name":"amount","value":"not-a-number","type":"integer"}]'
+# HTTP 400
+{"message":"Bad request","exception":"Converter can only convert integers"}
+```
+
+**Workaround:** ignore the PUT response body (the wrapper uses `request<void>`); read variable state via the GET endpoint when the operator needs to see what persisted. Treat 4xx JSON as opaque — `<ErrorBox>` renders the raw bytes per Pattern P-003 (the operator sees `{"message":"Bad request","exception":"Converter can only convert integers"}` verbatim, which is more useful than any rewritten copy). Do NOT introduce a parser for the engine's JSON error shape; the verbatim message IS the diagnostic.
+
+**Surfaced by:** Story 19.1 live-engine probe (2026-05-28) — the spec assumed `request<void>` resolves cleanly on 201 (it does) and that 4xx error bodies are plain text (they're not — JSON). Both assumptions hold downstream because (a) `request<void>` ignores the response body and (b) `<ErrorBox>` renders `error.message` verbatim regardless of shape. Documented for future stories that touch `/runtime/*/variables` PUT (Story 19.2 Add path) and any future story that programmatically interprets a PUT echo.
+
+**Extended by Story 19.2 live-engine probe (2026-05-28):**
+- `PUT /runtime/process-instances/{id}/variables` returns `201 Created` for BOTH insert (new name) AND update (existing name overwritten). The engine does NOT use `200 OK` to distinguish upsert insert vs update — always `201`. Operator-feel implication: the modal can't tell if the operator just created a new variable or overwrote an existing one from the HTTP status alone; the client-side duplicate-name warning (Add modal AC-3) carries the disambiguation.
+- `DELETE /runtime/process-instances/{id}/variables/{name}` on a non-existent name returns `404 Not Found` with JSON body `{"message":"Not found","exception":"Execution '<id>' does not have a variable '<name>' in scope local"}`. The exception message mentions `"in scope local"` even when the path has no scope — same scope-echo shape as the PUT response above. The verbatim message is operator-friendly enough.
+- DELETE is NOT idempotent: re-deleting an already-deleted name returns 404 (not 204). The one-shot destructive `<DeleteVariableModal>` toast surfaces this verbatim — operator-feel-adequate.
+- Variable names containing dots (`my.nested.key`) and UTF-8 unicode (`unicode-üñî`) round-trip cleanly via PUT (JSON body) and DELETE (URL-encoded path segment). `encodeURIComponent` is non-negotiable on the path; the spec's AC-1 wrapper bakes it in.
+
+---
+
+## RC-16 — `PUT /repository/process-definitions/{id}` persists `category` to the DB but the single-GET endpoint serves the BPMN-cached value, not the persisted one
+
+**Naive intuition:** PUT a new `category`, then GET the same id and observe the new value. Symmetric writes and reads — REST convention.
+
+**Actual behaviour:** flowable-rest 7.2.0 splits the read paths between two storage tiers and only ONE tier reflects PUT updates:
+
+1. **`PUT /repository/process-definitions/{id}` with `{"category": "X"}` returns `200 OK`** with the echoed body. The engine writes `X` to `act_re_procdef.category_` in the database (verified via `psql -c 'SELECT category_ FROM act_re_procdef WHERE id_=…'`).
+
+2. **`GET /repository/process-definitions/{id}` (single)** reads `category` from the engine's process-definition cache, which is populated at deploy time from the BPMN file's `<definitions targetNamespace="…">` attribute (or a `category` attribute if explicitly set — non-standard). PUT updates do NOT invalidate this cache, so the single-GET keeps returning the BPMN-derived value forever.
+
+3. **`GET /repository/process-definitions?…` (list)** reads `category` directly from `act_re_procdef.category_` via the JPA query. The DB-persisted value DOES surface here.
+
+The contradiction is observable in a single session:
+
+```bash
+# Fresh deploy of a BPMN with targetNamespace="http://flowable.org/bpmn"
+# and no explicit `category` attribute → category = "http://flowable.org/bpmn"
+
+$ curl -X PUT $BASE/repository/process-definitions/$DEF \
+    -H "Content-Type: application/json" -d '{"category":"finance"}'
+# HTTP 200 — body echoes "category":"finance"
+
+$ curl $BASE/repository/process-definitions/$DEF
+# HTTP 200 — body says "category":"http://flowable.org/bpmn"    ← STALE
+
+$ curl "$BASE/repository/process-definitions?deploymentId=$DEP"
+# HTTP 200 — body says "category":"finance"                     ← FRESH
+
+$ psql -c "SELECT category_ FROM act_re_procdef WHERE id_='$DEF'"
+# category_ = "finance"                                          ← FRESH
+```
+
+The LIST endpoint's `id` and `processDefinitionId` query filters are SILENTLY IGNORED (a follow-up quirk: filters like `?id=$DEF` return the entire unfiltered page). The reliable per-id filters are `key=` (matches all versions of the key — JS-filter to the specific id) or `deploymentId=` (matches all definitions in that deployment — JS-filter to the id). `category=` works as expected (it's the underlying DB query column).
+
+**Workaround:** for any code path that loads a process definition AFTER a `PUT /repository/process-definitions/{id}` (i.e., the operator just edited the category), read via the list endpoint, NOT via the single-GET. The `api.getProcessDefinitionFresh(id)` wrapper in [src/api.ts](../src/api.ts) implements the workaround: extract `key` from the engine's `id` format (`key:version:UUID`), call `GET /repository/process-definitions?key=$KEY&size=200`, JS-filter by id. Falls through to the single-GET if the list doesn't surface the id (defensive — shouldn't happen for a deployed definition). The route loader at [src/routes/definitions/$id.tsx](../src/routes/definitions/$id.tsx) uses the fresh variant; the original `api.getProcessDefinition(id)` wrapper is preserved unchanged for any callers that explicitly want the single-GET (currently no in-tree consumers; reserved for future cache-aware uses).
+
+**Surfaced by:** Story 20.1 live-engine probe + E2E walkthrough (2026-05-30). The story spec assumed the single-GET would reflect the PUT (compat.md FR-43 line 60 / line 149 documented the PUT but did NOT verify GET-after-PUT consistency on the single endpoint — only the list endpoint and the manual psql probe confirmed persistence). Without this caveat, the operator-feel UX is "I saved a category but the detail page still shows the old value, even after refresh — did the save really work?". The list-endpoint workaround makes the detail page reflect the new value on the very next route load.
+
+Filed downstream notes for follow-up:
+- The behaviour is reproducible on the `flowable/all-in-one:7.2.0` container with PostgreSQL backend.
+- This affects any future story that needs to read fresh per-id state for fields the engine caches at deploy time. Epic 21 task PUT touches `/runtime/tasks/{id}` (runtime tier, not deployment-cached) so likely won't hit this quirk; Epic 22 user/group PUT touches `/identity/*` which has its own data path. Re-probe if symptoms surface there.
+
+---
+
+## RC-17 — Flowable App `.bar` archives MUST be deployed via the App sub-app, not the BPMN sub-app
+
+**Naive intuition:** any of the Flowable sub-app deployment endpoints will fully process a `.bar` archive (extracting bundled BPMN + DMN + app metadata).
+
+**Actual behaviour:** only `POST /flowable-rest/app-api/app-repository/deployments` triggers the full chain. The App engine's `AppDeployer` cascades into `BpmnDeployer` and `DmnDeployer` for bundled `.bpmn20.xml` / `.dmn` entries, AND creates corresponding child deployments in the BPMN and DMN sub-apps with `parentDeploymentId` pointing back at the original app-deployment id. The bundled processes / decisions become queryable via `/repository/process-definitions` and `/dmn-repository/decisions` in the normal way.
+
+`POST /repository/deployments` (BPMN sub-app) accepts a `.bar` but only registers the bundled BPMN processes — the `.app` manifest is stored as a passthrough resource (NOT parsed); bundled `.dmn` files are NOT registered. `POST /dmn-repository/deployments` (DMN sub-app) outright rejects `.bar` with `"File must be of type .dmn"`.
+
+**The `.app` manifest MUST be JSON, not XML.** An XML `<appModel>` shape (which the published "Flowable App Model" XSDs describe) returns `"Error reading app resource"` on upload. The working shape mirrors Flowable Modeler's exported JSON:
+
+```json
+{
+  "key": "loanApp",
+  "name": "Loan App",
+  "description": "...",
+  "theme": "theme-1",
+  "icon": "glyphicon-asterisk",
+  "models": [
+    { "id": 1, "name": "Loan Process", "key": "loanProcess", "modelType": 0, "version": 1 }
+  ]
+}
+```
+
+**The `.app` manifest's `models[].key` MUST match the bundled `.bpmn20.xml`'s `<process id="...">`.** When the keys disagree, `AppDeployer` silently skips the BPMN extraction step (the engine logs "Processing app resource" but never the matching `BpmnDeployer: processing resource` line) and no child BPMN deployment is created. The same applies to DMN entries via `modelType: 4`.
+
+**Workaround:** Flowatch's `api.deployBar` wrapper ([src/api.ts](../src/api.ts)) POSTs to `/app-api/app-repository/deployments` — a single multipart upload covers app-def + BPMN + DMN registration. The child BPMN deployment that the engine spawns appears in `/repository/deployments` with `parentDeploymentId` pointing at the parent app-deployment id (standalone BPMN deploys carry `parentDeploymentId === id`); the parent-vs-self mismatch is the BAR discriminator the `/deployments` list loader uses to tag rows as `kind="bar"` ([src/routes/deployments/index.tsx](../src/routes/deployments/index.tsx)).
+
+**Surfaced by:** Story 25.1 live-engine probes (2026-06-01 / 2026-06-02). The first walkthrough chose the BPMN endpoint (per spec) and discovered the missing app-def registration. A second walkthrough fanned the archive across all three sub-apps in parallel and hit the `act_uniq_procdef` unique-key collision. The third walkthrough — driven by an operator probe with a Flowable-Modeler-exported `orderApp.bar` — confirmed that the App sub-app alone handles the cascade correctly, and the manifest-vs-BPMN key mismatch silently suppresses the BPMN extraction (the failure mode is "no error, just no child BPMN registration"). The implementation now POSTs `.bar` archives to `/app-api/app-repository/deployments` exclusively.
+
+---
+
 ## How to extend this file
 
 When a review surfaces a runtime quirk that meets all three of:
