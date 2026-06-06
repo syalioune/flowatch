@@ -85,6 +85,9 @@ export default defineConfig({
           bpmn: ["bpmn-js"],
           dmn: ["dmn-js"],
           react: ["react", "react-dom"],
+          // Story 28.4 (ADR-009): OIDC libs in their own chunk so the ~bundle
+          // weight only loads when an OIDC connection mounts <AuthProvider>.
+          oidc: ["react-oidc-context", "oidc-client-ts"],
         },
       },
     },

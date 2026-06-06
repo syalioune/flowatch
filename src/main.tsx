@@ -2,6 +2,7 @@
 
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import ReactDOM from "react-dom/client";
+import { resolveOidcProviderConfig } from "./lib/oidc-accessor";
 // Self-hosted IBM Plex faces must register before any layout-affecting CSS.
 import "./styles/fonts.css";
 import "./lib/route-meta";
@@ -38,4 +39,17 @@ declare module "@tanstack/react-router" {
 
 const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("root element not found");
-ReactDOM.createRoot(rootEl).render(<RouterProvider router={router} />);
+
+// Story 28.4 (ADR-009): when the active connection is OIDC, dynamically import
+// the react-oidc-context provider (its own `oidc` Vite chunk) and wrap the app
+// in <AuthProvider>. For Basic/Bearer users the chunk never loads — the
+// tree-shake intent. The dynamic import is the lazy boundary.
+const tree = <RouterProvider router={router} />;
+const oidcCfg = resolveOidcProviderConfig();
+if (oidcCfg) {
+  import("./lib/oidc-provider").then(({ renderWithOidc }) => {
+    renderWithOidc(rootEl, tree, oidcCfg);
+  });
+} else {
+  ReactDOM.createRoot(rootEl).render(tree);
+}

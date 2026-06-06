@@ -40,6 +40,13 @@ export default defineConfig({
         "src/__tests__/**",
         "src/lib/**/__tests__/**",
         "src/lib/window-events.ts",
+        // Story 28.4: thin react-oidc-context binding/bootstrap shim
+        // (<AuthProvider> wiring + the useAuth() bridge). Exercising it needs a
+        // live provider + IdP; like main.tsx it is bootstrap/binding glue, not
+        // runtime logic. The plain-TS half (oidc-accessor.ts — singleton +
+        // resolveOidcProviderConfig) IS covered; the strategy + dispatcher are
+        // covered. Smoke-verified at the Epic 28 batch clean-state e2e.
+        "src/lib/oidc-provider.tsx",
       ],
       // ## Coverage thresholds
       //

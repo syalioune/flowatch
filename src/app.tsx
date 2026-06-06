@@ -11,7 +11,10 @@ import {
   Toaster,
   Topbar,
 } from "./components";
-import { installStrategyForActiveConnection } from "./lib/install-auth-strategy";
+import {
+  installStrategyForActiveConnection,
+  reloadIfOidcProviderMismatch,
+} from "./lib/install-auth-strategy";
 import { KeyboardCheatsheetModal } from "./lib/keyboard-cheatsheet-modal";
 import {
   NAV_INVALIDATE_COUNTS,
@@ -168,8 +171,14 @@ function App() {
   // Topbar quick-switch / Manage dropdown). The Auth-tab Save calls the
   // dispatcher itself; this listener covers the switch path.
   React.useEffect(() => {
+    // Mount: install only (no reload — main.tsx already mounted the correct
+    // provider for the persisted active kind, so a reload would be redundant /
+    // could loop). Switch: install + reload if the OIDC provider state changed.
     installStrategyForActiveConnection();
-    const handler = (): void => installStrategyForActiveConnection();
+    const handler = (): void => {
+      installStrategyForActiveConnection();
+      reloadIfOidcProviderMismatch();
+    };
     window.addEventListener(SAVED_CONNECTIONS_CHANGED, handler);
     return () => window.removeEventListener(SAVED_CONNECTIONS_CHANGED, handler);
   }, []);

@@ -112,3 +112,43 @@ export class BearerAuthStrategy implements AuthStrategy {
     this.onAuthFailure();
   }
 }
+
+/**
+ * Minimal structural view of the OIDC token accessor (Story 28.4). Declared
+ * locally so `auth-strategy.ts` stays free of any `react-oidc-context` /
+ * bridge import — the dispatcher injects a getter that returns the real
+ * accessor (or null when the provider isn't mounted).
+ */
+export interface OidcAccessorLike {
+  getToken(): Promise<string | null>;
+  signIn(): void;
+}
+
+/**
+ * OIDC (Authorization Code + PKCE) concrete (Story 28.4 — the N=3 strategy).
+ *
+ * `authorizationHeader()` is the async seam's payoff (Story 28.1 made it async
+ * FOR this): it `await`s the bridge accessor's `getToken()`, which may silent-
+ * renew before returning the in-memory access token. `null` (not signed in /
+ * renew failed) → no header → engine 401 → `onUnauthorized()` re-initiates the
+ * interactive flow (react-oidc-context tries silent-first internally).
+ *
+ * The accessor is INJECTED via a getter (not imported) so this file never pulls
+ * in react-oidc-context — preserving the OIDC tree-shake (ADR-009) and keeping
+ * `auth-strategy.ts` React-free. NFR-11: the token lives only in the bridge's
+ * in-memory store; this class never persists it.
+ */
+export class OidcAuthStrategy implements AuthStrategy {
+  readonly kind = "oidc" as const;
+  private readonly accessor: () => OidcAccessorLike | null;
+  constructor(accessor: () => OidcAccessorLike | null) {
+    this.accessor = accessor;
+  }
+  async authorizationHeader(): Promise<string | null> {
+    const token = (await this.accessor()?.getToken()) ?? null;
+    return token ? `Bearer ${token}` : null;
+  }
+  async onUnauthorized(): Promise<void> {
+    this.accessor()?.signIn();
+  }
+}
