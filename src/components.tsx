@@ -495,11 +495,13 @@ export const Topbar = ({
 interface SettingsModalProps {
   open: boolean;
   onClose: () => void;
+  /** Story 28.3: open directly on a given tab (e.g. "authentication" on 401). */
+  initialTab?: SettingsTab | undefined;
 }
 
 type PingResult = { ok: true; name?: string; version?: string } | { ok: false; error: string };
 
-type SettingsTab = "connection" | "authentication" | "about";
+export type SettingsTab = "connection" | "authentication" | "about";
 
 // Story 28.2: Settings → Authentication tab. Edits the ACTIVE connection's
 // auth method (the one from getActiveConnection()). Editing a non-active
@@ -696,11 +698,16 @@ function SettingsAuthTab() {
   );
 }
 
-export const SettingsModal = ({ open, onClose }: SettingsModalProps) => {
+export const SettingsModal = ({ open, onClose, initialTab }: SettingsModalProps) => {
   const [cfg, setCfg] = React.useState<FlowableConfig>(api.config());
   const [pinging, setPinging] = React.useState(false);
   const [pingRes, setPingRes] = React.useState<PingResult | null>(null);
   const [tab, setTab] = React.useState<SettingsTab>("connection");
+  // Story 28.3: when opened with an explicit initialTab (e.g. a 401 routes the
+  // operator to "authentication"), jump straight to it.
+  React.useEffect(() => {
+    if (open && initialTab) setTab(initialTab);
+  }, [open, initialTab]);
   if (!open) return null;
   const save = () => {
     api.setConfig(cfg);

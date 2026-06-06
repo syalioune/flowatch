@@ -73,3 +73,42 @@ export class BasicAuthStrategy implements AuthStrategy {
   }
   // onUnauthorized intentionally undefined — Basic has no refresh recovery.
 }
+
+/**
+ * Bearer (paste-a-token) concrete (Story 28.3 — the N=2 strategy).
+ *
+ * Produces `Authorization: Bearer <token>` from the active connection's
+ * persisted `authStrategyConfig.config.token` (Story 23.2 storage). The token
+ * is OPAQUE to Flowatch — NO JWT parse, NO `exp` check, NO refresh (refresh is
+ * OIDC's job, Story 28.4). An expired token → engine 401 → `onUnauthorized()`
+ * opens Settings at the Auth tab for a re-paste.
+ *
+ * Storage posture: the token persists in plaintext localStorage (Story 23.2
+ * AC-7 — parity with Basic credentials; the `auth-bearer-help` advisory warns
+ * the operator).
+ *
+ * Both constructor args are getters/callbacks (not snapshots / direct imports):
+ * - `token: () => string` reads the active connection's token LIVE each call,
+ *   so a re-paste in Settings takes effect without re-installing the strategy
+ *   (mirrors BasicAuthStrategy's creds getter). Empty/whitespace token →
+ *   `null` → no Authorization header → engine 401 → onUnauthorized recovers.
+ * - `onAuthFailure: () => void` is INJECTED (not a direct app/event import) so
+ *   `auth-strategy.ts` stays free of app/event dependencies. The dispatcher
+ *   (install-auth-strategy.ts) wires it to dispatch OPEN_SETTINGS_AUTH.
+ */
+export class BearerAuthStrategy implements AuthStrategy {
+  readonly kind = "bearer" as const;
+  private readonly token: () => string;
+  private readonly onAuthFailure: () => void;
+  constructor(token: () => string, onAuthFailure: () => void) {
+    this.token = token;
+    this.onAuthFailure = onAuthFailure;
+  }
+  async authorizationHeader(): Promise<string | null> {
+    const t = this.token().trim();
+    return t === "" ? null : `Bearer ${t}`;
+  }
+  async onUnauthorized(): Promise<void> {
+    this.onAuthFailure();
+  }
+}

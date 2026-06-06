@@ -3,10 +3,21 @@
 import { Outlet, useNavigate, useRouter } from "@tanstack/react-router";
 import React from "react";
 import { api } from "./api";
-import { ApiInspector, SettingsModal, Sidebar, Toaster, Topbar } from "./components";
+import {
+  ApiInspector,
+  SettingsModal,
+  type SettingsTab,
+  Sidebar,
+  Toaster,
+  Topbar,
+} from "./components";
 import { installStrategyForActiveConnection } from "./lib/install-auth-strategy";
 import { KeyboardCheatsheetModal } from "./lib/keyboard-cheatsheet-modal";
-import { NAV_INVALIDATE_COUNTS, SAVED_CONNECTIONS_CHANGED } from "./lib/nav-events";
+import {
+  NAV_INVALIDATE_COUNTS,
+  OPEN_SETTINGS_AUTH,
+  SAVED_CONNECTIONS_CHANGED,
+} from "./lib/nav-events";
 import { useRouteMeta } from "./lib/route-meta";
 import { listShortcutsByCategory } from "./lib/shortcuts";
 import "./lib/window-events";
@@ -71,6 +82,9 @@ function App() {
   const [focusEntry, setFocusEntry] = React.useState<{ id: string; seq: number } | null>(null);
   const focusSeqRef = React.useRef(0);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = React.useState<SettingsTab | undefined>(
+    undefined,
+  );
   const [cheatsheetOpen, setCheatsheetOpen] = React.useState(false);
   const navigate = useNavigate();
   const [tenants, setTenants] = React.useState<Tenant[]>([DEFAULT_TENANT]);
@@ -158,6 +172,19 @@ function App() {
     const handler = (): void => installStrategyForActiveConnection();
     window.addEventListener(SAVED_CONNECTIONS_CHANGED, handler);
     return () => window.removeEventListener(SAVED_CONNECTIONS_CHANGED, handler);
+  }, []);
+
+  // Story 28.3: a 401 under Bearer (BearerAuthStrategy.onUnauthorized) dispatches
+  // OPEN_SETTINGS_AUTH so the operator can re-paste a token. Open Settings at the
+  // Authentication tab. Idempotent under a 401 retry-storm — opening an already-
+  // open modal at the same tab is a no-op (React bails on identical state).
+  React.useEffect(() => {
+    const handler = (): void => {
+      setSettingsInitialTab("authentication");
+      setSettingsOpen(true);
+    };
+    window.addEventListener(OPEN_SETTINGS_AUTH, handler);
+    return () => window.removeEventListener(OPEN_SETTINGS_AUTH, handler);
   }, []);
 
   // Story 23.1: a connection switch (Topbar `.connection-switch` chip OR the
@@ -420,7 +447,11 @@ function App() {
         focusEntry={focusEntry}
       />
 
-      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        initialTab={settingsInitialTab}
+      />
 
       <KeyboardCheatsheetModal open={cheatsheetOpen} onClose={() => setCheatsheetOpen(false)} />
 

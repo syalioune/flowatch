@@ -47,14 +47,15 @@ test.describe("Settings → Authentication tab (Story 28.2 — FR-4)", () => {
     await expect(page.getByTestId("auth-tab-active-label")).toContainText("Default");
   });
 
-  test("switch to Bearer reveals token textarea + dormancy note; Save persists bearer", async ({
+  test("switch to Bearer reveals token textarea (no dormancy); Save persists bearer", async ({
     page,
   }) => {
     await page.locator(openSettings).click();
     await page.getByTestId("settings-tab-authentication").click();
     await page.getByTestId("auth-kind-bearer").click();
     await expect(page.getByTestId("auth-bearer-token")).toBeVisible();
-    await expect(page.getByTestId("auth-dormancy-note")).toBeVisible();
+    // Story 28.3: Bearer is live — dormancy note is OIDC-only.
+    await expect(page.getByTestId("auth-dormancy-note")).toHaveCount(0);
     await page.getByTestId("auth-bearer-token").fill("tok-abc");
     await page.getByTestId("auth-tab-save").click();
     await expect(page.locator(".toast", { hasText: "Authentication updated" })).toBeVisible();
@@ -90,6 +91,19 @@ test.describe("Settings → Authentication tab (Story 28.2 — FR-4)", () => {
     const raw = await page.evaluate(() => localStorage.getItem("flowatch.connections.v1"));
     // Still basic — the invalid OIDC config never persisted.
     expect(raw).not.toContain('"kind":"oidc"');
+  });
+
+  test("OPEN_SETTINGS_AUTH opens Settings directly on the Authentication tab (Story 28.3)", async ({
+    page,
+  }) => {
+    // Simulates BearerAuthStrategy.onUnauthorized firing on a 401. The app
+    // listener must open Settings AND select the Authentication tab.
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent("settings:open-auth")));
+    await expect(page.getByTestId("settings-tab-authentication")).toHaveAttribute(
+      "data-active",
+      "1",
+    );
+    await expect(page.getByTestId("auth-tab-save")).toBeVisible();
   });
 
   test("switch back to Basic + Save keeps the engine reachable (live Basic)", async ({ page }) => {

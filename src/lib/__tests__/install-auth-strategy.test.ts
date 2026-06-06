@@ -8,11 +8,12 @@
  * reads getActiveConnection() and installs into the real api funnel.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../api";
-import { type AuthStrategy, BasicAuthStrategy } from "../auth-strategy";
+import { type AuthStrategy, BasicAuthStrategy, BearerAuthStrategy } from "../auth-strategy";
 import type { AuthStrategyConfig } from "../auth-strategy-config";
 import { DormantAuthStrategy, installStrategyForActiveConnection } from "../install-auth-strategy";
+import { OPEN_SETTINGS_AUTH } from "../nav-events";
 import { type SavedConnectionsState, STORAGE_KEY } from "../saved-connections";
 
 const seed = (asc: AuthStrategyConfig | undefined) => {
@@ -63,12 +64,24 @@ describe("installStrategyForActiveConnection", () => {
     expect(api.getAuthStrategy().kind).toBe("basic");
   });
 
-  it("installs a kind:'bearer' DormantAuthStrategy for a bearer connection", () => {
+  it("installs a live BearerAuthStrategy for a bearer connection (Story 28.3)", async () => {
     seed({ kind: "bearer", config: { token: "tok-123" } });
     installStrategyForActiveConnection();
     const s = api.getAuthStrategy();
     expect(s.kind).toBe("bearer");
-    expect(s).toBeInstanceOf(DormantAuthStrategy);
+    expect(s).toBeInstanceOf(BearerAuthStrategy);
+    // The installed strategy reads the persisted token live → Bearer header.
+    expect(await s.authorizationHeader()).toBe("Bearer tok-123");
+  });
+
+  it("Bearer onUnauthorized dispatches OPEN_SETTINGS_AUTH (Story 28.3)", async () => {
+    seed({ kind: "bearer", config: { token: "tok-123" } });
+    installStrategyForActiveConnection();
+    const spy = vi.fn();
+    window.addEventListener(OPEN_SETTINGS_AUTH, spy);
+    await api.getAuthStrategy().onUnauthorized?.();
+    window.removeEventListener(OPEN_SETTINGS_AUTH, spy);
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 
   it("installs a kind:'oidc' DormantAuthStrategy for an oidc connection", () => {

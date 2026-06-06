@@ -65,8 +65,9 @@ export const AuthStrategyFields: React.FC<AuthStrategyFieldsProps> = ({
   onOidcScopesChange,
   disabled = false,
 }) => {
-  // Story 28.3 narrows this to `kind === "oidc"`; Story 28.4 removes it.
-  const showDormancy = kind === "bearer" || kind === "oidc";
+  // Story 28.3 narrowed this to OIDC-only (Bearer is now live); Story 28.4
+  // removes it entirely.
+  const showDormancy = kind === "oidc";
   return (
     <>
       <div>
