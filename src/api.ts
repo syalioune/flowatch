@@ -103,6 +103,7 @@ import type {
   RequestOpts,
 } from "./api-types";
 import { FlowableError } from "./api-types";
+import { type AuthStrategy, BasicAuthStrategy } from "./lib/auth-strategy";
 import { randomId } from "./lib/random-id";
 
 // ── Config + storage ──────────────────────────────────────────────────────
@@ -230,7 +231,23 @@ const qs = (params?: QueryParams): string => {
   return s ? "?" + s : "";
 };
 
-const basicAuth = (): string => "Basic " + btoa(`${cfg.username}:${cfg.password}`);
+// ── Pluggable auth strategy (Story 28.1 — ADR-009) ────────────────────────
+//
+// The active strategy produces the Authorization header for every request()
+// and multipartFetch() call. Default is BasicAuthStrategy reading cfg via a
+// getter closure (so api.setConfig() + connection switches are reflected
+// without re-installing). Story 28.2's install dispatcher swaps this on
+// connection-active per the persisted authStrategyConfig.kind.
+let authStrategy: AuthStrategy = new BasicAuthStrategy(() => ({
+  username: cfg.username,
+  password: cfg.password,
+}));
+export function setAuthStrategy(s: AuthStrategy): void {
+  authStrategy = s;
+}
+export function getAuthStrategy(): AuthStrategy {
+  return authStrategy;
+}
 
 // Shared multipart POST envelope used by `uploadDeployment` (Story 9.2) and
 // `addTaskAttachment` file path (Story 21.2). Bypasses `request()` because the
@@ -256,7 +273,12 @@ const multipartFetch = async (
   };
   try {
     const fd = buildFd();
-    const headers: Record<string, string> = { Authorization: basicAuth() };
+    // Story 28.1: delegate the Authorization header to the active strategy
+    // (this path is the non-obvious SECOND seam point — miss it and Bearer/
+    // OIDC uploads silently leak Basic). `null` → no header sent.
+    const headers: Record<string, string> = {};
+    const authHeader = await authStrategy.authorizationHeader();
+    if (authHeader !== null) headers.Authorization = authHeader;
     entry.headers = redactAuthHeader(headers);
     const res = await fetch(url, { method: "POST", headers, body: fd });
     entry.status = res.status;
@@ -306,10 +328,14 @@ export async function request<T = unknown>(
   };
 
   try {
+    // Story 28.1: the active AuthStrategy produces the Authorization header
+    // (async — chosen for OIDC's on-demand token refresh, Story 28.4). `null`
+    // → no Authorization header sent (reserved no-auth / empty-token case).
     const headers: Record<string, string> = {
-      Authorization: basicAuth(),
       Accept: raw ? "*/*" : "application/json",
     };
+    const authHeader = await authStrategy.authorizationHeader();
+    if (authHeader !== null) headers.Authorization = authHeader;
     if (body) {
       headers["Content-Type"] = "application/json";
     }
@@ -339,6 +365,12 @@ export async function request<T = unknown>(
       const text = await res.text().catch(() => "");
       entry.error = text || `HTTP ${res.status}`;
       logCall(entry);
+      // Story 28.1: 401-recovery seam. The active strategy's onUnauthorized
+      // hook is ADDITIVE — it fires a recovery side-channel (Bearer 28.3 →
+      // open Settings; OIDC 28.4 → silent renew / re-auth) but the error
+      // STILL propagates so the calling screen surfaces its ErrorBox. Basic
+      // leaves the hook undefined → optional-chaining no-ops.
+      if (res.status === 401) await authStrategy.onUnauthorized?.();
       throw new FlowableError(entry.error, res.status);
     }
     // Story 9.6: when asResponse is set, log the entry and hand the caller the
@@ -1048,6 +1080,9 @@ export const api = {
     }
   },
   log: (): ApiLogEntry[] => [...API_LOG],
+  // Auth (Story 28.1 — pluggable AuthStrategy seam)
+  setAuthStrategy,
+  getAuthStrategy,
   // BPMN repository
   listDeployments,
   getDeployment,
