@@ -10,9 +10,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../api";
-import { type AuthStrategy, BasicAuthStrategy, BearerAuthStrategy } from "../auth-strategy";
+import { BasicAuthStrategy, BearerAuthStrategy, OidcAuthStrategy } from "../auth-strategy";
 import type { AuthStrategyConfig } from "../auth-strategy-config";
-import { DormantAuthStrategy, installStrategyForActiveConnection } from "../install-auth-strategy";
+import { installStrategyForActiveConnection } from "../install-auth-strategy";
 import { OPEN_SETTINGS_AUTH } from "../nav-events";
 import { type SavedConnectionsState, STORAGE_KEY } from "../saved-connections";
 
@@ -92,14 +92,18 @@ describe("installStrategyForActiveConnection", () => {
     installStrategyForActiveConnection();
     const s = api.getAuthStrategy();
     expect(s.kind).toBe("oidc");
-    expect(s).toBeInstanceOf(DormantAuthStrategy);
+    expect(s).toBeInstanceOf(OidcAuthStrategy);
   });
 
-  it("DormantAuthStrategy still produces a Basic header from api.config()", async () => {
-    api.setConfig({ username: "dorm-u", password: "dorm-p" });
-    const s: AuthStrategy = new DormantAuthStrategy("bearer");
-    expect(await s.authorizationHeader()).toBe(`Basic ${btoa("dorm-u:dorm-p")}`);
-    expect(s.onUnauthorized).toBeUndefined();
+  it("OIDC strategy returns null header when the bridge accessor is absent", async () => {
+    seed({
+      kind: "oidc",
+      config: { issuer: "https://idp.test", clientId: "cid", scopes: ["openid"] },
+    });
+    installStrategyForActiveConnection();
+    // No <AuthProvider> mounted in jsdom → getOidcTokenAccessor() is null →
+    // no header (engine 401 → onUnauthorized re-initiates the flow).
+    expect(await api.getAuthStrategy().authorizationHeader()).toBeNull();
   });
 
   it("re-running the dispatcher after a kind change swaps the installed strategy", () => {

@@ -19,8 +19,8 @@
  * `auth-oidc-*`, `auth-dormancy-note`); the Basic username/password inputs
  * carry `${idPrefix}-username|password` so Add / Edit / Auth-tab stay distinct.
  *
- * Dormancy note: rendered for Bearer + OIDC at Story 28.2 (Basic is live).
- * Story 28.3 narrows it to OIDC-only (Bearer goes live); Story 28.4 removes it.
+ * Dormancy note: removed entirely at Story 28.4 — all three methods (Basic /
+ * Bearer / OIDC) are live. (Was bearer+OIDC at 28.2, OIDC-only at 28.3.)
  */
 
 import type React from "react";
@@ -65,9 +65,6 @@ export const AuthStrategyFields: React.FC<AuthStrategyFieldsProps> = ({
   onOidcScopesChange,
   disabled = false,
 }) => {
-  // Story 28.3 narrowed this to OIDC-only (Bearer is now live); Story 28.4
-  // removes it entirely.
-  const showDormancy = kind === "oidc";
   return (
     <>
       <div>
@@ -117,15 +114,6 @@ export const AuthStrategyFields: React.FC<AuthStrategyFieldsProps> = ({
             OIDC
           </button>
         </div>
-        {showDormancy && (
-          <p
-            className="mute"
-            data-testid="auth-dormancy-note"
-            style={{ marginTop: 6, fontSize: 11 }}
-          >
-            Persists per-connection config only — activation lands in v1.0.0 (Story 28).
-          </p>
-        )}
       </div>
       {kind === "bearer" && (
         <div>

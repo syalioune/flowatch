@@ -501,6 +501,20 @@ Filed downstream notes for follow-up:
 
 ---
 
+## RC-18 — OIDC `<AuthProvider>` config is render-time; switching auth method at runtime requires a page reload, and the engine side is the operator's responsibility
+
+**Naive intuition:** selecting OIDC in the Settings Authentication tab and saving should immediately authenticate `api.*` calls with the IdP token, the way switching to Basic/Bearer does (no reload).
+
+**Actual behaviour (Story 28.4):** `react-oidc-context`'s `<AuthProvider>` is configured ONCE at root render ([src/main.tsx](../src/main.tsx)) from the active connection's persisted `{issuer, clientId, scopes}`. There is no first-class way to swap the provider's config at runtime without remounting the React root. So switching INTO OIDC (or OUT of it, or between two OIDC issuers) triggers a guarded `window.location.reload()` (`reloadIfOidcProviderMismatch()` in [src/lib/install-auth-strategy.ts](../src/lib/install-auth-strategy.ts)) — the config persists first, the reload re-runs `main.tsx` which mounts the right provider. The reload is a no-op at app mount (the provider already matches the persisted kind) so it cannot loop. A fully-dynamic provider swap without reload is a deferred refinement.
+
+**Engine-side boundary (ADR-009):** Flowatch only SENDS `Authorization: Bearer <oidc-access-token>`. The Flowable engine must be configured (operator-side Spring Security) to accept the IdP's JWTs. The default `make stack` Flowable image is Basic-only, so an OIDC-active call against it 401s — this is EXPECTED, not a bug. The smoke probe therefore verifies the FLOW (redirect → callback → in-memory token → header swap → silent renew → sign-out), not a live 200 against the Basic engine. "Flowatch cannot solve the engine side."
+
+**NFR-11 (in-memory tokens):** the access + refresh tokens live ONLY in react-oidc-context's default in-memory `userStore` — Flowatch passes NO `WebStorageStateStore`, so a reviewer can confirm (DevTools → Application) that no access/refresh token touches `localStorage`/`sessionStorage`. Only the OIDC `{issuer, clientId, scopes}` CONFIG persists (Story 23.2 path). A page reload requires re-auth (silent renew if the IdP session cookie is still valid).
+
+**Surfaced by:** Story 28.4 implementation + smoke (2026-06-07). The reload-on-switch is the deliberate scope boundary; the engine-side + in-memory boundaries are the load-bearing operator/security contracts.
+
+---
+
 ## How to extend this file
 
 When a review surfaces a runtime quirk that meets all three of:

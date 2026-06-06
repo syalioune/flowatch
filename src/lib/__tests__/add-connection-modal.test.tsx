@@ -158,11 +158,10 @@ describe("<AddConnectionModal>", () => {
     expect(oidc).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("dormancy note + bearer help text render conditionally on kind", async () => {
+  it("bearer help text renders conditionally; no dormancy note for any kind (28.4)", async () => {
     const user = userEvent.setup();
     render(<AddConnectionModal open onClose={() => undefined} onSuccess={() => undefined} />);
-    // Story 28.2: Basic is live (no dormancy). Story 28.3: Bearer is live too —
-    // dormancy note is now OIDC-only.
+    // Story 28.4: all three methods are live — the dormancy note is removed.
     await screen.findByTestId("auth-kind-basic");
     expect(screen.queryByTestId("auth-dormancy-note")).not.toBeInTheDocument();
     expect(screen.queryByTestId("auth-bearer-help")).not.toBeInTheDocument();
@@ -170,7 +169,8 @@ describe("<AddConnectionModal>", () => {
     expect(await screen.findByTestId("auth-bearer-help")).toBeInTheDocument();
     expect(screen.queryByTestId("auth-dormancy-note")).not.toBeInTheDocument();
     await user.click(screen.getByTestId("auth-kind-oidc"));
-    expect(await screen.findByTestId("auth-dormancy-note")).toBeInTheDocument();
+    expect(await screen.findByTestId("auth-oidc-issuer")).toBeInTheDocument();
+    expect(screen.queryByTestId("auth-dormancy-note")).not.toBeInTheDocument();
   });
 
   it("switching kind clears the previous kind's exclusive field", async () => {

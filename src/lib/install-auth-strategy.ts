@@ -15,20 +15,26 @@
  * Fired at three points (Story 28.2):
  *   1. App mount (src/app.tsx) — honour the persisted active connection's kind.
  *   2. SAVED_CONNECTIONS_CHANGED listener (src/app.tsx) — re-install on switch.
- *   3. Settings → Authentication tab Save — apply without a reload.
+ *   3. Settings → Authentication tab Save — apply immediately.
  *
- * Per-kind branches: `basic` installs the live BasicAuthStrategy (Story 28.1);
- * `bearer` / `oidc` install a DormantAuthStrategy placeholder until Story 28.3
- * (bearer) / Story 28.4 (oidc) swap them for the real concrete. The dormancy
- * placeholder still produces a Basic header from `api.config()` so a
- * bearer/oidc connection activated before its concrete lands still sends
- * SOMETHING (matches Story 23.2's documented dormancy contract).
+ * Per-kind branches (all live as of Epic 28): `basic` → BasicAuthStrategy
+ * (Story 28.1); `bearer` → BearerAuthStrategy (Story 28.3); `oidc` →
+ * OidcAuthStrategy reading the in-memory bridge accessor (Story 28.4). The
+ * earlier DormantAuthStrategy placeholder was removed once all three concretes
+ * landed. Switching into/out-of OIDC additionally needs a guarded reload (see
+ * {@link reloadIfOidcProviderMismatch}) because <AuthProvider> is render-time.
  */
 
 import { api } from "../api";
-import { type AuthStrategy, BasicAuthStrategy, BearerAuthStrategy } from "./auth-strategy";
+import {
+  type AuthStrategy,
+  BasicAuthStrategy,
+  BearerAuthStrategy,
+  OidcAuthStrategy,
+} from "./auth-strategy";
 import type { AuthStrategyKind } from "./auth-strategy-config";
 import { OPEN_SETTINGS_AUTH } from "./nav-events";
+import { getOidcTokenAccessor, isOidcProviderMounted } from "./oidc-accessor";
 import { getActiveConnection } from "./saved-connections";
 
 /** Open the Settings modal at the Authentication tab (Story 28.3 401 recovery). */
@@ -47,24 +53,6 @@ const activeBearerToken = (): string => {
 };
 
 /**
- * Placeholder for a not-yet-implemented auth kind (bearer until 28.3, oidc
- * until 28.4). Carries the requested `kind` so `getAuthStrategy().kind`
- * reflects the operator's choice, but produces a Basic header from the active
- * cfg — the engine still receives credentials if any are set.
- */
-export class DormantAuthStrategy implements AuthStrategy {
-  readonly kind: AuthStrategyKind;
-  constructor(kind: AuthStrategyKind) {
-    this.kind = kind;
-  }
-  async authorizationHeader(): Promise<string | null> {
-    const { username, password } = api.config();
-    return `Basic ${btoa(`${username}:${password}`)}`;
-  }
-  // No onUnauthorized — dormant placeholder has no recovery.
-}
-
-/**
  * Read the active connection's `authStrategyConfig.kind` and install the
  * matching {@link AuthStrategy} into the api funnel. Defaults to `basic` when
  * no active connection / no config.
@@ -80,8 +68,11 @@ export function installStrategyForActiveConnection(): void {
       strategy = new BearerAuthStrategy(activeBearerToken, dispatchOpenSettingsAuth);
       break;
     case "oidc":
-      // Story 28.4 swaps this for `new OidcAuthStrategy()`.
-      strategy = new DormantAuthStrategy("oidc");
+      // Story 28.4: reads the in-memory token via the bridge accessor (injected
+      // getter — keeps auth-strategy.ts React-free). The <AuthProvider> is
+      // mounted by main.tsx; switch-into-OIDC at runtime reloads (see
+      // reloadIfOidcProviderMismatch) so the provider remounts with the config.
+      strategy = new OidcAuthStrategy(getOidcTokenAccessor);
       break;
     default:
       strategy = new BasicAuthStrategy(() => {
@@ -90,4 +81,33 @@ export function installStrategyForActiveConnection(): void {
       });
   }
   api.setAuthStrategy(strategy);
+}
+
+/**
+ * Story 28.4: `<AuthProvider>` is configured at root render (main.tsx) from the
+ * active OIDC connection. Switching INTO OIDC at runtime (Auth-tab Save / Topbar
+ * quick-switch) needs the provider with the new config, and switching OUT needs
+ * it torn down. Because the provider config is render-time, the simplest correct
+ * behaviour is a guarded `window.location.reload()` when the desired provider
+ * state (active kind === "oidc") differs from what mounted at page load.
+ *
+ * Called from the connection-switch + Auth-tab-Save paths (NOT app mount — at
+ * mount the desired state always matches what main.tsx already mounted, so this
+ * no-ops and cannot loop). Documented as the deliberate scope boundary; a fully
+ * dynamic provider swap without reload is a future refinement (deferred-work).
+ */
+export function reloadIfOidcProviderMismatch(): void {
+  const conn = getActiveConnection();
+  const wantOidc = conn?.authStrategyConfig?.kind === "oidc";
+  if (wantOidc === isOidcProviderMounted()) return;
+  try {
+    window.dispatchEvent(
+      new CustomEvent("app:toast", {
+        detail: { kind: "ok", text: "Reloading to apply the authentication change…", ttl: 2000 },
+      }),
+    );
+    window.location.reload();
+  } catch {
+    /* non-DOM */
+  }
 }

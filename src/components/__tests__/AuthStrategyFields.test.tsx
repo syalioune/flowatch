@@ -88,14 +88,15 @@ describe("<AuthStrategyFields>", () => {
     expect(screen.queryByTestId("harness-username")).not.toBeInTheDocument();
   });
 
-  it("OIDC selected: issuer/clientId/scopes + dormancy note appear", async () => {
+  it("OIDC selected: issuer/clientId/scopes appear; NO dormancy note (28.4 removed it)", async () => {
     const user = userEvent.setup();
     render(<Harness />);
     await user.click(screen.getByTestId("auth-kind-oidc"));
     expect(await screen.findByTestId("auth-oidc-issuer")).toBeInTheDocument();
     expect(screen.getByTestId("auth-oidc-client-id")).toBeInTheDocument();
     expect(screen.getByTestId("auth-oidc-scopes")).toBeInTheDocument();
-    expect(screen.getByTestId("auth-dormancy-note")).toBeInTheDocument();
+    // Story 28.4: all three methods are live — the dormancy note is gone for good.
+    expect(screen.queryByTestId("auth-dormancy-note")).not.toBeInTheDocument();
     expect(screen.queryByTestId("auth-bearer-token")).not.toBeInTheDocument();
   });
 

@@ -8,7 +8,13 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { type AuthStrategy, BasicAuthStrategy, BearerAuthStrategy } from "../auth-strategy";
+import {
+  type AuthStrategy,
+  BasicAuthStrategy,
+  BearerAuthStrategy,
+  type OidcAccessorLike,
+  OidcAuthStrategy,
+} from "../auth-strategy";
 
 describe("BasicAuthStrategy", () => {
   it("kind is 'basic'", () => {
@@ -93,5 +99,52 @@ describe("BearerAuthStrategy (Story 28.3)", () => {
     const s = new BearerAuthStrategy(() => "t", onAuthFailure);
     await s.onUnauthorized();
     expect(onAuthFailure).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("OidcAuthStrategy (Story 28.4)", () => {
+  const accessor = (over: Partial<OidcAccessorLike> = {}): OidcAccessorLike => ({
+    getToken: async () => "oidc-access-token",
+    signIn: () => {},
+    ...over,
+  });
+
+  it("kind is 'oidc'", () => {
+    const s = new OidcAuthStrategy(() => accessor());
+    expect(s.kind).toBe("oidc");
+  });
+
+  it("authorizationHeader() returns Bearer <access-token> via the accessor", async () => {
+    const s = new OidcAuthStrategy(() => accessor());
+    expect(await s.authorizationHeader()).toBe("Bearer oidc-access-token");
+  });
+
+  it("awaits the accessor's getToken (async seam payoff — silent renew on demand)", async () => {
+    const getToken = vi.fn(async () => "renewed-token");
+    const s = new OidcAuthStrategy(() => accessor({ getToken }));
+    expect(await s.authorizationHeader()).toBe("Bearer renewed-token");
+    expect(getToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns null when the accessor is absent (provider not mounted)", async () => {
+    const s = new OidcAuthStrategy(() => null);
+    expect(await s.authorizationHeader()).toBeNull();
+  });
+
+  it("returns null when getToken yields null (not signed in / renew failed)", async () => {
+    const s = new OidcAuthStrategy(() => accessor({ getToken: async () => null }));
+    expect(await s.authorizationHeader()).toBeNull();
+  });
+
+  it("onUnauthorized() calls the accessor's signIn() to re-initiate the flow", async () => {
+    const signIn = vi.fn();
+    const s = new OidcAuthStrategy(() => accessor({ signIn }));
+    await s.onUnauthorized();
+    expect(signIn).toHaveBeenCalledTimes(1);
+  });
+
+  it("onUnauthorized() is a no-op when the accessor is absent", async () => {
+    const s = new OidcAuthStrategy(() => null);
+    await expect(s.onUnauthorized()).resolves.toBeUndefined();
   });
 });

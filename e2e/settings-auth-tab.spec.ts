@@ -63,7 +63,22 @@ test.describe("Settings → Authentication tab (Story 28.2 — FR-4)", () => {
     expect(raw).toContain('"kind":"bearer"');
   });
 
-  test("switch to OIDC + valid config; Save persists oidc shape", async ({ page }) => {
+  test("switch to OIDC reveals issuer/clientId/scopes + sign-in affordance, no dormancy", async ({
+    page,
+  }) => {
+    await page.locator(openSettings).click();
+    await page.getByTestId("settings-tab-authentication").click();
+    await page.getByTestId("auth-kind-oidc").click();
+    await expect(page.getByTestId("auth-oidc-issuer")).toBeVisible();
+    await expect(page.getByTestId("auth-oidc-client-id")).toBeVisible();
+    await expect(page.getByTestId("auth-oidc-scopes")).toBeVisible();
+    // Story 28.4: dormancy note removed entirely.
+    await expect(page.getByTestId("auth-dormancy-note")).toHaveCount(0);
+    // Provider not mounted yet (active connection is Basic) → sign-in pending hint.
+    await expect(page.getByTestId("oidc-provider-pending")).toBeVisible();
+  });
+
+  test("Save OIDC persists the oidc shape (provider remounts via reload)", async ({ page }) => {
     await page.locator(openSettings).click();
     await page.getByTestId("settings-tab-authentication").click();
     await page.getByTestId("auth-kind-oidc").click();
@@ -71,9 +86,12 @@ test.describe("Settings → Authentication tab (Story 28.2 — FR-4)", () => {
     await page.getByTestId("auth-oidc-client-id").fill("flowatch");
     await page.getByTestId("auth-oidc-scopes").fill("openid, profile, offline_access");
     await page.getByTestId("auth-tab-save").click();
-    await expect(page.locator(".toast", { hasText: "Authentication updated" })).toBeVisible();
+    // Save persists synchronously BEFORE the guarded reload fires; poll the key
+    // (survives the reload-into-OIDC transition).
+    await page.waitForFunction(() =>
+      (localStorage.getItem("flowatch.connections.v1") ?? "").includes('"kind":"oidc"'),
+    );
     const raw = await page.evaluate(() => localStorage.getItem("flowatch.connections.v1"));
-    expect(raw).toContain('"kind":"oidc"');
     expect(raw).toContain("https://idp.example.test");
   });
 

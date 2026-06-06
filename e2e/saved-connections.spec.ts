@@ -274,15 +274,21 @@ test.describe("Saved connections (Story 23.1 — FR-49)", () => {
     expect(raw).toContain("flip-token");
   });
 
-  test("Dormancy note visible on Add + Edit (Story 23.2)", async ({ page }) => {
+  test("Dormancy note removed on Add + Edit (Story 28.4 — all methods live)", async ({ page }) => {
+    // Story 23.2 shipped a dormancy note (all methods dormant). Epic 28 made
+    // Basic (28.2) / Bearer (28.3) / OIDC (28.4) live, so the note is gone for
+    // every kind. This was "Dormancy note visible…" at 23.2.
     await page.locator('button[aria-label="Connection settings"]').click();
     await page.getByTestId("add-connection").click();
-    await expect(page.getByTestId("auth-dormancy-note")).toBeVisible();
+    await expect(page.getByTestId("auth-dormancy-note")).toHaveCount(0);
+    await page.getByTestId("auth-kind-oidc").click();
+    await expect(page.getByTestId("auth-oidc-issuer")).toBeVisible();
+    await expect(page.getByTestId("auth-dormancy-note")).toHaveCount(0);
     await page.getByTestId("add-connection-cancel").click();
     const list = page.getByTestId("saved-connections-list");
     await list.locator('button[data-testid^="edit-connection-"]').first().click();
     await expect(page.getByTestId("edit-connection-modal")).toBeVisible();
-    await expect(page.getByTestId("auth-dormancy-note")).toBeVisible();
+    await expect(page.getByTestId("auth-dormancy-note")).toHaveCount(0);
   });
 
   test("OIDC persistence round-trip across reload (Story 23.2)", async ({ page }) => {

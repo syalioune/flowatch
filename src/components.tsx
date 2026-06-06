@@ -15,8 +15,12 @@ import {
 import { buildCurlCommand, CURL_MULTIPART, CURL_UNSERIALIZABLE } from "./lib/curl";
 import { errorStatus } from "./lib/error";
 import { ErrorBox } from "./lib/error-box";
-import { installStrategyForActiveConnection } from "./lib/install-auth-strategy";
+import {
+  installStrategyForActiveConnection,
+  reloadIfOidcProviderMismatch,
+} from "./lib/install-auth-strategy";
 import { SAVED_CONNECTIONS_CHANGED } from "./lib/nav-events";
+import { getOidcTokenAccessor, OIDC_AUTH_CHANGED } from "./lib/oidc-accessor";
 import { randomId } from "./lib/random-id";
 import { type RouteEndpoint, useRouteMeta } from "./lib/route-meta";
 import {
@@ -552,6 +556,57 @@ const buildAuthTabConfig = (st: AuthTabState): unknown => {
   };
 };
 
+// Story 28.4: OIDC sign-in / sign-out affordances. Reads the in-memory token
+// accessor (published by the OidcTokenBridge inside <AuthProvider>) and
+// re-renders on OIDC_AUTH_CHANGED. When the provider isn't mounted yet (the
+// operator picked OIDC but hasn't saved+reloaded), the accessor is null → prompt
+// to save first. The token NEVER leaves memory (NFR-11).
+function OidcSignInOut() {
+  const [, force] = React.useReducer((n: number) => n + 1, 0);
+  React.useEffect(() => {
+    const handler = () => force();
+    window.addEventListener(OIDC_AUTH_CHANGED, handler);
+    return () => window.removeEventListener(OIDC_AUTH_CHANGED, handler);
+  }, []);
+  const accessor = getOidcTokenAccessor();
+  if (!accessor) {
+    return (
+      <p className="mute" data-testid="oidc-provider-pending" style={{ fontSize: 11 }}>
+        Save to start the OIDC session — the app reloads to connect to your identity provider.
+      </p>
+    );
+  }
+  if (accessor.isAuthenticated) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span className="badge" data-tone="ok" data-testid="oidc-signed-in-as">
+          <span className="sr-only">Status: signed in — </span>
+          {accessor.username ?? "signed in"}
+        </span>
+        <button
+          type="button"
+          className="btn"
+          data-testid="oidc-sign-out"
+          onClick={() => accessor.signOut()}
+        >
+          Sign out
+        </button>
+      </div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      className="btn"
+      data-variant="primary"
+      data-testid="oidc-sign-in"
+      onClick={() => accessor.signIn()}
+    >
+      Sign in with your identity provider
+    </button>
+  );
+}
+
 function SettingsAuthTab() {
   const [conn, setConn] = React.useState<SavedConnection | null>(() => getActiveConnection());
   const [st, setSt] = React.useState<AuthTabState>(() => hydrateAuthTab(conn));
@@ -636,12 +691,16 @@ function SettingsAuthTab() {
         if (conn.password !== undefined) patch.password = undefined;
       }
       const updated = updateConnection(conn.id, patch);
-      // Re-install so the change applies without a reload.
+      // Re-install so the change applies without a reload (Basic/Bearer).
       installStrategyForActiveConnection();
       setConn(updated);
       setSt(hydrateAuthTab(updated));
       setBusy(false);
       toast({ kind: "ok", text: "Authentication updated", ttl: 3000 });
+      // Story 28.4: switching INTO / OUT OF OIDC needs <AuthProvider> remounted
+      // with the new config (render-time). Guarded reload (no-op when the
+      // provider state already matches the saved kind).
+      reloadIfOidcProviderMismatch();
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
       setBusy(false);
@@ -680,6 +739,7 @@ function SettingsAuthTab() {
             onOidcScopesChange={(v) => setField("oidcScopes", v)}
             disabled={busy}
           />
+          {st.kind === "oidc" && <OidcSignInOut />}
         </div>
       </div>
       <div className="modal-ft">
