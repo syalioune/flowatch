@@ -186,6 +186,12 @@ export interface FlowableFormProperty {
 export interface FlowableTaskForm {
   formKey?: string;
   formProperties?: FlowableFormProperty[];
+  // Story 29.1 (FR-23): a form-js definition carries a `components` array
+  // (the form-js schema) instead of `formProperties`. The discriminator
+  // `classifyTaskForm` (src/components/TaskFormPanel.tsx) branches on which
+  // field is a populated array. `unknown[]` because the form-js schema shape
+  // is owned by @bpmn-io/form-js-viewer, not the Flowable wire contract.
+  components?: unknown[];
 }
 
 // Story 24.1: Flowable batch operations DTO (FR-53). Permissive optional

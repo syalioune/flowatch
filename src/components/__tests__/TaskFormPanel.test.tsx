@@ -14,10 +14,45 @@ import { api, FlowableError, type FlowableTask, type FlowableTaskForm } from "..
 import { NAV_INVALIDATE_COUNTS } from "../../lib/nav-events";
 import {
   buildSubmitProperties,
+  classifyTaskForm,
   initialFormValues,
+  mapFormJsData,
   TaskFormPanel,
   validateFormValues,
 } from "../TaskFormPanel";
+
+// AC-6: mock the vanilla form-js `Form` class so the component test doesn't
+// depend on a real DOM form-js render. The mock records `on("submit")`
+// handlers and replays them from `submit()` (matching the real Form#submit
+// which emits the "submit" event synchronously); `formMock.{data,errors}`
+// let each test drive the emitted payload.
+const formMock = vi.hoisted(() => ({
+  data: {} as Record<string, unknown>,
+  errors: {} as Record<string, unknown>,
+  importRejects: null as Error | null,
+}));
+vi.mock("@bpmn-io/form-js-viewer", () => {
+  class MockForm {
+    private handlers: Record<string, Array<(e: unknown) => void>> = {};
+    on(type: string, h: (e: unknown) => void) {
+      this.handlers[type] = this.handlers[type] ?? [];
+      this.handlers[type].push(h);
+    }
+    off(type: string, h: (e: unknown) => void) {
+      this.handlers[type] = (this.handlers[type] ?? []).filter((x) => x !== h);
+    }
+    importSchema() {
+      return formMock.importRejects ? Promise.reject(formMock.importRejects) : Promise.resolve({});
+    }
+    submit() {
+      const result = { data: formMock.data, errors: formMock.errors, files: new Map() };
+      for (const h of this.handlers.submit ?? []) h(result);
+      return result;
+    }
+    destroy() {}
+  }
+  return { Form: MockForm };
+});
 
 const sampleTask: FlowableTask = {
   id: "task-1",
@@ -113,6 +148,52 @@ describe("validateFormValues", () => {
   });
 });
 
+describe("classifyTaskForm (Story 29.1)", () => {
+  it("returns 'form-js' when the payload carries a NON-EMPTY components array", () => {
+    expect(classifyTaskForm({ components: [{ type: "textfield", key: "name" }] })).toBe("form-js");
+  });
+
+  it("returns 'legacy' when the payload carries a NON-EMPTY formProperties array (no components)", () => {
+    expect(classifyTaskForm({ formProperties: [{ id: "a", type: "string" }] })).toBe("legacy");
+  });
+
+  it("prefers form-js when BOTH populated arrays are present", () => {
+    expect(
+      classifyTaskForm({
+        components: [{ type: "textfield", key: "n" }],
+        formProperties: [{ id: "a", type: "string" }],
+      }),
+    ).toBe("form-js");
+  });
+
+  it("returns 'none' for EMPTY arrays (live engine sends formProperties:[] for no-form tasks)", () => {
+    expect(classifyTaskForm({ components: [] })).toBe("none");
+    expect(classifyTaskForm({ formProperties: [] })).toBe("none");
+    expect(classifyTaskForm({ formKey: "x", formProperties: [] })).toBe("none");
+  });
+
+  it("returns 'none' for null / undefined / a no-array payload", () => {
+    expect(classifyTaskForm(null)).toBe("none");
+    expect(classifyTaskForm(undefined)).toBe("none");
+    expect(classifyTaskForm({ formKey: "x" })).toBe("none");
+  });
+});
+
+describe("mapFormJsData (Story 29.1)", () => {
+  it("maps a form-js data object to the { id, value } envelope, stringifying values", () => {
+    expect(mapFormJsData({ name: "Mira", amount: 1000, active: true, archived: false })).toEqual([
+      { id: "name", value: "Mira" },
+      { id: "amount", value: "1000" },
+      { id: "active", value: "true" },
+      { id: "archived", value: "false" },
+    ]);
+  });
+
+  it("returns an empty array for an empty data object", () => {
+    expect(mapFormJsData({})).toEqual([]);
+  });
+});
+
 describe("buildSubmitProperties", () => {
   it("returns booleans as 'true' / 'false' strings", () => {
     expect(buildSubmitProperties({ active: true, archived: false })).toEqual([
@@ -154,6 +235,9 @@ describe("<TaskFormPanel>", () => {
     onSubmitted = vi.fn();
     (api as unknown as Host).getTaskForm = getSpy as unknown as GetFormFn;
     (api as unknown as Host).submitTaskForm = submitSpy as unknown as SubmitFormFn;
+    formMock.data = {};
+    formMock.errors = {};
+    formMock.importRejects = null;
   });
 
   afterEach(() => {
@@ -287,6 +371,88 @@ describe("<TaskFormPanel>", () => {
     const refresh = screen.getByTestId("task-form-refresh");
     fireEvent.click(refresh);
     await waitFor(() => expect(getSpy.mock.calls.length).toBeGreaterThanOrEqual(2));
+  });
+
+  // ─── Story 29.1: form-js branch ─────────────────────────────────────
+  const fjsPayload: FlowableTaskForm = {
+    formKey: "loan-fjs",
+    components: [{ type: "textfield", key: "name", label: "Name" }],
+  };
+
+  it("mounts the form-js branch for a components payload (legacy field rows absent)", async () => {
+    getSpy.mockResolvedValue(fjsPayload);
+    render(<TaskFormPanel taskId="t-1" task={sampleTask} onSubmitted={onSubmitted} />);
+    await waitFor(() => expect(screen.getByTestId("task-form-js-viewer")).toBeInTheDocument());
+    // form-js submit button present; legacy field rows + legacy submit absent.
+    expect(screen.getByTestId("task-form-js-submit")).toBeInTheDocument();
+    expect(screen.queryByTestId("task-form-field-name")).toBeNull();
+    expect(screen.queryByTestId("task-form-submit")).toBeNull();
+  });
+
+  it("form-js submit maps data → { properties } via submitTaskForm + dispatches nav + onSubmitted", async () => {
+    getSpy.mockResolvedValue(fjsPayload);
+    submitSpy.mockResolvedValue({} as unknown as FlowableTaskForm);
+    formMock.data = { name: "Mira", active: true };
+    const events: string[] = [];
+    const handler = (e: Event) => events.push(e.type);
+    window.addEventListener(NAV_INVALIDATE_COUNTS, handler);
+    try {
+      render(<TaskFormPanel taskId="t-1" task={sampleTask} onSubmitted={onSubmitted} />);
+      // The submit button is enabled only after importSchema resolves (ready).
+      const submit = await screen.findByTestId("task-form-js-submit");
+      await waitFor(() => expect(submit).not.toBeDisabled());
+      fireEvent.click(submit);
+      await waitFor(() => expect(submitSpy).toHaveBeenCalledTimes(1));
+      expect(submitSpy).toHaveBeenCalledWith("t-1", {
+        properties: [
+          { id: "name", value: "Mira" },
+          { id: "active", value: "true" },
+        ],
+      });
+      expect(events).toContain(NAV_INVALIDATE_COUNTS);
+      expect(onSubmitted).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener(NAV_INVALIDATE_COUNTS, handler);
+    }
+  });
+
+  it("form-js client-side validation errors block submit", async () => {
+    getSpy.mockResolvedValue(fjsPayload);
+    submitSpy.mockResolvedValue({} as unknown as FlowableTaskForm);
+    formMock.errors = { name: ["Field is required."] };
+    render(<TaskFormPanel taskId="t-1" task={sampleTask} onSubmitted={onSubmitted} />);
+    const submit = await screen.findByTestId("task-form-js-submit");
+    await waitFor(() => expect(submit).not.toBeDisabled());
+    fireEvent.click(submit);
+    // Errors non-empty → handler returns early; no wire call, no navigation.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(submitSpy).not.toHaveBeenCalled();
+    expect(onSubmitted).not.toHaveBeenCalled();
+  });
+
+  it("renders an ErrorBox (not a blank panel) when importSchema rejects", async () => {
+    getSpy.mockResolvedValue(fjsPayload);
+    formMock.importRejects = new Error("malformed form-js schema");
+    render(<TaskFormPanel taskId="t-1" task={sampleTask} onSubmitted={onSubmitted} />);
+    await waitFor(() =>
+      expect(screen.getByTestId("task-form-js-import-error")).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/malformed form-js schema/)).toBeInTheDocument();
+    // Submit stays disabled when the import failed.
+    expect(screen.getByTestId("task-form-js-submit")).toBeDisabled();
+  });
+
+  it("form-js submit failure renders an in-panel ErrorBox (retryable)", async () => {
+    getSpy.mockResolvedValue(fjsPayload);
+    submitSpy.mockRejectedValue(new Error("Engine rejected the form"));
+    formMock.data = { name: "Mira" };
+    render(<TaskFormPanel taskId="t-1" task={sampleTask} onSubmitted={onSubmitted} />);
+    const submit = await screen.findByTestId("task-form-js-submit");
+    await waitFor(() => expect(submit).not.toBeDisabled());
+    fireEvent.click(submit);
+    await waitFor(() => expect(screen.getByTestId("task-form-error-box")).toBeInTheDocument());
+    expect(screen.getByText(/Engine rejected the form/)).toBeInTheDocument();
+    expect(onSubmitted).not.toHaveBeenCalled();
   });
 
   it("selecting an enum option updates the controlled state and submits the selected key", async () => {

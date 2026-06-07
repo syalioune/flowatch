@@ -20,7 +20,7 @@ import { ErrorBox } from "../lib/error-box";
 import { NAV_INVALIDATE_COUNTS } from "../lib/nav-events";
 import { useApi } from "../lib/useApi";
 import { TaskAttachmentsPanel } from "./TaskAttachmentsPanel";
-import { TaskFormPanel } from "./TaskFormPanel";
+import { classifyTaskForm, TaskFormPanel } from "./TaskFormPanel";
 
 interface Props {
   task: FlowableTask;
@@ -50,11 +50,12 @@ export function TaskDetail({ task, reload }: Props) {
     [t.id],
   );
   // hasForm gates the legacy Complete button (AC-9). Flowable 7.2 returns a
-  // truthy payload (e.g. `{ formKey: null }`) even for tasks without
-  // declared form properties, so we additionally require non-empty
-  // formProperties before considering the form "real" — otherwise the
-  // operator loses access to the Complete button on no-form tasks.
-  const hasForm = !!form.data?.formProperties && form.data.formProperties.length > 0;
+  // truthy payload (e.g. `{ formKey: null }`) even for tasks without declared
+  // form properties, so `classifyTaskForm` (Story 29.1) is the single source of
+  // truth: it returns "none" for empty/no-form payloads and "form-js"/"legacy"
+  // for a real form of either shape. Any real form (form-js OR legacy) hides
+  // the Complete button — the panel's Submit replaces it for both.
+  const hasForm = classifyTaskForm(form.data) !== "none";
   const variables = useApi(() => api.getTaskVariables(t.id), [t.id]);
 
   // Story 11.4: Delegate modal + Resolve handler state.

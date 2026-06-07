@@ -30,6 +30,13 @@ import "dmn-js/dist/assets/dmn-js-boxed-expression.css";
 import "dmn-js/dist/assets/dmn-js-boxed-expression-controls.css";
 import "dmn-js/dist/assets/dmn-font/css/dmn-embedded.css";
 
+// form-js viewer assets (Story 29.1, FR-23). Imported ONCE here alongside the
+// bpmn-js / dmn-js block — never per-component (Pattern P-006). `form-js-base`
+// carries the structural layout; `form-js` the default theme. Flowatch's
+// `data-look` system overrides the visual tokens via src/styles/components.css.
+import "@bpmn-io/form-js-viewer/dist/assets/form-js-base.css";
+import "@bpmn-io/form-js-viewer/dist/assets/form-js.css";
+
 const router = createRouter({ routeTree });
 
 declare module "@tanstack/react-router" {

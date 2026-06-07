@@ -45,6 +45,18 @@ vi.mock("@tanstack/react-router", () => ({
 // own getTaskForm spy still fires.
 vi.mock("../TaskFormPanel", () => ({
   TaskFormPanel: () => <div data-testid="task-form-panel-stub" />,
+  // Story 29.1: TaskDetail gates the legacy Complete button on
+  // classifyTaskForm(...) !== "none". Re-implement the (tiny, pure)
+  // discriminator in the mock so the gate behaves correctly without pulling
+  // the real module (which imports @bpmn-io/form-js-viewer) into this suite.
+  classifyTaskForm: (
+    p: { components?: unknown[]; formProperties?: unknown[] } | null | undefined,
+  ) =>
+    p && Array.isArray(p.components) && p.components.length > 0
+      ? "form-js"
+      : p && Array.isArray(p.formProperties) && p.formProperties.length > 0
+        ? "legacy"
+        : "none",
 }));
 
 type Host = {

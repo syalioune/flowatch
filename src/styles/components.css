@@ -1024,6 +1024,42 @@
   stroke: var(--fg-soft) !important;
 }
 
+/* form-js viewer chrome blend (Story 29.1, Pattern P-007).
+   @bpmn-io/form-js exposes its own `--color-*` design tokens on
+   `.fjs-container`; rather than fight its rules per-element, we remap those
+   tokens to Flowatch's data-look / data-theme CSS variables so the form
+   inherits the active look + theme automatically. No hard-coded colors —
+   every value resolves through the existing token vocabulary. */
+.form-js-host .fjs-container {
+  --color-text: var(--fg);
+  --color-text-light: var(--fg-soft);
+  --color-text-lighter: var(--fg-mute);
+  --color-text-lightest: var(--fg-mute);
+  --color-background: var(--bg-elev);
+  --color-background-disabled: var(--bg-sunken);
+  --color-background-readonly: var(--bg-sunken);
+  --color-borders: var(--line);
+  --color-borders-group: var(--line);
+  --color-borders-disabled: var(--line);
+  --color-borders-readonly: var(--line);
+  --color-accent: var(--accent);
+  --color-warning: var(--bad);
+  font-family: var(--font-body, inherit);
+}
+.form-js-host .fjs-form-field-label {
+  color: var(--fg-soft);
+}
+.form-js-host .fjs-input,
+.form-js-host .fjs-textarea,
+.form-js-host .fjs-select {
+  background: var(--bg-elev);
+  color: var(--fg);
+  border-color: var(--line);
+}
+.form-js-host .fjs-form-field-error {
+  color: var(--bad);
+}
+
 /* DMN decision-table chrome blend */
 .dmn-host .dmn-decision-table-container {
   background: var(--bg) !important;
