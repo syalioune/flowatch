@@ -10,6 +10,7 @@ OWNER := $(shell echo "$(REPO)" | cut -d/ -f1)
 NAME  := $(shell echo "$(REPO)" | cut -d/ -f2)
 
 COMPOSE     := docker compose
+KC_COMPOSE  := docker compose -f docker-compose.keycloak.yml
 ENGINE_BASE := http://localhost:8080/flowable-rest/service
 ENGINE_AUTH := rest-admin:test
 
@@ -55,6 +56,21 @@ engine-shell:    ## Open a shell in the flowable container
 	$(COMPOSE) exec flowable sh
 engine-psql:     ## psql into the postgres database
 	$(COMPOSE) exec postgres psql -U flowable -d flowable
+
+# --- Keycloak OIDC test fixture (Story 28.4) -------------------------------
+.PHONY: keycloak-up keycloak-down keycloak-logs keycloak-ps
+keycloak-up:     ## Start the Keycloak OIDC test IdP (:8081, realm=flowatch, users mira/alice)
+	$(KC_COMPOSE) up -d
+	@echo "Keycloak  : http://localhost:8081/  (admin / admin)"
+	@echo "Issuer    : http://localhost:8081/realms/flowatch"
+	@echo "Client ID : flowatch  ·  Scopes: openid, profile, email, offline_access"
+	@echo "Users     : mira/mira-test  ·  alice/alice-test"
+keycloak-down:   ## Stop and remove the Keycloak fixture
+	$(KC_COMPOSE) down
+keycloak-logs:   ## Tail Keycloak logs
+	$(KC_COMPOSE) logs -f
+keycloak-ps:     ## Show Keycloak fixture status
+	$(KC_COMPOSE) ps
 
 # --- GitHub bootstrap (one-time per repo) ----------------------------------
 .PHONY: bootstrap bootstrap-labels bootstrap-milestones bootstrap-project bootstrap-protect
