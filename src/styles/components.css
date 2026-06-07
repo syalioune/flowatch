@@ -1389,6 +1389,47 @@
 .drawer-sect:first-child {
   margin-top: 0;
 }
+/* Story 30.1 — Flowable extensionElements editor lists (listeners, field
+   injection, in/out mappings) inside the BPMN properties panel. Token
+   vocabulary only (Pattern P-007); no hard-coded colors. */
+.ext-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 6px;
+}
+.ext-list-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+/* The add-forms are a single-column grid (each control on its own full-width
+   row) — `.input`/`.select` keep their inherited `width:100%`. `min-width:0`
+   guards against any future flex parent collapsing a child to min-content
+   (the "22px-wide, impossible to fill" bug). */
+.ext-add .input,
+.ext-add .select {
+  min-width: 0;
+}
+/* An existing extensionElements entry, rendered as an editable stacked block
+   (each control on its own full-width row) with a Remove button. */
+.ext-entry {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  margin-bottom: 6px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+.ext-entry .input,
+.ext-entry .select {
+  min-width: 0;
+}
 .code {
   font-family: var(--font-mono);
   font-size: 11.5px;

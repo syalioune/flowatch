@@ -431,3 +431,132 @@ describe("<BpmnModeler> — Story 16.3 New + Deploy + post-deploy toast", () => 
     expect(keyInput.value).toBe("loan-approval");
   });
 });
+
+// ─── Story 30.1 — element-type-aware Flowable field dispatch ────────────
+// The pending banner is gone (placeholder-then-real, AC-5); selecting an
+// element now renders the FR-38 coverage-table field set for that bpmnKind.
+describe("<BpmnModeler> — Story 30.1 properties panel dispatch", () => {
+  // Fire a selection of the given BPMN type. The stub BO answers .get() with
+  // undefined (empty) so the fields render in their cleared state.
+  const selectKind = async (type: string) => {
+    renderModeler();
+    await waitFor(() => expect(buses.length).toBe(1));
+    const bus = buses[0];
+    if (!bus) throw new Error("bus not captured");
+    const businessObject = { id: "El_1", get: (_k: string) => undefined };
+    bus.fire("selection.changed", {
+      newSelection: [{ id: "El_1", type, businessObject }],
+      oldSelection: [],
+    });
+  };
+
+  it("removes the Epic-30 pending banner (AC-5 placeholder swap)", async () => {
+    await selectKind("bpmn:UserTask");
+    expect(screen.queryByTestId("bpmn-properties-pending-banner")).not.toBeInTheDocument();
+  });
+
+  it("UserTask renders assignee / candidateGroups / async + listener editors", async () => {
+    await selectKind("bpmn:UserTask");
+    for (const attr of [
+      "assignee",
+      "candidateUsers",
+      "candidateGroups",
+      "formKey",
+      "async",
+      "exclusive",
+    ]) {
+      expect(screen.getByTestId(`bpmn-prop-${attr}`)).toBeInTheDocument();
+    }
+    expect(screen.getByTestId("bpmn-listeners-tasklistener")).toBeInTheDocument();
+    expect(screen.getByTestId("bpmn-listeners-executionlistener")).toBeInTheDocument();
+  });
+
+  it("ServiceTask renders class / expression / field injection — NOT user-task fields", async () => {
+    await selectKind("bpmn:ServiceTask");
+    for (const attr of [
+      "class",
+      "expression",
+      "delegateExpression",
+      "type",
+      "resultVariableName",
+    ]) {
+      expect(screen.getByTestId(`bpmn-prop-${attr}`)).toBeInTheDocument();
+    }
+    expect(screen.getByTestId("bpmn-field-injection")).toBeInTheDocument();
+    // Dispatch is exclusive — assignee is a UserTask-only field.
+    expect(screen.queryByTestId("bpmn-prop-assignee")).not.toBeInTheDocument();
+  });
+
+  it("CallActivity renders in/out mapping editors", async () => {
+    await selectKind("bpmn:CallActivity");
+    expect(screen.getByTestId("bpmn-prop-calledElementType")).toBeInTheDocument();
+    expect(screen.getByTestId("bpmn-inout-in")).toBeInTheDocument();
+    expect(screen.getByTestId("bpmn-inout-out")).toBeInTheDocument();
+  });
+
+  it("every simple-attribute field shows its data-testid + persists via the typed write path", async () => {
+    await selectKind("bpmn:UserTask");
+    const bus = buses[0];
+    if (!bus) throw new Error("bus not captured");
+    const input = screen.getByTestId("bpmn-prop-assignee") as HTMLInputElement;
+    fireEvent.blur(input, { target: { value: "kermit" } });
+    // No throw + the field exists — the write routes through modeling
+    // (stubbed updateProperties). Round-trip semantics are covered headless
+    // in flowable-moddle.test.ts.
+    expect(input).toBeInTheDocument();
+  });
+
+  // Fire a selection of an EVENT element carrying an eventDefinition.
+  const selectEvent = async (type: string, eventDefinition: Record<string, unknown>) => {
+    renderModeler();
+    await waitFor(() => expect(buses.length).toBe(1));
+    const bus = buses[0];
+    if (!bus) throw new Error("bus not captured");
+    const businessObject = {
+      id: "Ev_1",
+      eventDefinitions: [eventDefinition],
+      get: () => undefined,
+    };
+    bus.fire("selection.changed", {
+      newSelection: [{ id: "Ev_1", type, businessObject }],
+      oldSelection: [],
+    });
+  };
+
+  it("a signal event renders the editable signal-name field", async () => {
+    await selectEvent("bpmn:StartEvent", {
+      $type: "bpmn:SignalEventDefinition",
+      signalRef: { name: "orderPlaced" },
+    });
+    const f = screen.getByTestId("bpmn-prop-signalName") as HTMLInputElement;
+    expect(f).toBeInTheDocument();
+    expect(f.value).toBe("orderPlaced");
+  });
+
+  it("a message event renders the editable message-name field", async () => {
+    await selectEvent("bpmn:IntermediateCatchEvent", {
+      $type: "bpmn:MessageEventDefinition",
+      messageRef: { name: "paid" },
+    });
+    expect(screen.getByTestId("bpmn-prop-messageName")).toBeInTheDocument();
+  });
+
+  it("an error event renders the error code + name fields", async () => {
+    await selectEvent("bpmn:EndEvent", {
+      $type: "bpmn:ErrorEventDefinition",
+      errorRef: { errorCode: "E1", name: "Boom" },
+    });
+    expect(screen.getByTestId("bpmn-prop-errorCode")).toBeInTheDocument();
+    expect(screen.getByTestId("bpmn-prop-errorName")).toBeInTheDocument();
+  });
+
+  it("a timer event renders the kind selector + expression field", async () => {
+    await selectEvent("bpmn:BoundaryEvent", {
+      $type: "bpmn:TimerEventDefinition",
+      timeDuration: { body: "PT5M" },
+    });
+    expect(screen.getByTestId("bpmn-prop-timerKind")).toBeInTheDocument();
+    const expr = screen.getByTestId("bpmn-prop-timerExpression") as HTMLInputElement;
+    expect(expr.value).toBe("PT5M");
+  });
+});

@@ -1,0 +1,242 @@
+{
+  "name": "Flowable",
+  "uri": "http://flowable.org/bpmn",
+  "prefix": "flowable",
+  "xml": {
+    "tagAlias": "lowerCase"
+  },
+  "associations": [],
+  "types": [
+    {
+      "name": "AsyncCapable",
+      "isAbstract": true,
+      "extends": ["bpmn:Activity"],
+      "properties": [
+        { "name": "async", "isAttr": true, "type": "Boolean", "default": false },
+        { "name": "exclusive", "isAttr": true, "type": "Boolean", "default": true },
+        { "name": "asyncLeave", "isAttr": true, "type": "Boolean", "default": false },
+        { "name": "noWaitStatesAsyncLeave", "isAttr": true, "type": "Boolean" },
+        { "name": "parallelInSameTransaction", "isAttr": true, "type": "Boolean" }
+      ]
+    },
+    {
+      "name": "UserTaskExtension",
+      "isAbstract": true,
+      "extends": ["bpmn:UserTask"],
+      "properties": [
+        { "name": "assignee", "isAttr": true, "type": "String" },
+        { "name": "candidateUsers", "isAttr": true, "type": "String" },
+        { "name": "candidateGroups", "isAttr": true, "type": "String" },
+        { "name": "dueDate", "isAttr": true, "type": "String" },
+        { "name": "priority", "isAttr": true, "type": "String" },
+        { "name": "formKey", "isAttr": true, "type": "String" },
+        { "name": "formFieldValidation", "isAttr": true, "type": "String" },
+        { "name": "formHandlerClass", "isAttr": true, "type": "String" },
+        { "name": "businessCalendarName", "isAttr": true, "type": "String" },
+        { "name": "taskIdVariableName", "isAttr": true, "type": "String" },
+        { "name": "taskCompleterVariableName", "isAttr": true, "type": "String" }
+      ]
+    },
+    {
+      "name": "ServiceTaskExtension",
+      "isAbstract": true,
+      "extends": ["bpmn:ServiceTask", "bpmn:SendTask", "bpmn:BusinessRuleTask"],
+      "properties": [
+        { "name": "class", "isAttr": true, "type": "String" },
+        { "name": "expression", "isAttr": true, "type": "String" },
+        { "name": "delegateExpression", "isAttr": true, "type": "String" },
+        { "name": "type", "isAttr": true, "type": "String" },
+        { "name": "resultVariableName", "isAttr": true, "type": "String" },
+        { "name": "skipExpression", "isAttr": true, "type": "String" },
+        { "name": "topic", "isAttr": true, "type": "String" },
+        { "name": "triggerable", "isAttr": true, "type": "String" },
+        { "name": "doNotIncludeVariables", "isAttr": true, "type": "Boolean" },
+        { "name": "extensionId", "isAttr": true, "type": "String" }
+      ]
+    },
+    {
+      "name": "ScriptTaskExtension",
+      "isAbstract": true,
+      "extends": ["bpmn:ScriptTask"],
+      "properties": [
+        { "name": "resultVariable", "isAttr": true, "type": "String" },
+        { "name": "autoStoreVariables", "isAttr": true, "type": "Boolean" },
+        { "name": "useLocalScopeForResultVariable", "isAttr": true, "type": "Boolean" },
+        { "name": "storeResultVariableAsTransient", "isAttr": true, "type": "Boolean" }
+      ]
+    },
+    {
+      "name": "BusinessRuleTaskExtension",
+      "isAbstract": true,
+      "extends": ["bpmn:BusinessRuleTask"],
+      "properties": [
+        { "name": "decisionRef", "isAttr": true, "type": "String" },
+        { "name": "decisionRefTenantId", "isAttr": true, "type": "String" },
+        { "name": "fallbackToDefaultTenant", "isAttr": true, "type": "Boolean" }
+      ]
+    },
+    {
+      "name": "CallActivityExtension",
+      "isAbstract": true,
+      "extends": ["bpmn:CallActivity"],
+      "properties": [
+        { "name": "calledElementType", "isAttr": true, "type": "String" },
+        { "name": "businessKey", "isAttr": true, "type": "String" },
+        { "name": "inheritBusinessKey", "isAttr": true, "type": "Boolean" },
+        { "name": "sameDeployment", "isAttr": true, "type": "Boolean" },
+        { "name": "fallbackToDefaultTenant", "isAttr": true, "type": "Boolean" }
+      ]
+    },
+    {
+      "name": "CaseTaskExtension",
+      "isAbstract": true,
+      "extends": ["bpmn:Task"],
+      "properties": [{ "name": "caseDefinitionKey", "isAttr": true, "type": "String" }]
+    },
+    {
+      "name": "MultiInstanceExtension",
+      "isAbstract": true,
+      "extends": ["bpmn:MultiInstanceLoopCharacteristics"],
+      "properties": [
+        { "name": "collection", "isAttr": true, "type": "String" },
+        { "name": "elementVariable", "isAttr": true, "type": "String" },
+        { "name": "elementIndexVariable", "isAttr": true, "type": "String" }
+      ]
+    },
+    {
+      "name": "ProcessExtension",
+      "isAbstract": true,
+      "extends": ["bpmn:Process"],
+      "properties": [
+        { "name": "history", "isAttr": true, "type": "String" },
+        { "name": "initiator", "isAttr": true, "type": "String" },
+        { "name": "candidateStarterUsers", "isAttr": true, "type": "String" },
+        { "name": "candidateStarterGroups", "isAttr": true, "type": "String" }
+      ]
+    },
+    {
+      "name": "StartEventExtension",
+      "isAbstract": true,
+      "extends": ["bpmn:StartEvent"],
+      "properties": [
+        { "name": "initiator", "isAttr": true, "type": "String" },
+        { "name": "formKey", "isAttr": true, "type": "String" },
+        { "name": "formFieldValidation", "isAttr": true, "type": "String" }
+      ]
+    },
+    {
+      "name": "TimerEventExtension",
+      "isAbstract": true,
+      "extends": ["bpmn:TimerEventDefinition"],
+      "properties": [{ "name": "endDate", "isAttr": true, "type": "String" }]
+    },
+    {
+      "name": "ExecutionListener",
+      "superClass": ["Element"],
+      "meta": { "allowedIn": ["*"] },
+      "properties": [
+        { "name": "class", "isAttr": true, "type": "String" },
+        { "name": "expression", "isAttr": true, "type": "String" },
+        { "name": "delegateExpression", "isAttr": true, "type": "String" },
+        { "name": "event", "isAttr": true, "type": "String" },
+        { "name": "onTransaction", "isAttr": true, "type": "String" },
+        { "name": "fields", "type": "Field", "isMany": true, "xml": { "serialize": "property" } }
+      ]
+    },
+    {
+      "name": "TaskListener",
+      "superClass": ["Element"],
+      "meta": { "allowedIn": ["bpmn:UserTask"] },
+      "properties": [
+        { "name": "class", "isAttr": true, "type": "String" },
+        { "name": "expression", "isAttr": true, "type": "String" },
+        { "name": "delegateExpression", "isAttr": true, "type": "String" },
+        { "name": "event", "isAttr": true, "type": "String" },
+        { "name": "onTransaction", "isAttr": true, "type": "String" },
+        { "name": "fields", "type": "Field", "isMany": true, "xml": { "serialize": "property" } }
+      ]
+    },
+    {
+      "name": "Field",
+      "superClass": ["Element"],
+      "meta": { "allowedIn": ["*"] },
+      "properties": [
+        { "name": "name", "isAttr": true, "type": "String" },
+        { "name": "expression", "isAttr": true, "type": "String" },
+        { "name": "stringValue", "isAttr": true, "type": "String" },
+        { "name": "string", "type": "String", "xml": { "serialize": "property" } },
+        { "name": "expressionChild", "type": "Expression", "xml": { "serialize": "property" } }
+      ]
+    },
+    {
+      "name": "Expression",
+      "superClass": ["Element"],
+      "properties": [{ "name": "text", "isBody": true, "type": "String" }]
+    },
+    {
+      "name": "String",
+      "superClass": ["Element"],
+      "properties": [{ "name": "text", "isBody": true, "type": "String" }]
+    },
+    {
+      "name": "In",
+      "superClass": ["Element"],
+      "meta": { "allowedIn": ["bpmn:CallActivity"] },
+      "properties": [
+        { "name": "source", "isAttr": true, "type": "String" },
+        { "name": "sourceExpression", "isAttr": true, "type": "String" },
+        { "name": "target", "isAttr": true, "type": "String" },
+        { "name": "transient", "isAttr": true, "type": "Boolean" }
+      ]
+    },
+    {
+      "name": "Out",
+      "superClass": ["Element"],
+      "meta": { "allowedIn": ["bpmn:CallActivity"] },
+      "properties": [
+        { "name": "source", "isAttr": true, "type": "String" },
+        { "name": "sourceExpression", "isAttr": true, "type": "String" },
+        { "name": "target", "isAttr": true, "type": "String" },
+        { "name": "transient", "isAttr": true, "type": "Boolean" }
+      ]
+    },
+    {
+      "name": "FormProperty",
+      "superClass": ["Element"],
+      "meta": { "allowedIn": ["*"] },
+      "properties": [
+        { "name": "id", "isAttr": true, "type": "String" },
+        { "name": "name", "isAttr": true, "type": "String" },
+        { "name": "type", "isAttr": true, "type": "String" },
+        { "name": "expression", "isAttr": true, "type": "String" },
+        { "name": "variable", "isAttr": true, "type": "String" },
+        { "name": "default", "isAttr": true, "type": "String" },
+        { "name": "datePattern", "isAttr": true, "type": "String" },
+        { "name": "readable", "isAttr": true, "type": "Boolean", "default": true },
+        { "name": "writable", "isAttr": true, "type": "Boolean", "default": true },
+        { "name": "required", "isAttr": true, "type": "Boolean", "default": false },
+        { "name": "values", "type": "Value", "isMany": true, "xml": { "serialize": "property" } }
+      ]
+    },
+    {
+      "name": "Value",
+      "superClass": ["Element"],
+      "properties": [
+        { "name": "id", "isAttr": true, "type": "String" },
+        { "name": "name", "isAttr": true, "type": "String" }
+      ]
+    },
+    {
+      "name": "EventListener",
+      "superClass": ["Element"],
+      "meta": { "allowedIn": ["bpmn:Process"] },
+      "properties": [
+        { "name": "events", "isAttr": true, "type": "String" },
+        { "name": "class", "isAttr": true, "type": "String" },
+        { "name": "delegateExpression", "isAttr": true, "type": "String" },
+        { "name": "entityType", "isAttr": true, "type": "String" }
+      ]
+    }
+  ],
+  "enumerations": []
+}

@@ -21,6 +21,17 @@ import React from "react";
 import { api, type FlowableProcessDefinition } from "../api";
 import { Icon, toast } from "../components";
 import { DeployBpmnModal, type DeployBpmnModalTarget } from "../lib/deploy-bpmn-modal";
+import {
+  type EventDefSvc,
+  eventDefKind,
+  firstEventDef,
+  setEventRefAttr,
+  setTimerDef,
+  type TimerKind,
+  timerKindOf,
+  timerValueOf,
+} from "./event-defs";
+import flowableModdle from "./flowable-moddle.json";
 import { BLANK_BPMN_XML, LOAN_BPMN_XML } from "./starters";
 
 // @migration-any: bpmn-js DI container, event-bus payloads, and BO shapes
@@ -174,6 +185,413 @@ interface BpmnModelerProps {
   initialDefinitionId?: string | undefined;
 }
 
+// ─── Story 30.1 nested-extension editors ────────────────────────────
+// Presentational sub-components for the extensionElements editors. They own
+// their own draft-input state; the committed list + add/remove callbacks are
+// supplied by the parent (which routes them through the command stack). These
+// are NOT the element-type dispatch (that stays an inline switch in the
+// panel) — they are reusable field-cluster widgets shared across kinds.
+
+const TASK_LISTENER_EVENTS = ["create", "assignment", "complete", "delete"] as const;
+const EXEC_LISTENER_EVENTS = ["start", "end", "take"] as const;
+const ON_TRANSACTION = ["", "before-commit", "committed", "rolled-back"] as const;
+const IMPL_KINDS = ["class", "expression", "delegateExpression"] as const;
+
+// Current impl kind (class / expression / delegateExpression) of a listener
+// + its value. Listeners store the impl under exactly one of the three attrs.
+const listenerKind = (l: AnyEl): (typeof IMPL_KINDS)[number] =>
+  l.class != null
+    ? "class"
+    : l.expression != null
+      ? "expression"
+      : l.delegateExpression != null
+        ? "delegateExpression"
+        : "class";
+const listenerValue = (l: AnyEl): string => {
+  const v = l[listenerKind(l)];
+  return v == null ? "" : String(v);
+};
+
+interface ListenerEditorProps {
+  /** "Task listeners" | "Execution listeners" — operator-feel heading. */
+  title: string;
+  /** wire-level element type, e.g. "flowable:TaskListener". */
+  wireType: string;
+  events: readonly string[];
+  list: AnyEl[];
+  onAdd: (attrs: Record<string, unknown>) => void;
+  onUpdate: (child: AnyEl, attrs: Record<string, unknown>) => void;
+  onRemove: (child: AnyEl) => void;
+}
+
+const ListenerEditor = ({
+  title,
+  wireType,
+  events,
+  list,
+  onAdd,
+  onUpdate,
+  onRemove,
+}: ListenerEditorProps) => {
+  const [implKind, setImplKind] = React.useState<(typeof IMPL_KINDS)[number]>("class");
+  const [implValue, setImplValue] = React.useState("");
+  const [event, setEvent] = React.useState(events[0] || "");
+  const [onTx, setOnTx] = React.useState("");
+  const testidBase = wireType.replace("flowable:", "").toLowerCase();
+  return (
+    <div className="form-row" data-testid={`bpmn-listeners-${testidBase}`}>
+      <label>
+        {title} <span className="mono">{wireType}</span>
+      </label>
+      {list.map((l, i) => {
+        const kind = listenerKind(l);
+        return (
+          <div
+            className="ext-entry"
+            // biome-ignore lint/suspicious/noArrayIndexKey: moddle elements have no stable id
+            key={`${testidBase}:${i}`}
+            data-testid={`bpmn-listener-row-${testidBase}-${i}`}
+          >
+            <select
+              className="select"
+              value={l.event || events[0] || ""}
+              aria-label={`${title} ${i} event`}
+              onChange={(e) => onUpdate(l, { event: e.target.value })}
+            >
+              {events.map((ev) => (
+                <option key={ev} value={ev}>
+                  {ev}
+                </option>
+              ))}
+            </select>
+            <select
+              className="select"
+              value={kind}
+              aria-label={`${title} ${i} implementation kind`}
+              onChange={(e) => {
+                const next = e.target.value as (typeof IMPL_KINDS)[number];
+                const v = listenerValue(l);
+                onUpdate(l, {
+                  class: undefined,
+                  expression: undefined,
+                  delegateExpression: undefined,
+                  [next]: v,
+                });
+              }}
+            >
+              {IMPL_KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {k}
+                </option>
+              ))}
+            </select>
+            <input
+              className="input mono"
+              key={`${testidBase}:${i}:val`}
+              defaultValue={listenerValue(l)}
+              aria-label={`${title} ${i} implementation value`}
+              onBlur={(e) => onUpdate(l, { [kind]: e.target.value })}
+            />
+            <select
+              className="select"
+              value={l.onTransaction || ""}
+              aria-label={`${title} ${i} onTransaction`}
+              onChange={(e) => onUpdate(l, { onTransaction: e.target.value })}
+            >
+              {ON_TRANSACTION.map((t) => (
+                <option key={t || "_none"} value={t}>
+                  {t || "onTransaction: (none)"}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn"
+              data-size="sm"
+              data-variant="ghost"
+              aria-label={`Remove ${title} entry ${i}`}
+              onClick={() => onRemove(l)}
+            >
+              <Icon name="x" size={12} /> Remove
+            </button>
+          </div>
+        );
+      })}
+      <div className="ext-add" style={{ display: "grid", gap: 6 }}>
+        <select
+          className="select"
+          value={event}
+          aria-label={`${title} event`}
+          onChange={(e) => setEvent(e.target.value)}
+        >
+          {events.map((ev) => (
+            <option key={ev} value={ev}>
+              {ev}
+            </option>
+          ))}
+        </select>
+        <select
+          className="select"
+          value={implKind}
+          aria-label={`${title} implementation kind`}
+          onChange={(e) => setImplKind(e.target.value as (typeof IMPL_KINDS)[number])}
+        >
+          {IMPL_KINDS.map((k) => (
+            <option key={k} value={k}>
+              {k}
+            </option>
+          ))}
+        </select>
+        <input
+          className="input mono"
+          value={implValue}
+          placeholder="com.acme.MyListener"
+          aria-label={`${title} implementation value`}
+          onChange={(e) => setImplValue(e.target.value)}
+        />
+        <select
+          className="select"
+          value={onTx}
+          aria-label={`${title} onTransaction`}
+          onChange={(e) => setOnTx(e.target.value)}
+        >
+          {ON_TRANSACTION.map((t) => (
+            <option key={t || "_none"} value={t}>
+              {t || "onTransaction: (none)"}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="btn"
+          data-size="sm"
+          data-variant="ghost"
+          data-testid={`bpmn-listener-add-${testidBase}`}
+          disabled={!implValue.trim()}
+          onClick={() => {
+            onAdd({ event, [implKind]: implValue.trim(), onTransaction: onTx });
+            setImplValue("");
+            setOnTx("");
+          }}
+        >
+          <Icon name="plus" size={12} /> Add listener
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const fieldKind = (f: AnyEl): "stringValue" | "expression" =>
+  f.expression != null ? "expression" : "stringValue";
+const fieldValue = (f: AnyEl): string => {
+  const v = f[fieldKind(f)];
+  return v == null ? "" : String(v);
+};
+
+interface FieldInjectionEditorProps {
+  list: AnyEl[];
+  onAdd: (attrs: Record<string, unknown>) => void;
+  onUpdate: (child: AnyEl, attrs: Record<string, unknown>) => void;
+  onRemove: (child: AnyEl) => void;
+}
+
+const FieldInjectionEditor = ({ list, onAdd, onUpdate, onRemove }: FieldInjectionEditorProps) => {
+  const [name, setName] = React.useState("");
+  const [valKind, setValKind] = React.useState<"stringValue" | "expression">("stringValue");
+  const [value, setValue] = React.useState("");
+  return (
+    <div className="form-row" data-testid="bpmn-field-injection">
+      <label>
+        Field injection <span className="mono">flowable:field</span>
+      </label>
+      {list.map((f, i) => {
+        const kind = fieldKind(f);
+        return (
+          <div
+            className="ext-entry"
+            // biome-ignore lint/suspicious/noArrayIndexKey: moddle elements have no stable id
+            key={`field:${i}`}
+            data-testid={`bpmn-field-row-${i}`}
+          >
+            <input
+              className="input mono"
+              key={`field:${i}:name`}
+              defaultValue={f.name || ""}
+              aria-label={`Field ${i} name`}
+              onBlur={(e) => onUpdate(f, { name: e.target.value })}
+            />
+            <select
+              className="select"
+              value={kind}
+              aria-label={`Field ${i} value kind`}
+              onChange={(e) => {
+                const next = e.target.value as "stringValue" | "expression";
+                const v = fieldValue(f);
+                onUpdate(f, { stringValue: undefined, expression: undefined, [next]: v });
+              }}
+            >
+              <option value="stringValue">string</option>
+              <option value="expression">expression</option>
+            </select>
+            <input
+              className="input mono"
+              key={`field:${i}:val`}
+              defaultValue={fieldValue(f)}
+              aria-label={`Field ${i} value`}
+              onBlur={(e) => onUpdate(f, { [kind]: e.target.value })}
+            />
+            <button
+              type="button"
+              className="btn"
+              data-size="sm"
+              data-variant="ghost"
+              aria-label={`Remove field injection ${i}`}
+              onClick={() => onRemove(f)}
+            >
+              <Icon name="x" size={12} /> Remove
+            </button>
+          </div>
+        );
+      })}
+      <div className="ext-add" style={{ display: "grid", gap: 6 }}>
+        <input
+          className="input mono"
+          value={name}
+          placeholder="fieldName"
+          aria-label="Field name"
+          onChange={(e) => setName(e.target.value)}
+        />
+        <select
+          className="select"
+          value={valKind}
+          aria-label="Field value kind"
+          onChange={(e) => setValKind(e.target.value as "stringValue" | "expression")}
+        >
+          <option value="stringValue">string</option>
+          <option value="expression">expression</option>
+        </select>
+        <input
+          className="input mono"
+          value={value}
+          placeholder="value"
+          aria-label="Field value"
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <button
+          type="button"
+          className="btn"
+          data-size="sm"
+          data-variant="ghost"
+          data-testid="bpmn-field-add"
+          disabled={!name.trim() || !value.trim()}
+          onClick={() => {
+            onAdd({ name: name.trim(), [valKind]: value.trim() });
+            setName("");
+            setValue("");
+          }}
+        >
+          <Icon name="plus" size={12} /> Add field
+        </button>
+      </div>
+    </div>
+  );
+};
+
+interface InOutEditorProps {
+  direction: "in" | "out";
+  wireType: string;
+  list: AnyEl[];
+  onAdd: (attrs: Record<string, unknown>) => void;
+  onUpdate: (child: AnyEl, attrs: Record<string, unknown>) => void;
+  onRemove: (child: AnyEl) => void;
+}
+
+const InOutEditor = ({
+  direction,
+  wireType,
+  list,
+  onAdd,
+  onUpdate,
+  onRemove,
+}: InOutEditorProps) => {
+  const [source, setSource] = React.useState("");
+  const [target, setTarget] = React.useState("");
+  return (
+    <div className="form-row" data-testid={`bpmn-inout-${direction}`}>
+      <label>
+        {direction === "in" ? "In mappings" : "Out mappings"}{" "}
+        <span className="mono">{wireType}</span>
+      </label>
+      {list.map((mp, i) => (
+        <div
+          className="ext-entry"
+          // biome-ignore lint/suspicious/noArrayIndexKey: moddle elements have no stable id
+          key={`${direction}:${i}`}
+          data-testid={`bpmn-inout-row-${direction}-${i}`}
+        >
+          <input
+            className="input mono"
+            key={`${direction}:${i}:src`}
+            defaultValue={mp.source || ""}
+            placeholder="source"
+            aria-label={`${direction} ${i} source`}
+            onBlur={(e) => onUpdate(mp, { source: e.target.value })}
+          />
+          <input
+            className="input mono"
+            key={`${direction}:${i}:tgt`}
+            defaultValue={mp.target || ""}
+            placeholder="target"
+            aria-label={`${direction} ${i} target`}
+            onBlur={(e) => onUpdate(mp, { target: e.target.value })}
+          />
+          <button
+            type="button"
+            className="btn"
+            data-size="sm"
+            data-variant="ghost"
+            aria-label={`Remove ${direction} mapping ${i}`}
+            onClick={() => onRemove(mp)}
+          >
+            <Icon name="x" size={12} /> Remove
+          </button>
+        </div>
+      ))}
+      <div className="ext-add" style={{ display: "grid", gap: 6 }}>
+        <input
+          className="input mono"
+          value={source}
+          placeholder="source"
+          aria-label={`${direction} source`}
+          onChange={(e) => setSource(e.target.value)}
+        />
+        <input
+          className="input mono"
+          value={target}
+          placeholder="target"
+          aria-label={`${direction} target`}
+          onChange={(e) => setTarget(e.target.value)}
+        />
+        <button
+          type="button"
+          className="btn"
+          data-size="sm"
+          data-variant="ghost"
+          data-testid={`bpmn-inout-add-${direction}`}
+          disabled={!source.trim() || !target.trim()}
+          onClick={() => {
+            onAdd({ source: source.trim(), target: target.trim() });
+            setSource("");
+            setTarget("");
+          }}
+        >
+          <Icon name="plus" size={12} /> Add
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ─── BPMN modeler (real bpmn-js) ───────────────────────────────────
 export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
   const navigate = useNavigate();
@@ -255,6 +673,13 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
       m = new BpmnModelerClass({
         container: containerRef.current as HTMLElement,
         keyboard: { bindTo: window },
+        // Story 30.1: register the Flowable moddle descriptor so every
+        // flowable: attribute + extensionElements child is TYPED — the
+        // load-bearing round-trip foundation (FR-38 / D-8 / ADR-006).
+        // Typed properties read via bo.get("flowable:<attr>") and write via
+        // modeling.updateProperties / updateModdleProperties; untyped/foreign
+        // content still survives via moddle's lax handling (AC-4).
+        moddleExtensions: { flowable: flowableModdle },
       });
     } catch (e) {
       setError(String(e));
@@ -399,18 +824,139 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
     if (!m || !selected) return;
     m.get("modeling").updateProperties(selected, { name: val });
   };
+  // Story 30.1 — Flowable extension read/write helpers.
+  //
+  // Reads go through the TYPED moddle accessor `bo.get("flowable:<attr>")`
+  // (the descriptor registered in the constructor names every flowable:
+  // attribute). Writes go through `modeling.updateProperties` with the
+  // `flowable:`-qualified key so the value serializes under the right
+  // namespace and round-trips losslessly.
+
+  // Typed read of a flowable: attribute off the current selection's BO.
+  const readExtAttr = (attr: string): string => {
+    if (!bo) return "";
+    const v = (bo as { get?: (k: string) => unknown }).get?.(`flowable:${attr}`);
+    return v == null ? "" : String(v);
+  };
+  // Typed read of a boolean flowable: flag (Flowable serializes these as the
+  // string "true"; the descriptor types them Boolean so moddle coerces).
+  const readExtBool = (attr: string): boolean => {
+    if (!bo) return false;
+    const v = (bo as { get?: (k: string) => unknown }).get?.(`flowable:${attr}`);
+    return v === true || v === "true";
+  };
+
+  // Write (or clear) a simple flowable: attribute. Empty string / null clears
+  // the attribute entirely (absence is the clean default — keeps round-trip
+  // diffs honest, matching Flowable's own serializer; never writes "").
   const updateExtAttr = (attr: string, val: unknown) => {
     const m = modelerRef.current;
     if (!m || !selected) return;
     const modeling = m.get("modeling");
-    const props: Record<string, unknown> = {};
-    props[attr] = val;
+    const cleared = val === "" || val === null || val === undefined || val === false;
+    const props: Record<string, unknown> = { [`flowable:${attr}`]: cleared ? undefined : val };
     try {
       modeling.updateProperties(selected, props);
     } catch {
-      (selected.businessObject as Record<string, unknown>)[attr] = val;
+      // SDR fix: fallback must keep the flowable: namespace key (the
+      // command-stack path writes the qualified name) — a bare attr key
+      // would lose the namespace on rejection.
+      (selected.businessObject as Record<string, unknown>)[`flowable:${attr}`] = cleared
+        ? undefined
+        : val;
       setVersion((v) => v + 1);
     }
+  };
+
+  // Boolean flag write: checked → string "true"; unchecked → clear the
+  // attribute (Flowable treats absence as false — never write "false").
+  const updateExtBool = (attr: string, checked: boolean) => {
+    updateExtAttr(attr, checked ? "true" : "");
+  };
+
+  // ── Nested extensionElements helpers (listeners / field injection / in-out)
+  //
+  // Per the modeling-service write discipline (Dev Notes): create the moddle
+  // element with bpmnFactory, ensure a bpmn:ExtensionElements container, and
+  // commit the new values array via modeling.updateModdleProperties so the
+  // edit goes through the command stack (undo + dirty tracking for free).
+  // NEVER mutate businessObject.extensionElements directly.
+
+  // List the current extensionElements children of a given flowable: type.
+  const listExtChildren = (type: string): AnyEl[] => {
+    if (!bo || !bo.extensionElements || !Array.isArray(bo.extensionElements.values)) return [];
+    return bo.extensionElements.values.filter((v: AnyEl) => v && v.$type === type);
+  };
+
+  // Append a freshly-created flowable: moddle element to extensionElements.
+  const addExtChild = (type: string, attrs: Record<string, unknown>) => {
+    const m = modelerRef.current;
+    if (!m || !selected) return;
+    const modeling = m.get("modeling");
+    const bpmnFactory = m.get("bpmnFactory");
+    const moddle = m.get("moddle");
+    const boLocal = selected.businessObject as AnyEl;
+    // Drop empty-string attrs so we don't serialize blank attributes.
+    const clean: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(attrs)) {
+      if (val !== "" && val != null) clean[k] = val;
+    }
+    const child = bpmnFactory.create(type, clean);
+    let ext = boLocal.extensionElements;
+    if (!ext) {
+      ext = moddle.create("bpmn:ExtensionElements", { values: [] });
+      ext.$parent = boLocal;
+    }
+    const values = [...(ext.values || []), child];
+    try {
+      modeling.updateModdleProperties(selected, ext, { values });
+      if (!boLocal.extensionElements) {
+        modeling.updateProperties(selected, { extensionElements: ext });
+      }
+    } catch {
+      // Defensive fallback — keep the model consistent even if the command
+      // stack rejects (e.g. a stub modeler in tests).
+      boLocal.extensionElements = ext;
+      ext.values = values;
+    }
+    // Single re-render regardless of path (SDR fix: was double-incrementing
+    // on the catch path).
+    setVersion((v) => v + 1);
+  };
+
+  // Remove an extensionElements child by reference.
+  const removeExtChild = (child: AnyEl) => {
+    const m = modelerRef.current;
+    if (!m || !selected || !bo || !bo.extensionElements) return;
+    const modeling = m.get("modeling");
+    const ext = bo.extensionElements;
+    const values = (ext.values || []).filter((v: AnyEl) => v !== child);
+    try {
+      modeling.updateModdleProperties(selected, ext, { values });
+    } catch {
+      ext.values = values;
+    }
+    // Single re-render regardless of path (SDR fix).
+    setVersion((v) => v + 1);
+  };
+
+  // Update properties on an EXISTING extensionElements child in place. Empty-
+  // string values clear the attribute (absence is the clean default). Goes
+  // through the command stack like the create/remove paths (undo + dirty).
+  const updateExtChild = (child: AnyEl, attrs: Record<string, unknown>) => {
+    const m = modelerRef.current;
+    if (!m || !selected) return;
+    const modeling = m.get("modeling");
+    const clean: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(attrs)) {
+      clean[k] = val === "" || val == null ? undefined : val;
+    }
+    try {
+      modeling.updateModdleProperties(selected, child, clean);
+    } catch {
+      Object.assign(child, clean);
+    }
+    setVersion((v) => v + 1);
   };
 
   const saveXML = async () => {
@@ -645,6 +1191,316 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
   const sel = selected;
   const bo = sel && sel.businessObject;
 
+  // ── Story 30.1 field render helpers (element-type dispatch stays an inline
+  //    switch in the panel JSX; these are per-attribute field renderers).
+  const kind = sel ? bpmnKind(sel) : "";
+
+  const textField = (attr: string, label: string, placeholder?: string) =>
+    sel ? (
+      <div className="form-row" key={`${attr}-row`}>
+        <label>
+          {label} <span className="mono">flowable:{attr}</span>
+        </label>
+        <input
+          className="input mono"
+          key={`${sel.id}:${attr}:${version}`}
+          defaultValue={readExtAttr(attr)}
+          placeholder={placeholder}
+          data-testid={`bpmn-prop-${attr}`}
+          onBlur={(e) => updateExtAttr(attr, e.target.value)}
+        />
+      </div>
+    ) : null;
+
+  const boolField = (attr: string, label: string) =>
+    sel ? (
+      <div className="form-row" key={`${attr}-row`}>
+        <label htmlFor={`bpmn-prop-${attr}`}>
+          {label} <span className="mono">flowable:{attr}</span>
+        </label>
+        <input
+          id={`bpmn-prop-${attr}`}
+          type="checkbox"
+          key={`${sel.id}:${attr}:${version}`}
+          checked={readExtBool(attr)}
+          data-testid={`bpmn-prop-${attr}`}
+          onChange={(e) => updateExtBool(attr, e.target.checked)}
+        />
+      </div>
+    ) : null;
+
+  // Sequence-flow condition (standard bpmn:conditionExpression — NOT a
+  // flowable: attr). Stored as a bpmn:FormalExpression whose `body` is the
+  // JUEL/UEL expression. Write creates/updates the FormalExpression; an empty
+  // value clears the condition (a default/unconditional flow).
+  const setCondition = (body: string) => {
+    const m = modelerRef.current;
+    if (!m || !selected) return;
+    const modeling = m.get("modeling");
+    const trimmed = body.trim();
+    if (!trimmed) {
+      try {
+        modeling.updateProperties(selected, { conditionExpression: undefined });
+      } catch {}
+      setVersion((v) => v + 1);
+      return;
+    }
+    const moddle = m.get("moddle");
+    const expr = moddle.create("bpmn:FormalExpression", { body: trimmed });
+    expr.$parent = selected.businessObject;
+    try {
+      modeling.updateProperties(selected, { conditionExpression: expr });
+    } catch {
+      (selected.businessObject as AnyEl).conditionExpression = expr;
+    }
+    setVersion((v) => v + 1);
+  };
+  const conditionField = () =>
+    sel ? (
+      <div className="form-row" key="condition-row">
+        <label htmlFor="bpmn-prop-condition">
+          Condition <span className="mono">bpmn:conditionExpression</span>
+        </label>
+        <textarea
+          id="bpmn-prop-condition"
+          className="textarea mono"
+          key={`${sel.id}:cond:${version}`}
+          defaultValue={(bo?.conditionExpression && bo.conditionExpression.body) || ""}
+          placeholder={'${decision == "reject"}'}
+          data-testid="bpmn-prop-condition"
+          onBlur={(e) => setCondition(e.target.value)}
+        />
+      </div>
+    ) : null;
+
+  // Build the event-definition service backed by bpmn-js modeling for the
+  // current selection (the pure helpers at module scope do the real work).
+  const eventDefSvc = (): EventDefSvc | null => {
+    const m = modelerRef.current;
+    if (!m || !selected) return null;
+    const modeling = m.get("modeling");
+    let definitions: AnyEl | null = null;
+    try {
+      definitions = m.get("canvas").getRootElement()?.businessObject?.$parent ?? null;
+    } catch {}
+    return {
+      moddle: m.get("moddle"),
+      updateModdle: (target, props) => {
+        try {
+          modeling.updateModdleProperties(selected, target, props);
+        } catch {
+          Object.assign(target, props);
+        }
+      },
+      definitions,
+    };
+  };
+  const commitEventDef = (fn: (svc: EventDefSvc) => void) => {
+    const svc = eventDefSvc();
+    if (svc) fn(svc);
+    setVersion((v) => v + 1);
+  };
+
+  // Editable signal / message / timer / error event-definition fields. Renders
+  // for ANY event element (start / intermediate / boundary / end) that carries
+  // an eventDefinition; null otherwise.
+  const eventDefFields = () => {
+    const ed = bo ? firstEventDef(bo) : null;
+    const k = eventDefKind(ed);
+    if (!ed || !k) return null;
+    const textRow = (
+      testid: string,
+      label: string,
+      wire: string,
+      value: string,
+      onCommit: (svc: EventDefSvc, v: string) => void,
+      placeholder?: string,
+    ) => (
+      <div className="form-row" key={testid}>
+        <label>
+          {label} <span className="mono">{wire}</span>
+        </label>
+        <input
+          className="input mono"
+          key={`${sel?.id}:${testid}:${version}`}
+          defaultValue={value}
+          placeholder={placeholder}
+          data-testid={testid}
+          onBlur={(e) => commitEventDef((svc) => onCommit(svc, e.target.value))}
+        />
+      </div>
+    );
+    if (k === "signal")
+      return textRow(
+        "bpmn-prop-signalName",
+        "Signal name",
+        "bpmn:signalRef",
+        ed.signalRef?.name || "",
+        (svc, v) => setEventRefAttr(svc, ed, "signalRef", "bpmn:Signal", "name", v),
+        "orderPlaced",
+      );
+    if (k === "message")
+      return textRow(
+        "bpmn-prop-messageName",
+        "Message name",
+        "bpmn:messageRef",
+        ed.messageRef?.name || "",
+        (svc, v) => setEventRefAttr(svc, ed, "messageRef", "bpmn:Message", "name", v),
+        "paymentReceived",
+      );
+    if (k === "error")
+      return (
+        <React.Fragment key="error-event-def">
+          {textRow(
+            "bpmn-prop-errorCode",
+            "Error code",
+            "bpmn:errorRef · errorCode",
+            ed.errorRef?.errorCode || "",
+            (svc, v) => setEventRefAttr(svc, ed, "errorRef", "bpmn:Error", "errorCode", v),
+            "E_LOAN_REJECTED",
+          )}
+          {textRow(
+            "bpmn-prop-errorName",
+            "Error name",
+            "bpmn:errorRef · name",
+            ed.errorRef?.name || "",
+            (svc, v) => setEventRefAttr(svc, ed, "errorRef", "bpmn:Error", "name", v),
+          )}
+        </React.Fragment>
+      );
+    // timer
+    const tk = timerKindOf(ed);
+    return (
+      <div className="form-row" key="timer-event-def" data-testid="bpmn-prop-timer">
+        <label>
+          Timer <span className="mono">bpmn:timerEventDefinition</span>
+        </label>
+        <select
+          className="select"
+          value={tk}
+          aria-label="Timer kind"
+          data-testid="bpmn-prop-timerKind"
+          onChange={(e) =>
+            commitEventDef((svc) =>
+              setTimerDef(svc, ed, e.target.value as TimerKind, timerValueOf(ed)),
+            )
+          }
+        >
+          <option value="timeDuration">Duration (timeDuration)</option>
+          <option value="timeDate">Date (timeDate)</option>
+          <option value="timeCycle">Cycle (timeCycle)</option>
+        </select>
+        <input
+          className="input mono"
+          key={`${sel?.id}:timerexpr:${version}`}
+          defaultValue={timerValueOf(ed)}
+          placeholder={
+            tk === "timeCycle" ? "R3/PT10M" : tk === "timeDate" ? "2026-01-01T00:00:00" : "PT5M"
+          }
+          data-testid="bpmn-prop-timerExpression"
+          onBlur={(e) =>
+            commitEventDef((svc) => setTimerDef(svc, ed, timerKindOf(ed), e.target.value))
+          }
+        />
+      </div>
+    );
+  };
+
+  const taskListeners = () => (
+    <ListenerEditor
+      title="Task listeners"
+      wireType="flowable:TaskListener"
+      events={TASK_LISTENER_EVENTS}
+      list={listExtChildren("flowable:TaskListener")}
+      onAdd={(attrs) => addExtChild("flowable:TaskListener", attrs)}
+      onUpdate={updateExtChild}
+      onRemove={removeExtChild}
+    />
+  );
+  const execListeners = (events: readonly string[] = EXEC_LISTENER_EVENTS) => (
+    <ListenerEditor
+      title="Execution listeners"
+      wireType="flowable:ExecutionListener"
+      events={events}
+      list={listExtChildren("flowable:ExecutionListener")}
+      onAdd={(attrs) => addExtChild("flowable:ExecutionListener", attrs)}
+      onUpdate={updateExtChild}
+      onRemove={removeExtChild}
+    />
+  );
+  const fieldInjection = () => (
+    <FieldInjectionEditor
+      list={listExtChildren("flowable:Field")}
+      onAdd={(attrs) => addExtChild("flowable:Field", attrs)}
+      onUpdate={updateExtChild}
+      onRemove={removeExtChild}
+    />
+  );
+  const inOutMappings = () => (
+    <>
+      <InOutEditor
+        direction="in"
+        wireType="flowable:in"
+        list={listExtChildren("flowable:In")}
+        onAdd={(attrs) => addExtChild("flowable:In", attrs)}
+        onUpdate={updateExtChild}
+        onRemove={removeExtChild}
+      />
+      <InOutEditor
+        direction="out"
+        wireType="flowable:out"
+        list={listExtChildren("flowable:Out")}
+        onAdd={(attrs) => addExtChild("flowable:Out", attrs)}
+        onUpdate={updateExtChild}
+        onRemove={removeExtChild}
+      />
+    </>
+  );
+
+  // Process-level fields (AC-2 Process row) — surfaced in the no-selection
+  // Outline header. These target the canvas root element (the bpmn:Process),
+  // not `selected`, so they have their own read/write against the root BO.
+  const getRootEl = (): AnyEl | null => {
+    const m = modelerRef.current;
+    if (!m) return null;
+    try {
+      const root = m.get("canvas").getRootElement();
+      // A Collaboration root has no flowable: process attrs; skip it.
+      if (root?.businessObject?.$type === "bpmn:Process") return root;
+    } catch {}
+    return null;
+  };
+  const rootEl = sel ? null : getRootEl();
+  const rootBo = rootEl?.businessObject as AnyEl | undefined;
+  const readRootAttr = (attr: string): string => {
+    const v = rootBo?.get?.(`flowable:${attr}`);
+    return v == null ? "" : String(v);
+  };
+  const updateRootAttr = (attr: string, val: string) => {
+    const m = modelerRef.current;
+    if (!m || !rootEl) return;
+    const cleared = val === "";
+    try {
+      m.get("modeling").updateProperties(rootEl, {
+        [`flowable:${attr}`]: cleared ? undefined : val,
+      });
+    } catch {}
+  };
+  const processTextField = (attr: string, label: string) => (
+    <div className="form-row" key={`proc-${attr}`}>
+      <label>
+        {label} <span className="mono">flowable:{attr}</span>
+      </label>
+      <input
+        className="input mono"
+        key={`proc:${attr}:${version}`}
+        defaultValue={readRootAttr(attr)}
+        data-testid={`bpmn-prop-${attr}`}
+        onBlur={(e) => updateRootAttr(attr, e.target.value)}
+      />
+    </div>
+  );
+
   return (
     <div className="modeler" data-engine="real">
       <div className="mod-toolbar">
@@ -729,7 +1585,14 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
           <Icon name="plus" size={13} />
           New
         </button>
-        <button type="button" className="btn" data-size="sm" data-variant="ghost" onClick={saveXML}>
+        <button
+          type="button"
+          className="btn"
+          data-size="sm"
+          data-variant="ghost"
+          data-testid="bpmn-save-xml"
+          onClick={saveXML}
+        >
           <Icon name="save" size={13} />
           Save
         </button>
@@ -890,6 +1753,21 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
                   <span className="kind">{bpmnKind(el)}</span>
                 </button>
               ))}
+              {rootEl && (
+                <div
+                  data-testid="bpmn-process-section"
+                  style={{
+                    padding: "8px 14px 0",
+                    borderTop: "1px solid var(--line)",
+                    marginTop: 8,
+                  }}
+                >
+                  <div className="drawer-sect">Process · {rootEl.businessObject.id}</div>
+                  {processTextField("candidateStarterUsers", "Candidate starter users")}
+                  {processTextField("candidateStarterGroups", "Candidate starter groups")}
+                  {processTextField("initiator", "Initiator")}
+                </div>
+              )}
               <div style={{ padding: "10px 14px" }}>
                 <div className="text-xs mute">
                   Drag from the bpmn-js palette to add elements. Click any node to edit
@@ -901,29 +1779,6 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
           )}
           {sel && (
             <>
-              <div
-                data-testid="bpmn-properties-pending-banner"
-                style={{
-                  margin: "0 0 12px",
-                  padding: "10px 12px",
-                  background: "var(--bg-sunken)",
-                  border: "1px solid var(--warn)",
-                  borderRadius: 6,
-                  color: "var(--fg-soft)",
-                  fontSize: 12,
-                  lineHeight: 1.45,
-                }}
-              >
-                <strong style={{ color: "var(--warn)" }}>
-                  Flowable-specific properties pending
-                </strong>
-                <br />
-                Name &amp; XML id below persist via bpmn-js. Flowable extension attributes (Service
-                Task class / async, User Task assignee &amp; form key, Business Rule decisionRef, …)
-                render here but
-                <em> edits don't yet round-trip to the BPMN XML</em> — full support lands in Epic 30
-                (Flowable properties panel).
-              </div>
               <div className="form-row">
                 <label>
                   Name <span className="mono">bpmn:name</span>
@@ -947,140 +1802,91 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
                 />
               </div>
 
-              {bpmnKind(sel) === "UserTask" && (
+              {/* Event-definition fields (signal / message / timer / error) —
+                  render for ANY event element carrying an eventDefinition,
+                  before the kind-specific Flowable fields below. Standard BPMN
+                  refs/expressions, editable + lossless round-trip. */}
+              {eventDefFields()}
+
+              {/* Story 30.1 — element-type-aware Flowable field dispatch.
+                  Inline switch on bpmnKind (CLAUDE.md tab-aware dispatch); each
+                  arm renders the FR-38 coverage-table field set, all wired to
+                  the registered flowable moddle descriptor for lossless round-
+                  trip. */}
+              {kind === "UserTask" && (
                 <>
-                  <div className="form-row">
-                    <label>
-                      Assignee <span className="mono">flowable:assignee</span>
-                    </label>
-                    <input
-                      className="input mono"
-                      key={sel.id + ":asg:" + version}
-                      defaultValue={bo.assignee || ""}
-                      placeholder="${initiator}"
-                      onBlur={(e) => updateExtAttr("assignee", e.target.value)}
-                    />
-                  </div>
-                  <div className="form-row">
-                    <label>
-                      Candidate groups <span className="mono">flowable:candidateGroups</span>
-                    </label>
-                    <input
-                      className="input mono"
-                      key={sel.id + ":cg:" + version}
-                      defaultValue={bo.candidateGroups || ""}
-                      onBlur={(e) => updateExtAttr("candidateGroups", e.target.value)}
-                    />
-                  </div>
-                  <div className="form-row">
-                    <label>
-                      Form key <span className="mono">flowable:formKey</span>
-                    </label>
-                    <input
-                      className="input mono"
-                      key={sel.id + ":fk:" + version}
-                      defaultValue={bo.formKey || ""}
-                      onBlur={(e) => updateExtAttr("formKey", e.target.value)}
-                    />
-                  </div>
-                  <div className="form-row">
-                    <label>
-                      Due date <span className="mono">flowable:dueDate · ISO</span>
-                    </label>
-                    <input
-                      className="input mono"
-                      key={sel.id + ":dd:" + version}
-                      defaultValue={bo.dueDate || ""}
-                      placeholder="P2D"
-                      onBlur={(e) => updateExtAttr("dueDate", e.target.value)}
-                    />
-                  </div>
+                  {textField("assignee", "Assignee", "${initiator}")}
+                  {textField("candidateUsers", "Candidate users")}
+                  {textField("candidateGroups", "Candidate groups")}
+                  {textField("formKey", "Form key")}
+                  {textField("dueDate", "Due date", "P2D")}
+                  {textField("priority", "Priority", "50")}
+                  {boolField("async", "Run asynchronously")}
+                  {boolField("exclusive", "Exclusive")}
+                  {boolField("asyncLeave", "Async (on leave)")}
+                  {taskListeners()}
+                  {execListeners()}
                 </>
               )}
-              {bpmnKind(sel) === "ServiceTask" && (
+              {kind === "ServiceTask" && (
                 <>
-                  <div className="form-row">
-                    <label>Implementation</label>
-                    <select className="select" defaultValue="class">
-                      <option value="class">Java delegate (class)</option>
-                      <option value="expression">Expression</option>
-                      <option value="delegateExpression">Delegate expression</option>
-                    </select>
-                  </div>
-                  <div className="form-row">
-                    <label>
-                      Class <span className="mono">flowable:class</span>
-                    </label>
-                    <input
-                      className="input mono"
-                      key={sel.id + ":cls:" + version}
-                      defaultValue={bo.class || ""}
-                      placeholder="com.acme…"
-                      onBlur={(e) => updateExtAttr("class", e.target.value)}
-                    />
-                  </div>
-                  <div className="form-row">
-                    <label>
-                      Async <span className="mono">flowable:async</span>
-                    </label>
-                    <div className="seg-row">
-                      <button
-                        type="button"
-                        className="seg-btn"
-                        data-on={!bo.async ? "1" : "0"}
-                        onClick={() => updateExtAttr("async", false)}
-                      >
-                        No
-                      </button>
-                      <button
-                        type="button"
-                        className="seg-btn"
-                        data-on={bo.async ? "1" : "0"}
-                        onClick={() => updateExtAttr("async", true)}
-                      >
-                        Yes
-                      </button>
-                    </div>
-                  </div>
+                  {textField("class", "Class", "com.acme.MyDelegate")}
+                  {textField("expression", "Expression", "${myBean.method()}")}
+                  {textField("delegateExpression", "Delegate expression", "${myDelegate}")}
+                  {textField("type", "Built-in type", "http")}
+                  {textField("resultVariableName", "Result variable")}
+                  {fieldInjection()}
+                  {boolField("async", "Run asynchronously")}
+                  {boolField("exclusive", "Exclusive")}
+                  {boolField("asyncLeave", "Async (on leave)")}
+                  {execListeners()}
                 </>
               )}
-              {bpmnKind(sel) === "BusinessRuleTask" && (
+              {kind === "ScriptTask" && (
                 <>
-                  <div className="form-row">
-                    <label>
-                      Decision ref <span className="mono">flowable:decisionRef</span>
-                    </label>
-                    <input
-                      className="input mono"
-                      key={sel.id + ":dr:" + version}
-                      defaultValue={bo.decisionRef || ""}
-                      onBlur={(e) => updateExtAttr("decisionRef", e.target.value)}
-                    />
-                  </div>
-                  <div className="form-row">
-                    <label>Result variable</label>
-                    <input className="input mono" placeholder="decision" />
-                  </div>
+                  {textField("resultVariable", "Result variable")}
+                  {boolField("async", "Run asynchronously")}
+                  {boolField("exclusive", "Exclusive")}
+                  {boolField("asyncLeave", "Async (on leave)")}
+                  {execListeners()}
                 </>
               )}
-              {bpmnKind(sel) === "ExclusiveGateway" && (
-                <div className="form-row">
-                  <label>Default flow</label>
-                  <input className="input mono" placeholder="Flow_…" />
-                </div>
+              {kind === "CallActivity" && (
+                <>
+                  {textField("calledElementType", "Called element type", "key")}
+                  {textField("businessKey", "Business key")}
+                  {boolField("inheritBusinessKey", "Inherit business key")}
+                  {inOutMappings()}
+                  {boolField("async", "Run asynchronously")}
+                  {boolField("exclusive", "Exclusive")}
+                  {boolField("asyncLeave", "Async (on leave)")}
+                  {execListeners()}
+                </>
               )}
-              {bpmnKind(sel) === "SequenceFlow" && (
-                <div className="form-row">
-                  <label>
-                    Condition <span className="mono">bpmn:conditionExpression</span>
-                  </label>
-                  <textarea
-                    className="textarea mono"
-                    key={sel.id + ":cond:" + version}
-                    defaultValue={(bo.conditionExpression && bo.conditionExpression.body) || ""}
-                    placeholder={'${decision == "approve"}'}
-                  />
-                </div>
+              {kind === "BusinessRuleTask" && (
+                <>
+                  {textField("class", "Class")}
+                  {textField("expression", "Expression")}
+                  {textField("delegateExpression", "Delegate expression")}
+                  {textField("resultVariableName", "Result variable")}
+                  {boolField("async", "Run asynchronously")}
+                  {boolField("exclusive", "Exclusive")}
+                  {boolField("asyncLeave", "Async (on leave)")}
+                  {execListeners()}
+                </>
+              )}
+              {kind === "StartEvent" && (
+                <>
+                  {textField("formKey", "Form key")}
+                  {textField("initiator", "Initiator")}
+                  {execListeners()}
+                </>
+              )}
+              {kind === "SequenceFlow" && (
+                <>
+                  {conditionField()}
+                  {execListeners(["take"])}
+                </>
               )}
 
               <div className="drawer-sect">REST</div>
