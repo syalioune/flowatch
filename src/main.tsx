@@ -2,6 +2,7 @@
 
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import ReactDOM from "react-dom/client";
+import { installStrategyForActiveConnection } from "./lib/install-auth-strategy";
 import { resolveOidcProviderConfig } from "./lib/oidc-accessor";
 // Self-hosted IBM Plex faces must register before any layout-affecting CSS.
 import "./styles/fonts.css";
@@ -44,6 +45,13 @@ if (!rootEl) throw new Error("root element not found");
 // the react-oidc-context provider (its own `oidc` Vite chunk) and wrap the app
 // in <AuthProvider>. For Basic/Bearer users the chunk never loads — the
 // tree-shake intent. The dynamic import is the lazy boundary.
+// Install the AuthStrategy matching the active connection BEFORE the first
+// render — otherwise the module-default BasicAuthStrategy (empty creds →
+// "Basic Og==") fires on the earliest API calls (probe / nav counts) that run
+// in mount effects before app.tsx's install effect swaps it. The app.tsx
+// effect + SAVED_CONNECTIONS_CHANGED listener still handle runtime switches.
+installStrategyForActiveConnection();
+
 const tree = <RouterProvider router={router} />;
 const oidcCfg = resolveOidcProviderConfig();
 if (oidcCfg) {

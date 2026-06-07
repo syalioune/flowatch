@@ -48,6 +48,7 @@ describe("OIDC token accessor singleton", () => {
       getToken: async () => "t",
       signIn: () => {},
       signOut: () => {},
+      renewSilent: () => {},
       isAuthenticated: true,
       username: "mira",
     };

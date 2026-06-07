@@ -21,6 +21,7 @@ import {
   OPEN_SETTINGS_AUTH,
   SAVED_CONNECTIONS_CHANGED,
 } from "./lib/nav-events";
+import { OIDC_AUTH_CHANGED } from "./lib/oidc-accessor";
 import { useRouteMeta } from "./lib/route-meta";
 import { listShortcutsByCategory } from "./lib/shortcuts";
 import "./lib/window-events";
@@ -275,6 +276,25 @@ function App() {
     window.addEventListener(NAV_INVALIDATE_COUNTS, handler);
     return () => window.removeEventListener(NAV_INVALIDATE_COUNTS, handler);
   }, [refreshNavCounts]);
+
+  // Story 28.4 (smoke fix): react-oidc-context finishes the token exchange
+  // ASYNC after mount, so the dashboard's first probe / nav-count / loader
+  // fetches fire BEFORE the OIDC access token is available (no Authorization
+  // header → engine 401s, screens stuck on errors). When the bridge reports an
+  // auth-state change (sign-in / silent-renew completes), re-run the data
+  // fetches so the now-available Bearer token is applied. Fires on every
+  // OIDC_AUTH_CHANGED (incl. the pre-auth bridge mount) — the extra pre-token
+  // refetch is harmless (same no-header result as the initial load).
+  React.useEffect(() => {
+    const handler = (): void => {
+      void probe();
+      void refetchTenants();
+      void refreshNavCounts();
+      void router.invalidate();
+    };
+    window.addEventListener(OIDC_AUTH_CHANGED, handler);
+    return () => window.removeEventListener(OIDC_AUTH_CHANGED, handler);
+  }, [probe, refetchTenants, refreshNavCounts, router]);
 
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {
