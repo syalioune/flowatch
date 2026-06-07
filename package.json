@@ -29,6 +29,7 @@
     "badges:check": "node scripts/release/update-readme-badges.mjs --check"
   },
   "dependencies": {
+    "@bpmn-io/form-js-viewer": "1.21.3",
     "@tanstack/react-router": "^1.169.2",
     "bpmn-js": "^17.11.1",
     "dmn-js": "^16.6.1",

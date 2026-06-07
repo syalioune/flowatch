@@ -1,0 +1,17 @@
+{
+  "type": "default",
+  "id": "loanFormJs",
+  "schemaVersion": 19,
+  "components": [
+    {
+      "type": "textfield",
+      "key": "comment",
+      "label": "Comment"
+    },
+    {
+      "type": "checkbox",
+      "key": "approved",
+      "label": "Approved"
+    }
+  ]
+}

@@ -76,7 +76,7 @@ export default defineConfig({
     react(),
   ],
   optimizeDeps: {
-    include: ["bpmn-js", "dmn-js"],
+    include: ["bpmn-js", "dmn-js", "@bpmn-io/form-js-viewer"],
   },
   build: {
     rollupOptions: {
@@ -88,6 +88,10 @@ export default defineConfig({
           // Story 28.4 (ADR-009): OIDC libs in their own chunk so the ~bundle
           // weight only loads when an OIDC connection mounts <AuthProvider>.
           oidc: ["react-oidc-context", "oidc-client-ts"],
+          // Story 29.1 (FR-23): form-js viewer in its own chunk, mirroring
+          // the bpmn / dmn split — keeps the form-js bundle out of the main
+          // entry chunk (only loads when <TaskFormPanel> renders a form-js task).
+          forms: ["@bpmn-io/form-js-viewer"],
         },
       },
     },

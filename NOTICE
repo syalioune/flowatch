@@ -9,6 +9,7 @@ identifier, and homepage URL.
 Direct dependencies (production):
 ----------------------------------------------------------------
 
+- @bpmn-io/form-js-viewer  1.21.3  Custom: LICENSE  https://github.com/bpmn-io/form-js
 - @tanstack/react-router  1.169.2  MIT  https://github.com/TanStack/router
 - bpmn-js  17.11.1  Custom: LICENSE  https://github.com/bpmn-io/bpmn-js
 - dmn-js  16.8.2  Custom: LICENSE  https://github.com/bpmn-io/dmn-js
