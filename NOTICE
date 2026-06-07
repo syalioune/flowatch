@@ -12,8 +12,10 @@ Direct dependencies (production):
 - @tanstack/react-router  1.169.2  MIT  https://github.com/TanStack/router
 - bpmn-js  17.11.1  Custom: LICENSE  https://github.com/bpmn-io/bpmn-js
 - dmn-js  16.8.2  Custom: LICENSE  https://github.com/bpmn-io/dmn-js
+- oidc-client-ts  3.5.0  Apache-2.0  https://github.com/authts/oidc-client-ts
 - react  18.3.1  MIT  https://github.com/facebook/react
 - react-dom  18.3.1  MIT  https://github.com/facebook/react
+- react-oidc-context  3.3.1  MIT  https://github.com/authts/react-oidc-context
 - zod  3.25.76  MIT  https://github.com/colinhacks/zod
 
 ----------------------------------------------------------------

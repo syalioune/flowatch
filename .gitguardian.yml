@@ -18,9 +18,11 @@ secret:
     - ".trivyignore"
     - ".gitleaks.toml"
     # Keycloak OIDC test fixture (Story 28.4) — throwaway dev-only realm with
-    # intentionally weak public test-user passwords. Never deployed.
+    # intentionally weak public test-user passwords. Never deployed. The doc
+    # repeats the same fixture credentials (admin/admin, mira/alice).
     - "keycloak/**"
     - "docker-compose.keycloak.yml"
+    - "docs/oidc-testing.md"
 
   # Known dev-only credentials baked into the local stack.
   ignored-matches:
@@ -60,3 +62,5 @@ secret:
       match: "mira-test"
     - name: "Keycloak OIDC test-fixture user password — alice (Story 28.4)"
       match: "alice-test"
+    - name: "Keycloak OIDC test-fixture bootstrap admin password (Story 28.4)"
+      match: "admin"
