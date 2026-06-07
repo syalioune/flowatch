@@ -64,13 +64,23 @@ export const classifyTaskForm = (payload: FlowableTaskForm | null | undefined): 
 
 // Story 29.1: map a form-js submit `data` object (field-key → value) to the
 // SAME `{ id, value }` envelope the legacy `buildSubmitProperties` produces, so
-// both branches submit wire-identically via `api.submitTaskForm`. Values
+// both branches submit wire-identically via `api.submitTaskForm`. Scalar values
 // stringify like the legacy serializer (booleans → "true"/"false", numbers →
 // their JS string form). Exported for unit testing.
+//
+// `null` / `undefined` field values (an untouched optional field) are SKIPPED
+// rather than serialized to the literal strings "null" / "undefined" — the
+// legacy serializer never emits those, so skipping keeps the wire shape
+// faithful. Non-scalar form-js values (arrays from checklist/taglist, objects
+// from group/table) are NOT specially handled here — a type-aware serializer
+// is deferred-work, and the 29.1 fixture/live surface only exercises scalars
+// (see deferred-work.md). Review: bmad-code-review 2026-06-07.
 export const mapFormJsData = (
   data: Record<string, unknown>,
 ): Array<{ id: string; value: string }> =>
-  Object.entries(data).map(([id, value]) => ({ id, value: String(value) }));
+  Object.entries(data)
+    .filter(([, value]) => value !== null && value !== undefined)
+    .map(([id, value]) => ({ id, value: String(value) }));
 
 // Local event-payload interface (Pattern P-006): form-js doesn't publish a
 // React-typed `submit` payload, so we name the fields actually observed —
@@ -182,6 +192,10 @@ function FormJsForm({
   handleSubmitRef.current = (e: FormJsSubmitEvent) => {
     // form-js surfaces client-side validation errors natively; block submit.
     if (e.errors && Object.keys(e.errors).length > 0) return;
+    // Guard against a re-entrant submit while a POST is already in flight (the
+    // button is disabled while busy, but a schema-embedded submit button or a
+    // fast double-fire could still re-enter). Review: bmad-code-review.
+    if (busy) return;
     setSubmitError(null);
     setBusy(true);
     void (async () => {
@@ -203,6 +217,11 @@ function FormJsForm({
   React.useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    // `cancelled` guards the async importSchema chain so a teardown (unmount or
+    // schema change) before the promise settles doesn't setState on a stale
+    // instance — mirrors the BpmnModeler / useApi cancelled-flag precedent.
+    // Review: bmad-code-review 2026-06-07.
+    let cancelled = false;
     let form: Form;
     try {
       form = new Form({ container: el });
@@ -218,9 +237,14 @@ function FormJsForm({
     // schema rejects → ErrorBox (AC-3), never a blank panel.
     form
       .importSchema(schema as Parameters<Form["importSchema"]>[0])
-      .then(() => setReady(true))
-      .catch((e: unknown) => setImportError(e instanceof Error ? e : new Error(String(e))));
+      .then(() => {
+        if (!cancelled) setReady(true);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setImportError(e instanceof Error ? e : new Error(String(e)));
+      });
     return () => {
+      cancelled = true;
       try {
         form.off("submit", onSubmit);
         form.destroy();
@@ -464,7 +488,17 @@ export function TaskFormPanel({ taskId, task, onSubmitted }: Props) {
         )}
         {/* Story 29.1: form-js branch — modern @bpmn-io/form-js render. */}
         {!form.loading && !form.error && kind === "form-js" && form.data && (
-          <FormJsForm taskId={taskId} task={task} schema={form.data} onSubmitted={onSubmitted} />
+          // key={taskId} forces a fresh FormJsForm (clean ready/busy/error
+          // state + a fresh vanilla Form) when navigating between two form-js
+          // tasks, mirroring the legacy branch's taskId-keyed state reset.
+          // Review: bmad-code-review 2026-06-07.
+          <FormJsForm
+            key={taskId}
+            taskId={taskId}
+            task={task}
+            schema={form.data}
+            onSubmitted={onSubmitted}
+          />
         )}
         {/* Story 11.3 legacy branch — kept verbatim as the FR-23 fallback. */}
         {!form.loading && !form.error && kind === "legacy" && form.data && (
