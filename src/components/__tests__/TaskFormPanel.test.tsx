@@ -192,6 +192,14 @@ describe("mapFormJsData (Story 29.1)", () => {
   it("returns an empty array for an empty data object", () => {
     expect(mapFormJsData({})).toEqual([]);
   });
+
+  it("skips null / undefined values instead of serializing them to 'null' / 'undefined'", () => {
+    expect(mapFormJsData({ a: "x", b: null, c: undefined, d: 0, e: false })).toEqual([
+      { id: "a", value: "x" },
+      { id: "d", value: "0" },
+      { id: "e", value: "false" },
+    ]);
+  });
 });
 
 describe("buildSubmitProperties", () => {
