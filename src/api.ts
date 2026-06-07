@@ -232,12 +232,9 @@ const qs = (params?: QueryParams): string => {
 };
 
 // ── Pluggable auth strategy (Story 28.1 — ADR-009) ────────────────────────
-//
-// The active strategy produces the Authorization header for every request()
-// and multipartFetch() call. Default is BasicAuthStrategy reading cfg via a
-// getter closure (so api.setConfig() + connection switches are reflected
-// without re-installing). Story 28.2's install dispatcher swaps this on
-// connection-active per the persisted authStrategyConfig.kind.
+// Active strategy produces the Authorization header for request() +
+// multipartFetch(). Default BasicAuthStrategy reads cfg via a getter closure;
+// Story 28.2's dispatcher swaps it per the active authStrategyConfig.kind.
 let authStrategy: AuthStrategy = new BasicAuthStrategy(() => ({
   username: cfg.username,
   password: cfg.password,

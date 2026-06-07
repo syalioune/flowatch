@@ -31,6 +31,9 @@ export default defineConfig({
         "src/screens.tsx",
         "src/modeler.tsx",
         "src/components.tsx",
+        // Story 28.4: extracted from components.tsx for the NFR-21 size gate;
+        // keep it coverage-gated (it carries real Auth-tab runtime logic).
+        "src/components/SettingsAuthTab.tsx",
       ],
       exclude: [
         "src/**/*.test.ts",
@@ -116,7 +119,18 @@ export default defineConfig({
         perFile: true,
         "src/lib/**": { lines: 60, branches: 60, functions: 60, statements: 60 },
         "src/api.ts": { lines: 96, branches: 92, statements: 96, functions: 93 },
-        "src/components.tsx": { lines: 53, branches: 75, functions: 45, statements: 53 },
+        // Story 28.4: branches 75→74 — the well-covered Auth-tab (85% branches)
+        // was extracted to src/components/SettingsAuthTab.tsx for the NFR-21
+        // size gate, which lowers the remaining file's branch average by ~1pp.
+        // The extracted logic stays gated by its own entry below (no coverage
+        // loss — the code + its tests moved together). ≤2pp ratchet-down nudge.
+        "src/components.tsx": { lines: 53, branches: 74, functions: 45, statements: 53 },
+        "src/components/SettingsAuthTab.tsx": {
+          lines: 80,
+          branches: 80,
+          functions: 65,
+          statements: 80,
+        },
         "src/modeler.tsx": { lines: 0, branches: 0, functions: 0, statements: 0 },
         "src/screens.tsx": { lines: 1, branches: 0, functions: 0, statements: 1 },
       },
