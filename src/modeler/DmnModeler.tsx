@@ -820,7 +820,14 @@ export const DmnModeler = ({ initialDecisionId }: DmnModelerProps) => {
           <Icon name="plus" size={13} />
           New
         </button>
-        <button type="button" className="btn" data-size="sm" data-variant="ghost" onClick={saveXML}>
+        <button
+          type="button"
+          className="btn"
+          data-size="sm"
+          data-variant="ghost"
+          data-testid="dmn-save-xml"
+          onClick={saveXML}
+        >
           <Icon name="save" size={13} />
           Save
         </button>
