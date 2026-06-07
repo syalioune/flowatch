@@ -121,17 +121,25 @@ export class BearerAuthStrategy implements AuthStrategy {
  */
 export interface OidcAccessorLike {
   getToken(): Promise<string | null>;
-  signIn(): void;
+  /** Best-effort silent renew (no redirect). */
+  renewSilent(): void;
 }
 
 /**
  * OIDC (Authorization Code + PKCE) concrete (Story 28.4 — the N=3 strategy).
  *
  * `authorizationHeader()` is the async seam's payoff (Story 28.1 made it async
- * FOR this): it `await`s the bridge accessor's `getToken()`, which may silent-
- * renew before returning the in-memory access token. `null` (not signed in /
- * renew failed) → no header → engine 401 → `onUnauthorized()` re-initiates the
- * interactive flow (react-oidc-context tries silent-first internally).
+ * FOR this): it `await`s the bridge accessor's `getToken()` (in-memory access
+ * token; `automaticSilentRenew` keeps it fresh). `null` (not signed in) → no
+ * header.
+ *
+ * `onUnauthorized()` does a DEBOUNCED, best-effort SILENT renew — it does NOT
+ * interactive-redirect. A resource-server 401 (e.g. a Basic-only Flowable
+ * engine rejecting the OIDC JWT, per ADR-009 / RC-18) must NEVER escalate to a
+ * top-level `signinRedirect()`: that produces an infinite redirect loop
+ * (every call 401s → redirect → back → 401 → …). Interactive sign-in is
+ * USER-initiated via the Auth-tab button only. The debounce stops a 401-storm
+ * from firing many silent renews.
  *
  * The accessor is INJECTED via a getter (not imported) so this file never pulls
  * in react-oidc-context — preserving the OIDC tree-shake (ADR-009) and keeping
@@ -141,6 +149,7 @@ export interface OidcAccessorLike {
 export class OidcAuthStrategy implements AuthStrategy {
   readonly kind = "oidc" as const;
   private readonly accessor: () => OidcAccessorLike | null;
+  private lastRenewAt = 0;
   constructor(accessor: () => OidcAccessorLike | null) {
     this.accessor = accessor;
   }
@@ -149,6 +158,11 @@ export class OidcAuthStrategy implements AuthStrategy {
     return token ? `Bearer ${token}` : null;
   }
   async onUnauthorized(): Promise<void> {
-    this.accessor()?.signIn();
+    // Debounce: at most one silent renew per 10s, regardless of how many
+    // concurrent calls 401. No interactive redirect (loop guard).
+    const now = Date.now();
+    if (now - this.lastRenewAt < 10_000) return;
+    this.lastRenewAt = now;
+    this.accessor()?.renewSilent();
   }
 }

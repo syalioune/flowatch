@@ -105,7 +105,7 @@ describe("BearerAuthStrategy (Story 28.3)", () => {
 describe("OidcAuthStrategy (Story 28.4)", () => {
   const accessor = (over: Partial<OidcAccessorLike> = {}): OidcAccessorLike => ({
     getToken: async () => "oidc-access-token",
-    signIn: () => {},
+    renewSilent: () => {},
     ...over,
   });
 
@@ -136,11 +136,20 @@ describe("OidcAuthStrategy (Story 28.4)", () => {
     expect(await s.authorizationHeader()).toBeNull();
   });
 
-  it("onUnauthorized() calls the accessor's signIn() to re-initiate the flow", async () => {
-    const signIn = vi.fn();
-    const s = new OidcAuthStrategy(() => accessor({ signIn }));
+  it("onUnauthorized() calls the accessor's renewSilent() (NOT an interactive redirect)", async () => {
+    const renewSilent = vi.fn();
+    const s = new OidcAuthStrategy(() => accessor({ renewSilent }));
     await s.onUnauthorized();
-    expect(signIn).toHaveBeenCalledTimes(1);
+    expect(renewSilent).toHaveBeenCalledTimes(1);
+  });
+
+  it("onUnauthorized() debounces — a 401 storm fires at most one renew per 10s", async () => {
+    const renewSilent = vi.fn();
+    const s = new OidcAuthStrategy(() => accessor({ renewSilent }));
+    await s.onUnauthorized();
+    await s.onUnauthorized();
+    await s.onUnauthorized();
+    expect(renewSilent).toHaveBeenCalledTimes(1);
   });
 
   it("onUnauthorized() is a no-op when the accessor is absent", async () => {

@@ -15,6 +15,7 @@
  * WebStorageStateStore — NFR-11).
  */
 
+import { InMemoryWebStorage, WebStorageStateStore } from "oidc-client-ts";
 import { useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { AuthProvider, useAuth } from "react-oidc-context";
@@ -24,6 +25,15 @@ import {
   type OidcProviderConfig,
   setOidcTokenAccessor,
 } from "./oidc-accessor";
+
+// NFR-11: tokens in-memory only. oidc-client-ts' DEFAULT userStore is
+// window.sessionStorage (NOT in-memory) — so we MUST override it with an
+// InMemoryWebStorage, otherwise access/refresh tokens land in sessionStorage.
+// The stateStore (transient PKCE code_verifier + state) is LEFT as the default
+// localStorage: it MUST survive the full-page redirect round-trip to the IdP,
+// so it cannot be in-memory. oidc-client-ts clears it once the callback
+// completes.
+const inMemoryUserStore = new WebStorageStateStore({ store: new InMemoryWebStorage() });
 
 /** Strip the `?code=&state=` params after the IdP callback (no history entry). */
 function cleanCallbackUrl(): void {
@@ -42,18 +52,18 @@ export function OidcTokenBridge() {
   const auth = useAuth();
   useEffect(() => {
     setOidcTokenAccessor({
-      getToken: async () => {
-        if (auth.isAuthenticated && auth.user) return auth.user.access_token;
-        // Not authenticated yet — attempt a silent renew if a session exists.
-        try {
-          const u = await auth.signinSilent();
-          return u?.access_token ?? null;
-        } catch {
-          return null;
-        }
-      },
+      // Return the in-memory access token when the session is valid. Do NOT
+      // trigger signinSilent here — getToken runs on EVERY api.* call, and an
+      // iframe silent-auth per request would storm the IdP. automaticSilentRenew
+      // keeps the token fresh proactively; explicit sign-in handles the rest.
+      getToken: async () => (auth.isAuthenticated && auth.user ? auth.user.access_token : null),
       signIn: () => void auth.signinRedirect(),
       signOut: () => void auth.signoutRedirect(),
+      // Best-effort silent renew (no interactive redirect) — called by
+      // OidcAuthStrategy.onUnauthorized on a 401. Swallows failures so a
+      // resource-server 401 never escalates to a top-level navigation (the
+      // redirect-loop bug: a Basic-only engine 401s every OIDC call).
+      renewSilent: () => void auth.signinSilent().catch(() => {}),
       isAuthenticated: auth.isAuthenticated,
       username:
         (auth.user?.profile?.preferred_username as string | undefined) ??
@@ -85,6 +95,7 @@ export function renderWithOidc(
       redirect_uri={oidcCfg.redirect_uri}
       response_type={oidcCfg.response_type}
       automaticSilentRenew
+      userStore={inMemoryUserStore}
       onSigninCallback={cleanCallbackUrl}
       key={`${oidcCfg.authority}|${oidcCfg.client_id}`}
     >

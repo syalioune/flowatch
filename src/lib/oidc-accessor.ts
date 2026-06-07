@@ -18,10 +18,13 @@ import { getActiveConnection } from "./saved-connections";
 
 /** Shape the React bridge publishes for the strategy + UI to consume. */
 export interface OidcTokenAccessor {
-  /** In-memory access token (silent-renews if needed); null when not signed in. */
+  /** In-memory access token; null when not signed in / expired. */
   getToken: () => Promise<string | null>;
+  /** Interactive sign-in (full redirect) — USER-initiated only. */
   signIn: () => void;
   signOut: () => void;
+  /** Best-effort silent renew (iframe, no redirect) — 401 recovery, never loops. */
+  renewSilent: () => void;
   isAuthenticated: boolean;
   /** preferred_username / email of the signed-in user, or null. */
   username: string | null;
