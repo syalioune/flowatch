@@ -11,6 +11,7 @@ import {
   Toaster,
   Topbar,
 } from "./components";
+import { VersionDriftBanner } from "./components/VersionDriftBanner";
 import {
   installStrategyForActiveConnection,
   reloadIfOidcProviderMismatch,
@@ -71,6 +72,11 @@ interface Tenant {
 interface AppConnectionState {
   state: "pending" | "ok" | "err" | "unset";
   host: string;
+  // Story 31.1: the structured engine version from api.ping(), surfaced so
+  // <VersionDriftBanner> can compare it against __FLOWABLE_TESTED_VERSION__.
+  // Set ONLY on the "ok" commit — pending/err leave it undefined so the
+  // banner stays hidden when drift can't be determined (AC #6).
+  version?: string;
 }
 
 const DEFAULT_TENANT: Tenant = { id: "", name: "All tenants" };
@@ -147,7 +153,7 @@ function App() {
     commit({ state: "pending", host: "connecting…" });
     try {
       const r = await api.ping();
-      commit({ state: "ok", host: `${r.name} ${r.version} @ ${host}` });
+      commit({ state: "ok", host: `${r.name} ${r.version} @ ${host}`, version: r.version });
     } catch (_e) {
       commit({ state: "err", host: `unreachable: ${host}` });
     }
@@ -464,6 +470,7 @@ function App() {
         onSettings={() => setSettingsOpen(true)}
         onTweaks={handleTweaks}
       />
+      <VersionDriftBanner detected={conn.version} />
       <main className="main">
         <Outlet />
       </main>
