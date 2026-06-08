@@ -35,6 +35,10 @@ import React from "react";
 // re-shows the banner (AC #4).
 const DISMISS_STORAGE_KEY = "flowatch.version-banner-dismissed.v1";
 
+// docs/ is NOT bundled into the deployed SPA — a route-relative href would 404.
+// Point at the repo source so the link resolves from any screen.
+const COMPAT_DOC_URL = "https://github.com/syalioune/flowatch/blob/main/docs/compat.md";
+
 function readDismissedVersion(): string | null {
   try {
     return localStorage.getItem(DISMISS_STORAGE_KEY);
@@ -57,28 +61,36 @@ export function VersionDriftBanner({
 }: {
   detected?: string | undefined;
 }): React.ReactElement | null {
-  const tested = __FLOWABLE_TESTED_VERSION__;
+  // Normalize both sides before comparing/displaying. The vite `define` capture
+  // (`[^"\n]+` in vite.config.ts) keeps a trailing `\r` on a CRLF compat.md, and
+  // the engine could pad `r.version`; an un-trimmed exact-string compare would
+  // false-positive the banner on the golden path. Trimming is whitespace
+  // normalization, NOT semver tolerance — exact-string intent is preserved.
+  const tst = __FLOWABLE_TESTED_VERSION__.trim();
+  const det = detected?.trim();
   // Lazy-read the persisted dismissal once on mount.
   const [dismissedVersion, setDismissedVersion] = React.useState<string | null>(() =>
     readDismissedVersion(),
   );
 
-  const drift =
-    !!detected && tested !== "unknown" && detected !== tested && detected !== dismissedVersion;
+  const drift = !!det && tst !== "unknown" && det !== tst && det !== dismissedVersion;
 
   if (!drift) return null;
 
   const dismiss = (): void => {
-    // `detected` is a non-empty string here (drift === true gated on it).
-    writeDismissedVersion(detected as string);
-    setDismissedVersion(detected as string);
+    // `det` is a non-empty string here (drift === true gated on it).
+    writeDismissedVersion(det as string);
+    setDismissedVersion(det as string);
   };
 
   return (
     <div className="version-banner" role="status" data-testid="version-drift-banner">
       <span className="version-banner-msg">
-        Flowatch is tested against Flowable {tested}. Detected: {detected} — some features may
-        differ. See <a href="docs/compat.md">docs/compat.md</a>.
+        Flowatch is tested against Flowable {tst}. Detected: {det} — some features may differ. See{" "}
+        <a href={COMPAT_DOC_URL} target="_blank" rel="noreferrer">
+          docs/compat.md
+        </a>
+        .
       </span>
       <button
         type="button"
