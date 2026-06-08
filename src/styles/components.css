@@ -1907,3 +1907,38 @@ html[data-look="industrial"] .kpi {
   color: var(--fg);
   white-space: pre;
 }
+
+/* Story 31.1 — version-drift advisory banner. Non-blocking chrome strip
+   between the Topbar and <main>. Token-only (Pattern P-007); warn-tinted
+   background derives from --warn so it reads across all look/theme combos.
+   Density rescales via --pad / --gap like the rest of the chrome. */
+.version-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  padding: calc(var(--pad) * 0.6) var(--pad);
+  background: color-mix(in oklab, var(--warn) 16%, var(--bg));
+  border-bottom: 1px solid var(--line);
+  color: var(--fg);
+  font-size: 13px;
+}
+.version-banner-msg {
+  flex: 1;
+}
+.version-banner-msg a {
+  color: var(--accent);
+}
+.version-banner-dismiss {
+  flex: none;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--fg);
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 8px;
+  height: calc(var(--row-h) * 0.6);
+}
+.version-banner-dismiss:hover {
+  border-color: var(--line-strong);
+}
