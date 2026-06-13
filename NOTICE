@@ -23,6 +23,7 @@ Direct dependencies (production):
 Direct dependencies (development):
 ----------------------------------------------------------------
 
+- @axe-core/playwright  4.11.3  MPL-2.0  https://github.com/dequelabs/axe-core-npm
 - @biomejs/biome  2.4.15  MIT OR Apache-2.0  https://github.com/biomejs/biome
 - @commitlint/cli  21.0.1  MIT  https://github.com/conventional-changelog/commitlint
 - @commitlint/config-conventional  21.0.1  MIT  https://github.com/conventional-changelog/commitlint

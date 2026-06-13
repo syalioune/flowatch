@@ -24,6 +24,7 @@
  */
 
 import { expect, type Page, test } from "@playwright/test";
+import { SCREENS } from "./screens";
 
 interface BadgeScreen {
   path: string;
@@ -31,19 +32,24 @@ interface BadgeScreen {
   ready: string;
 }
 
+// Subsets reuse the canonical path/label from the shared registry (Story
+// 32.1, Task 2) but pin a STRICTER `ready: "table.tbl"` because these tests
+// assert table/badge structure on a populated (mocked) table — the registry's
+// comma-alternate selectors (which also match empty states) would let an
+// empty render satisfy the wait and starve the assertions.
 const BADGE_SCREENS: ReadonlyArray<BadgeScreen> = [
-  { path: "/instances", label: "Process instances", ready: "table.tbl" },
-  { path: "/definitions", label: "Process definitions", ready: "table.tbl" },
+  { path: SCREENS.instances.path, label: SCREENS.instances.label, ready: "table.tbl" },
+  { path: SCREENS.definitions.path, label: SCREENS.definitions.label, ready: "table.tbl" },
 ];
 
 const TABLE_SCREENS: ReadonlyArray<BadgeScreen> = [
-  { path: "/deployments", label: "Deployments", ready: "table.tbl" },
-  { path: "/definitions", label: "Process definitions", ready: "table.tbl" },
-  { path: "/instances", label: "Process instances", ready: "table.tbl" },
-  { path: "/tasks", label: "Tasks", ready: "table.tbl" },
-  { path: "/jobs", label: "Jobs", ready: "table.tbl" },
-  { path: "/history", label: "History", ready: "table.tbl" },
-  { path: "/identity", label: "Identity", ready: "table.tbl" },
+  { path: SCREENS.deployments.path, label: SCREENS.deployments.label, ready: "table.tbl" },
+  { path: SCREENS.definitions.path, label: SCREENS.definitions.label, ready: "table.tbl" },
+  { path: SCREENS.instances.path, label: SCREENS.instances.label, ready: "table.tbl" },
+  { path: SCREENS.tasks.path, label: SCREENS.tasks.label, ready: "table.tbl" },
+  { path: SCREENS.jobs.path, label: "Jobs", ready: "table.tbl" },
+  { path: SCREENS.history.path, label: SCREENS.history.label, ready: "table.tbl" },
+  { path: SCREENS.identity.path, label: "Identity", ready: "table.tbl" },
   { path: "/decisions?tab=decisions", label: "Decisions", ready: "table.tbl" },
 ];
 

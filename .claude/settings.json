@@ -9,7 +9,17 @@
       "Bash(curl -u rest-admin*)",
       "Bash(git status)",
       "Bash(git diff*)",
-      "Bash(git log*)"
+      "Bash(git log*)",
+      "Read(//media/alioune/Data/dev/flowatch/_bmad-output/**)",
+      "Read(//media/alioune/Data/dev/flowatch-bmad/_bmad-output/**)",
+      "Bash(node -e \"console.log\\('axe-core:', require\\('axe-core/package.json'\\).version\\); console.log\\('@axe-core/playwright:', require\\('@axe-core/playwright/package.json'\\).version\\)\")",
+      "Bash(node -p \"require\\('./node_modules/@axe-core/playwright/package.json'\\).version\")",
+      "Bash(npx biome *)",
+      "Bash(curl -fsS -o /dev/null -w \"%{http_code}\" -u rest-admin:test http://localhost:8080/flowable-rest/service/management/engine)",
+      "Bash(curl -fsS -o /dev/null -w \"%{http_code}\" http://localhost:5173)",
+      "Bash(npx playwright *)",
+      "Bash(tee /tmp/axe-run.log)",
+      "Bash(node -e ' *)"
     ]
   },
   "hooks": {
