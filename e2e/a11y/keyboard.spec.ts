@@ -40,63 +40,7 @@
  */
 
 import { expect, type Page, test } from "@playwright/test";
-
-interface ScreenEntry {
-  path: string;
-  label: string;
-  ready: string;
-  /** Modeler routes use the relaxed AC-3 variant (focusable-tag check only). */
-  relaxed?: boolean;
-}
-
-const SCREENS = {
-  dashboard: { path: "/", label: "Dashboard", ready: ".kpi" },
-  deployments: {
-    path: "/deployments",
-    label: "Deployments",
-    ready: "table.tbl, [data-testid='empty-state'], .empty",
-  },
-  definitions: {
-    path: "/definitions",
-    label: "Process definitions",
-    ready: "table.tbl, [data-testid='empty-state'], .empty",
-  },
-  instances: {
-    path: "/instances",
-    label: "Process instances",
-    ready: "table.tbl, [data-testid='empty-state'], .empty",
-  },
-  tasks: {
-    path: "/tasks",
-    label: "Tasks",
-    ready: "table.tbl, [data-testid='empty-state'], .empty",
-  },
-  jobs: {
-    path: "/jobs",
-    label: "Jobs (executable tab)",
-    ready: "table.tbl, [data-testid='empty-state'], .empty",
-  },
-  history: {
-    path: "/history",
-    label: "History",
-    ready: "table.tbl, [data-testid='empty-state'], .empty",
-  },
-  identity: {
-    path: "/identity",
-    label: "Identity (users tab)",
-    ready: "table.tbl, [data-testid='empty-state'], .empty",
-  },
-  tenants: {
-    path: "/tenants",
-    label: "Tenants",
-    ready: "table.tbl, [data-testid='empty-state'], .empty",
-  },
-  decisions: { path: "/decisions", label: "Decisions", ready: "table.tbl, .empty-state, .tabs" },
-  bpmn: { path: "/bpmn", label: "BPMN modeler", ready: ".mod-toolbar", relaxed: true },
-  dmn: { path: "/dmn", label: "DMN modeler", ready: ".mod-toolbar", relaxed: true },
-} as const satisfies Record<string, ScreenEntry>;
-
-const SCREEN_LIST: ReadonlyArray<ScreenEntry> = Object.values(SCREENS);
+import { SCREEN_LIST, SCREENS, type ScreenEntry } from "./screens";
 
 const FOCUSABLE_TAGS = new Set(["A", "BUTTON", "INPUT", "SELECT", "TEXTAREA"]);
 
