@@ -14,6 +14,12 @@
 
 A single-page React + Vite GUI for **[Flowable](https://www.flowable.com/open-source/)** 7.x and beyond — the open-source BPMN/DMN process engine. Flowatch wraps the Flowable REST API and embeds the official [`bpmn-js`](https://bpmn.io/toolkit/bpmn-js/) and [`dmn-js`](https://bpmn.io/toolkit/dmn-js/) modelers in the browser. The app talks **only to the live engine** — there is no mock fallback. When the engine is unreachable, screens render explicit error states.
 
+<p align="center">
+  <img src="branding/screenshots/dashboard-editorial-light.png" alt="Flowatch Dashboard in the editorial look (light theme): process-engine overview tiles for deployments, running instances, open tasks, and jobs." width="32%">
+  <img src="branding/screenshots/dashboard-terminal-dark.png" alt="Flowatch Dashboard in the terminal look (dark theme): the same overview in a monospace, high-contrast dark identity." width="32%">
+  <img src="branding/screenshots/dashboard-industrial-dark.png" alt="Flowatch Dashboard in the industrial look (dark theme): the same overview in the industrial type identity." width="32%">
+</p>
+
 ## Why Flowatch exists
 
 Flowatch gives Flowable 7+ OSS users a complete browser GUI: model BPMN and DMN, deploy them, watch instances, work tasks, inspect jobs and history, and manage identity — all without writing curl commands.
