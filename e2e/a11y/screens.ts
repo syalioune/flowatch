@@ -39,8 +39,12 @@ export interface ScreenEntry {
   relaxed?: boolean;
   /**
    * Routes that embed a third-party canvas (`bpmn-js` / `dmn-js`). The axe
-   * scan scopes itself to the Flowatch chrome and EXCLUDES `.djs-container`
-   * so out-of-tree canvas internals are not audited (Story 32.1 AC #8).
+   * scan scopes itself to the Flowatch chrome and EXCLUDES the out-of-tree
+   * canvas internals so they are not audited (Story 32.1 AC #8): the diagram
+   * surface `.djs-container` (BPMN DRD + DMN DRD) AND the dmn-js decision-
+   * table editor `.dmn-decision-table-container` (Story 32.2 — its FEEL-cell
+   * `.content-editable` editors are dmn-js-owned DOM, not Flowatch chrome,
+   * and produced dark-theme `color-contrast` findings the engine ships).
    */
   excludeCanvas?: boolean;
 }

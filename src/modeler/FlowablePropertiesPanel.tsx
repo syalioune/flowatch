@@ -216,10 +216,11 @@ export const FlowablePropertiesPanel = ({
   const textField = (attr: string, label: string, placeholder?: string) =>
     sel ? (
       <div className="form-row" key={`${attr}-row`}>
-        <label>
+        <label htmlFor={`bpmn-prop-${attr}`}>
           {label} <span className="mono">flowable:{attr}</span>
         </label>
         <input
+          id={`bpmn-prop-${attr}`}
           className="input mono"
           key={`${sel.id}:${attr}:${version}`}
           defaultValue={readExtAttr(attr)}
@@ -335,10 +336,11 @@ export const FlowablePropertiesPanel = ({
       placeholder?: string,
     ) => (
       <div className="form-row" key={testid}>
-        <label>
+        <label htmlFor={testid}>
           {label} <span className="mono">{wire}</span>
         </label>
         <input
+          id={testid}
           className="input mono"
           key={`${sel?.id}:${testid}:${version}`}
           defaultValue={value}
@@ -410,6 +412,7 @@ export const FlowablePropertiesPanel = ({
         </select>
         <input
           className="input mono"
+          aria-label="Timer expression"
           key={`${sel?.id}:timerexpr:${version}`}
           defaultValue={timerValueOf(ed)}
           placeholder={
@@ -506,10 +509,11 @@ export const FlowablePropertiesPanel = ({
   };
   const processTextField = (attr: string, label: string) => (
     <div className="form-row" key={`proc-${attr}`}>
-      <label>
+      <label htmlFor={`bpmn-prop-${attr}`}>
         {label} <span className="mono">flowable:{attr}</span>
       </label>
       <input
+        id={`bpmn-prop-${attr}`}
         className="input mono"
         key={`proc:${attr}:${version}`}
         defaultValue={readRootAttr(attr)}
@@ -597,10 +601,11 @@ export const FlowablePropertiesPanel = ({
         {sel && (
           <>
             <div className="form-row">
-              <label>
+              <label htmlFor="bpmn-prop-name">
                 Name <span className="mono">bpmn:name</span>
               </label>
               <input
+                id="bpmn-prop-name"
                 className="input"
                 key={sel.id + ":name:" + version}
                 defaultValue={(bo && bo.name) || ""}
@@ -608,10 +613,11 @@ export const FlowablePropertiesPanel = ({
               />
             </div>
             <div className="form-row">
-              <label>
+              <label htmlFor="bpmn-prop-id">
                 ID <span className="mono">XML id</span>
               </label>
               <input
+                id="bpmn-prop-id"
                 className="input mono"
                 value={sel.id}
                 readOnly

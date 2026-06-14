@@ -515,19 +515,19 @@
 }
 .ep-method[data-m="GET"] {
   background: color-mix(in oklab, var(--info) 18%, transparent);
-  color: var(--info);
+  color: var(--info-fg);
 }
 .ep-method[data-m="POST"] {
   background: color-mix(in oklab, var(--ok) 18%, transparent);
-  color: var(--ok);
+  color: var(--ok-fg);
 }
 .ep-method[data-m="PUT"] {
   background: color-mix(in oklab, var(--warn) 22%, transparent);
-  color: var(--warn);
+  color: var(--warn-fg);
 }
 .ep-method[data-m="DELETE"] {
   background: color-mix(in oklab, var(--bad) 18%, transparent);
-  color: var(--bad);
+  color: var(--bad-fg);
 }
 .ep-chip-row {
   display: flex;
@@ -871,22 +871,22 @@
   background: currentColor;
 }
 .badge[data-tone="ok"] {
-  color: var(--ok);
+  color: var(--ok-fg);
   background: color-mix(in oklab, var(--ok) 12%, transparent);
   border-color: color-mix(in oklab, var(--ok) 30%, transparent);
 }
 .badge[data-tone="warn"] {
-  color: var(--warn);
+  color: var(--warn-fg);
   background: color-mix(in oklab, var(--warn) 14%, transparent);
   border-color: color-mix(in oklab, var(--warn) 32%, transparent);
 }
 .badge[data-tone="bad"] {
-  color: var(--bad);
+  color: var(--bad-fg);
   background: color-mix(in oklab, var(--bad) 14%, transparent);
   border-color: color-mix(in oklab, var(--bad) 32%, transparent);
 }
 .badge[data-tone="info"] {
-  color: var(--info);
+  color: var(--info-fg);
   background: color-mix(in oklab, var(--info) 14%, transparent);
   border-color: color-mix(in oklab, var(--info) 32%, transparent);
 }
@@ -1088,6 +1088,15 @@
   font-size: 12px;
   color: var(--fg-soft);
   cursor: pointer;
+  /* The element-row is a <button>; reset the UA `buttonface` background
+     (a light system colour) so the row inherits the dark panel surface —
+     otherwise dark-theme --fg-soft/--fg-mute text sits on #efefef and fails
+     AA contrast (Story 32.2). */
+  appearance: none;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
 }
 .mod-outline-tree .out-row:hover {
   background: var(--bg-hover);

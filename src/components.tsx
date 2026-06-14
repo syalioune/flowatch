@@ -432,7 +432,7 @@ export const Topbar = ({
     </div>
     <div className="search">
       <Icon name="search" size={13} />
-      <input placeholder="Search processes, instances, tasks…" />
+      <input aria-label="Search" placeholder="Search processes, instances, tasks…" />
       <kbd>⌘K</kbd>
     </div>
     <div className="top-actions">
@@ -1051,13 +1051,15 @@ export const ApiInspector = ({
                 {firstEp.method}
               </span>
               <input
+                aria-label="Request path"
                 className="input mono"
                 style={{ flex: 1, fontSize: 12 }}
                 value={tryPath}
                 onChange={(e) => setTryPath(e.target.value)}
               />
             </div>
-            <div className="code">
+            {/* biome-ignore lint/a11y/noNoninteractiveTabindex: WCAG SC 2.1.1 / axe scrollable-region-focusable — the snippet block scrolls and MUST be keyboard-reachable; tabIndex=0 on the region is the canonical fix (Story 32.2). */}
+            <div className="code" role="region" aria-label="Request snippet" tabIndex={0}>
               {snippet === "fetch"
                 ? buildFetchSnippet(cfg, { ...firstEp, path: tryPath })
                 : buildCurlSnippet(cfg, { ...firstEp, path: tryPath })}

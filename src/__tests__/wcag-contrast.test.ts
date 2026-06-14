@@ -56,6 +56,32 @@ const PAIRS: Pair[] = [
 
 const AA_BODY = 4.5;
 
+// Story 32.2 — on-tint status foregrounds. The status chips (.ep-method) and
+// badges (.badge[data-tone]) render a coloured label over a FAINT same-hue
+// tint of the semantic token (`color-mix(in oklab, var(--X) N%, transparent)`
+// composited over --bg). The plain semantic token failed AA as text there, so
+// dedicated `--X-fg` variants were added (see src/styles/tokens.css). These
+// pairs guard that each `--X-fg` clears AA against the LIGHTEST tint it is used
+// on (the badge tint % — chips use a heavier, darker tint, so passing the
+// badge tint covers them). sRGB-linear compositing here is conservative vs the
+// browser's oklab color-mix, so a green test implies a green render.
+type TintPair = { fgVar: string; tokenVar: string; pct: number; label: string };
+const TINT_PAIRS: TintPair[] = [
+  { fgVar: "--ok-fg", tokenVar: "--ok", pct: 0.12, label: "ok-fg on ok-tint" },
+  { fgVar: "--warn-fg", tokenVar: "--warn", pct: 0.14, label: "warn-fg on warn-tint" },
+  { fgVar: "--bad-fg", tokenVar: "--bad", pct: 0.14, label: "bad-fg on bad-tint" },
+  { fgVar: "--info-fg", tokenVar: "--info", pct: 0.14, label: "info-fg on info-tint" },
+];
+
+/** sRGB-linear composite of `token` at `pct` opacity over `bg` (conservative). */
+function compositeOver(token: Srgb, pct: number, bg: Srgb): Srgb {
+  return {
+    r: pct * token.r + (1 - pct) * bg.r,
+    g: pct * token.g + (1 - pct) * bg.g,
+    b: pct * token.b + (1 - pct) * bg.b,
+  };
+}
+
 // Documented exceptions — see audit doc for rationale. Shape:
 //   { look, theme, pair: "<label>", minRatio: <observed>, reason: "..." }
 const EXCEPTIONS: Array<{
@@ -288,6 +314,52 @@ describe(`WCAG 2.1 AA contrast — source: ${sourceFile.path}`, () => {
               ratio,
               `${look}/${theme} ${pair.label}: ${pair.fgVar}=${fgValue} (${rgbHex(fg)}) on ${pair.bgVar}=${bgValue} (${rgbHex(bg)}) → ${ratio.toFixed(2)}:1 < ${threshold}:1${exception ? ` (exception: ${exception.reason})` : ""} — see docs/a11y-audit-2026-05.md`,
             ).toBeGreaterThanOrEqual(threshold);
+          });
+        }
+      });
+    }
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// Story 32.2 — on-tint status foreground assertions (4 pairs × 6 combos)
+// ─────────────────────────────────────────────────────────────────────────
+
+describe(`WCAG 2.1 AA contrast — on-tint status foregrounds (Story 32.2)`, () => {
+  const blockCache = new Map<string, Map<string, string>>();
+  function getBlock(look: string, theme: string): Map<string, string> {
+    const key = `${look}-${theme}`;
+    let cached = blockCache.get(key);
+    if (!cached) {
+      cached = parseTokenBlock(css, `html[data-look="${look}"][data-theme="${theme}"]`);
+      blockCache.set(key, cached);
+    }
+    return cached;
+  }
+
+  for (const look of LOOKS) {
+    for (const theme of THEMES) {
+      describe(`${look} / ${theme}`, () => {
+        for (const pair of TINT_PAIRS) {
+          it(`${pair.label} — AA ≥ ${AA_BODY}:1`, () => {
+            const block = getBlock(look, theme);
+            const fgValue = block.get(pair.fgVar);
+            const tokenValue = block.get(pair.tokenVar);
+            const bgValue = block.get("--bg");
+            expect(fgValue, `${look}/${theme} block missing ${pair.fgVar}`).toBeDefined();
+            expect(tokenValue, `${look}/${theme} block missing ${pair.tokenVar}`).toBeDefined();
+            expect(bgValue, `${look}/${theme} block missing --bg`).toBeDefined();
+
+            const fg = tokenToSrgb(fgValue ?? "");
+            const token = tokenToSrgb(tokenValue ?? "");
+            const bg = tokenToSrgb(bgValue ?? "");
+            const tintBg = compositeOver(token, pair.pct, bg);
+            const ratio = contrastRatio(fg, tintBg);
+
+            expect(
+              ratio,
+              `${look}/${theme} ${pair.label}: ${pair.fgVar}=${fgValue} (${rgbHex(fg)}) on ${(pair.pct * 100) | 0}% ${pair.tokenVar} tint over --bg (${rgbHex(tintBg)}) → ${ratio.toFixed(2)}:1 < ${AA_BODY}:1 — see docs/a11y-audit-1.0.0.md`,
+            ).toBeGreaterThanOrEqual(AA_BODY);
           });
         }
       });

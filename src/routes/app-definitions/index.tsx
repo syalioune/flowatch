@@ -142,6 +142,7 @@ function AppDefinitionsRoute() {
       >
         <input
           type="text"
+          aria-label="Filter by key"
           data-testid="app-definitions-key-filter"
           placeholder="Key"
           defaultValue={search.key ?? ""}
@@ -153,6 +154,7 @@ function AppDefinitionsRoute() {
         />
         <input
           type="text"
+          aria-label="Filter by tenant ID"
           data-testid="app-definitions-tenant-id-filter"
           placeholder="Tenant ID"
           defaultValue={search.tenantId ?? ""}
