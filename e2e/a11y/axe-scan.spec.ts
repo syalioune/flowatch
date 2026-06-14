@@ -21,19 +21,22 @@
  * attributes directly — belt-and-braces so axe's contrast rules evaluate
  * against the actually-rendered tokens regardless of mount timing.
  *
- * ── GATE DEFERRAL (AC #9, placeholder-then-real) ──────────────────────────
- * This story MEASURES; it does NOT enforce. The per-cell violation assertion
- * here is ADVISORY: each test asserts only that the scan RAN for its cell
- * (matrix completeness). Existing violations are accumulated and written to a
- * machine-readable artifact (`e2e/a11y/.axe-results.json`) which Task 4
- * consumes to author `docs/a11y-audit-1.0.0.md`. Story 32.2 is the story that
- * flips the blocking findings to a hard `expect(violations).toEqual([])` gate.
+ * ── BLOCKING GATE (Story 32.2, AC #2) ─────────────────────────────────────
+ * Story 32.1 MEASURED (advisory); Story 32.2 ENFORCES. Each cell now asserts
+ * `expect(blockingViolations).toEqual([])` where blocking = `critical` /
+ * `serious` impact — a reappearing blocking violation fails CI. `moderate` /
+ * `minor` findings stay advisory: they are still accumulated to the artifact
+ * (`e2e/a11y/.axe-results.json`) but do not fail the build. The full result
+ * set is still flushed to disk in `afterAll` for the audit report.
  *
  * ── MODELER CANVAS EXCLUSION (AC #8) ──────────────────────────────────────
  * `/bpmn` and `/dmn` embed vanilla bpmn-js / dmn-js canvases (Pattern P-006).
  * Those SVG internals are out-of-tree (Flowatch does not theme them — see
  * docs/a11y-audit-2026-05.md). The scan is scoped to the Flowatch chrome by
- * excluding `.djs-container`; findings inside the canvas never surface.
+ * excluding the diagram surface `.djs-container` AND the dmn-js decision-table
+ * editor `.dmn-decision-table-container` (Story 32.2 — its FEEL-cell editors
+ * are dmn-js-owned DOM that ships its own dark-theme contrast); findings inside
+ * those canvases never surface.
  *
  * Chromium-only per playwright.config.ts. Live-stack: the webServer block
  * auto-spawns the engine + Vite (reuse-if-running). Many screens render their
@@ -116,7 +119,7 @@ async function waitForScreen(page: Page, screen: ScreenEntry): Promise<void> {
   await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
 }
 
-test.describe("Story 32.1 — axe-core matrix scan (advisory; gate lands in 32.2)", () => {
+test.describe("axe-core matrix scan — zero blocking violations (Story 32.2 hard gate)", () => {
   for (const screen of SCREEN_LIST) {
     for (const look of LOOKS) {
       for (const theme of THEMES) {
@@ -142,8 +145,10 @@ test.describe("Story 32.1 — axe-core matrix scan (advisory; gate lands in 32.2
             "wcag21aa",
           ]);
           if (screen.excludeCanvas) {
-            // AC #8 — out-of-tree bpmn-js / dmn-js canvas internals.
-            builder = builder.exclude(".djs-container");
+            // AC #8 — out-of-tree bpmn-js / dmn-js canvas internals: the
+            // diagram surface and the dmn-js decision-table editor (the latter
+            // is a no-op selector on /bpmn).
+            builder = builder.exclude(".djs-container").exclude(".dmn-decision-table-container");
           }
           const results = await builder.analyze();
 
@@ -166,12 +171,21 @@ test.describe("Story 32.1 — axe-core matrix scan (advisory; gate lands in 32.2
 
           cellsScanned += 1;
 
-          // ADVISORY (AC #9): assert only that the scan RAN for this cell —
-          // NOT that violations are empty. 32.2 flips this to a hard gate.
+          // HARD GATE (Story 32.2, AC #2): zero blocking (critical/serious)
+          // violations per cell. `moderate`/`minor` stay advisory (recorded to
+          // the artifact, not gated). A failure lists each blocking finding by
+          // rule + node so the offending cell is obvious in CI output.
+          const blockingViolations = results.violations
+            .filter((v) => v.impact === "critical" || v.impact === "serious")
+            .map((v) => ({
+              ruleId: v.id,
+              impact: v.impact,
+              nodes: v.nodes.map((n) => n.target.map((t) => String(t)).join(" ")),
+            }));
           expect(
-            Array.isArray(results.violations),
-            `axe did not return a violations array for ${screen.path} [${look}/${theme}]`,
-          ).toBe(true);
+            blockingViolations,
+            `blocking a11y violations on ${screen.path} [${look}/${theme}]:\n${JSON.stringify(blockingViolations, null, 2)}`,
+          ).toEqual([]);
         });
       }
     }

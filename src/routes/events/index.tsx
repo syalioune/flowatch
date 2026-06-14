@@ -116,6 +116,7 @@ function EventsRoute() {
       style={{ padding: "0 0 12px 0", gap: 8, flexWrap: "wrap" }}
     >
       <select
+        aria-label="Filter by event type"
         data-testid="events-event-type-filter"
         value={search.eventType ?? ""}
         onChange={(e) => updateFilter("eventType", e.target.value || undefined)}
@@ -131,6 +132,7 @@ function EventsRoute() {
       </select>
       <input
         type="text"
+        aria-label="Filter by event name"
         data-testid="events-event-name-filter"
         placeholder="Event name"
         // `key` remounts the input when the URL changes (back/forward) so
@@ -146,6 +148,7 @@ function EventsRoute() {
       />
       <input
         type="text"
+        aria-label="Filter by process instance ID"
         data-testid="events-process-instance-id-filter"
         placeholder="Process instance ID"
         key={`pi-${search.processInstanceId ?? ""}`}
@@ -160,6 +163,7 @@ function EventsRoute() {
       />
       <input
         type="text"
+        aria-label="Filter by tenant ID"
         data-testid="events-tenant-id-filter"
         placeholder="Tenant ID"
         key={`tenant-${search.tenantId ?? ""}`}
