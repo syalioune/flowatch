@@ -1,0 +1,52 @@
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!--
+  GitHub social-preview card (Story 33.3, DOC-DAA-002). 1280×640 (2:1).
+  Source of truth: edit this SVG, then re-export branding/social-preview.png
+  (see docs/repo-settings.md → Social preview). Visual identity = editorial-light
+  tokens (landing/style.css :root), Pattern P-007 — no ad-hoc hexes. The lockup
+  is an inline copy of branding/flowatch-lockup.svg (identical geometry); the
+  tagline is the landing-page H1 verbatim.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640"
+     fill="none" role="img"
+     aria-label="Flowatch — OSS GUI for Flowable 7+ OSS. Model. Deploy. Operate. The browser GUI for Flowable 7+ OSS.">
+  <style>
+    /* editorial-light tokens (landing/style.css) */
+    .bg     { fill: oklch(98.2% 0.005 80); }
+    .fg     { fill: oklch(22% 0.01 60); }
+    .soft   { fill: oklch(45% 0.015 60); }
+    .accent { fill: oklch(52% 0.16 32); }
+    .accent-stroke { stroke: oklch(52% 0.16 32); }
+    .serif  { font-family: "IBM Plex Serif", Georgia, "Times New Roman", serif; }
+    .sans   { font-family: "IBM Plex Sans", system-ui, sans-serif; }
+  </style>
+
+  <!-- field -->
+  <rect class="bg" x="0" y="0" width="1280" height="640"/>
+  <!-- editorial accent stripe (left edge) -->
+  <rect class="accent" x="0" y="0" width="12" height="640"/>
+
+  <!-- Lockup — inline copy of branding/flowatch-lockup.svg (viewBox 210×42),
+       scaled 3.4× and placed upper-left. color:fg so currentColor = --fg. -->
+  <g transform="translate(96 96) scale(3.4)" style="color: oklch(22% 0.01 60);">
+    <g transform="translate(4 5)">
+      <line x1="3" y1="16" x2="29" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="16" cy="16" r="6" fill="oklch(98.2% 0.005 80)" stroke="oklch(52% 0.16 32)" stroke-width="2"/>
+      <circle cx="16" cy="16" r="2" fill="oklch(52% 0.16 32)"/>
+    </g>
+    <text x="50" y="29" class="sans" font-weight="600" font-size="26" letter-spacing="-0.02em" fill="currentColor">Fl</text>
+    <circle cx="83" cy="21" r="6" fill="none" stroke="currentColor" stroke-width="2"/>
+    <circle cx="83" cy="21" r="2" fill="oklch(52% 0.16 32)"/>
+    <text x="91" y="29" class="sans" font-weight="600" font-size="26" letter-spacing="-0.02em" fill="currentColor">watch</text>
+  </g>
+
+  <!-- Tagline — landing H1 verbatim (two lines) -->
+  <text x="96" y="360" class="serif fg" font-weight="500" font-size="76" letter-spacing="-0.01em">Model. Deploy. Operate.</text>
+  <text x="96" y="448" class="serif fg" font-weight="500" font-size="58" letter-spacing="-0.01em">The browser GUI for Flowable 7+ OSS.</text>
+
+  <!-- accent rule -->
+  <rect class="accent" x="96" y="496" width="120" height="6" rx="3"/>
+
+  <!-- purpose line (epic-named string) -->
+  <text x="96" y="560" class="sans soft" font-weight="500" font-size="34" letter-spacing="0.01em">OSS GUI for Flowable 7+ OSS · Apache-2.0 · self-hosted</text>
+</svg>

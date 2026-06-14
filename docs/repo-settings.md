@@ -175,3 +175,12 @@ make landing-check      # NFR-9 enforcement — same regex the CI gate runs
 - No CDN-loaded fonts, scripts, or stylesheets. IBM Plex woff2 served from [`branding/fonts/`](../branding/fonts/), copied into `_site/fonts/` at stage time.
 - All actions in [`pages.yml`](../.github/workflows/pages.yml) are SHA-pinned with `# vX.Y.Z` version comments. Dependabot's `github-actions` ecosystem (see [`dependabot.yml`](../.github/dependabot.yml)) bumps them on the weekly schedule.
 - Apache 2.0 SPDX header on every source file (`landing/index.html`, `landing/style.css`).
+
+## Social preview (Story 33.3)
+
+The repo's social-preview card (what renders when `github.com/syalioune/flowatch` is shared on Twitter/X, LinkedIn, Slack) is **uploaded manually** — git/the REST API cannot set it.
+
+- **Upload:** Settings → General → Social preview → upload [`branding/social-preview.png`](../branding/social-preview.png) (1280×640, < 1 MB). **Re-upload after any repo re-creation or settings reset** (the setting does not survive those).
+- **Source of truth:** [`branding/social-preview.svg`](../branding/social-preview.svg) (1280×640, editorial-light tokens, inline copy of [`branding/flowatch-lockup.svg`](../branding/flowatch-lockup.svg) + landing-page tagline). Edit the SVG, then re-export the PNG.
+- **Re-export the PNG:** `rsvg-convert -w 1280 -h 640 branding/social-preview.svg -o branding/social-preview.png` (or `inkscape --export-type=png -w 1280 -h 640 branding/social-preview.svg`). Either needs IBM Plex Sans/Serif installed locally to match the committed PNG's typography; the woff2 faces live in [`branding/fonts/`](../branding/fonts/). The committed PNG was produced via headless Chromium (Playwright) with those faces loaded from `branding/fonts/`. Confirm the export is exactly 1280×640 and < 1 MB.
+- **Verify (manual, post-upload):** paste the repo URL into Twitter/X, LinkedIn, Slack (or a card validator) — the lockup + tagline should be legible at feed-thumbnail size. Platform caches may need a cache-bust.
