@@ -20,6 +20,10 @@ A single-page React + Vite GUI for **[Flowable](https://www.flowable.com/open-so
   <img src="branding/screenshots/dashboard-industrial-dark.png" alt="Flowatch Dashboard in the industrial look (dark theme): the same overview in the industrial type identity." width="32%">
 </p>
 
+<p align="center">
+  <img src="branding/screenshots/instance-detail-editorial-light.png" alt="Flowatch process-instance detail: a running BPMN diagram with the live current-activity overlay highlighting the active 'Provide new sales lead' task, the Runtime/History/Audit tabs, and the API Inspector endpoint chips listing every REST call the screen makes." width="88%">
+</p>
+
 ## Why Flowatch exists
 
 Flowatch gives Flowable 7+ OSS users a complete browser GUI: model BPMN and DMN, deploy them, watch instances, work tasks, inspect jobs and history, and manage identity — all without writing curl commands.
