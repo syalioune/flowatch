@@ -17,5 +17,3 @@ As Mira, I want to see variable changes and tasks across history for a given ins
 **When** the route loader calls the corresponding wrapper (`listHistoricVariables`, `listHistoricTasks`)
 **Then** rows show variable/task with their context (instance id, name, value/type for variables; assignee/completion for tasks)
 **And** filtering by `processInstanceId` is supported via search param.
-
----

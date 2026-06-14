@@ -1,6 +1,6 @@
-# HST-MIR-004: Run end-to-end a11y audit across 8 look × theme combos + 11 screens
+# HST-MIR-005: Run end-to-end a11y audit across 8 look × theme combos + 11 screens
 
-> **User Story ID**: HST-MIR-004
+> **User Story ID**: HST-MIR-005
 > **Persona**: MIR
 > **Epic**: 32 — Full Accessibility Audit
 > **Milestone**: 1.0.0

@@ -2,7 +2,7 @@
 
 > **User Story ID**: FND-MIR-002
 > **Persona**: MIR
-> **Epic**: 6 — Docker & Distribution Foundation
+> **Epic**: 6 — Distribution & Discovery Foundation
 > **Milestone**: 0.0.1
 > **Source**: `_bmad-output/planning-artifacts/epics.md` (story 6.3)
 > **State**: done

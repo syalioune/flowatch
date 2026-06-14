@@ -1,14 +1,15 @@
-# DOC-DAA-003: Project presentation page on GitHub Pages
+# FND-DAA-003: Author the GitHub Pages presentation site under `landing/`
 
-> **User Story ID**: DOC-DAA-003
-> **Persona**: DAA (Daan — Flowable evaluator)
+> **User Story ID**: FND-DAA-003
+> **Persona**: DAA
 > **Epic**: 6 — Distribution & Discovery Foundation
 > **Milestone**: 0.0.1
-> **Source**: `_bmad-output/planning-artifacts/epics.md` (Story 6.6); derived from sprint-change-proposal-2026-05-17
+> **Source**: `_bmad-output/planning-artifacts/epics.md` (story 6.6)
 > **State**: backlog
-> **Labels**: type:user-story, state:backlog, area:doc, release:0.0.1, scope:foundational
+> **Labels**: type:user-story, state:backlog, area:fnd, release:0.0.1
 
-As Daan (evaluator who landed on a forum link), I want a one-page project presentation at `https://syalioune.github.io/flowatch/`, so that I can decide in under a minute whether Flowatch is worth my afternoon — without reading a README written half for contributors. Per PRD FR-F12.
+
+As Daan (evaluator who landed on a forum link), I want a one-page project presentation at `https://syalioune.github.io/flowatch/`, so that I can decide in under a minute whether Flowatch is worth my afternoon — without reading a README written half for contributors. Per FR-F12.
 
 **Acceptance Criteria:**
 
@@ -28,9 +29,8 @@ As Daan (evaluator who landed on a forum link), I want a one-page project presen
 **And** all visual tokens resolve to the same OKLCH values as `:root[data-look="editorial"][data-theme="light"][data-density="regular"]` in `src/styles.css` (typography, accent, spacing, line-heights)
 **And** the page contains no SaaS clichés (no gradient cards, no glass-morphism, no animated illustrations, no email capture, no chat widget, no testimonial blocks, no social-proof logo strip, no "request a demo")
 **And** the pre-alpha banner is visible without scrolling on a 1440×900 viewport
-**And** `landing/index.html` and `landing/style.css` include the `SPDX-License-Identifier: Apache-2.0` header per FR-F7 / NFR-28
-**And** the page is previewable locally via `make landing-preview` (Makefile target documented in [docs/repo-settings.md](../../repo-settings.md)).
+**And** `landing/index.html` and `landing/style.css` include `<!-- SPDX-License-Identifier: Apache-2.0 -->` per FR-F7 / NFR-28
+**And** the page is previewable locally via `make landing-preview` (Makefile target documented in [docs/repo-settings.md](../../docs/repo-settings.md)).
 
 **Notes:**
 - Screenshot strip is deliberately deferred to a follow-up story in 0.0.2 or 1.0.0 once DOC-DAA-001 produces look × theme × density screenshots of the rebuilt app. Inlining pre-rebuild screenshots would set the wrong expectation for visitors who then install the current build.
-- Pairs with DOC-SYS-002 (deploy workflow). Both can land in the same PR or sequenced PRs.

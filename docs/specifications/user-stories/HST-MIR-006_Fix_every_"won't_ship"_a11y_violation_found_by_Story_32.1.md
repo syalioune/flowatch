@@ -1,6 +1,6 @@
-# HST-MIR-005: Fix every "won't ship" a11y violation found by Story 32.1
+# HST-MIR-006: Fix every "won't ship" a11y violation found by Story 32.1
 
-> **User Story ID**: HST-MIR-005
+> **User Story ID**: HST-MIR-006
 > **Persona**: MIR
 > **Epic**: 32 — Full Accessibility Audit
 > **Milestone**: 1.0.0

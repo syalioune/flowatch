@@ -2,7 +2,7 @@
 
 > **User Story ID**: FND-MIR-003
 > **Persona**: MIR
-> **Epic**: 6 — Docker & Distribution Foundation
+> **Epic**: 6 — Distribution & Discovery Foundation
 > **Milestone**: 0.0.1
 > **Source**: `_bmad-output/planning-artifacts/epics.md` (story 6.5)
 > **State**: done
@@ -19,5 +19,3 @@ As Mira (debugging a deployed Flowatch instance), I want the sidebar footer to s
 **And** CI builds embed the actual short SHA
 **And** the Flowable-tested version is sourced from a single constant emitted alongside the badge generator in Story 6.4 (no duplicate hard-coded literal)
 **And** the footer text is selectable (for copy-paste into bug reports).
-
----
