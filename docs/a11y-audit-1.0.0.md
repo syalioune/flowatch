@@ -108,7 +108,7 @@ score  = 100 − Σ over distinct (ruleId × cell) violations of weight[impact]
 ### Post-fix score (Story 32.2, AC #3)
 
 After Story 32.2 remediated the four root causes and re-ran the scan
-(2026-06-14, 90/90 cells):
+(2026-06-14, 90/90 index cells):
 
 | Rule | Impact | Distinct cells | Weight | Penalty |
 |---|---|---:|---:|---:|
@@ -116,9 +116,30 @@ After Story 32.2 remediated the four root causes and re-ran the scan
 | **Total penalty** | | **0** | | **0** |
 
 **Final a11y score = 100 − 0 = 100.** Clears the epic's tighter post-fix gate
-(**≥ 98**). The `afterAll` flush reports `0 violation-nodes across 90 cells`,
-and the per-cell `expect(blockingViolations).toEqual([])` hard gate is green
-across every screen × look × theme.
+(**≥ 98**). The per-cell `expect(blockingViolations).toEqual([])` hard gate is
+green across every screen × look × theme.
+
+### Detail-route gate expansion (Story 32.2 code-review D1)
+
+The index-route matrix above (15 top-level routes × 6 look×theme = 90 cells) did
+**not** exercise the 9 `$id`/`$key` detail routes, their panels, or their error
+states — surfaces that host their own input-bearing controls and scrollable
+viewers. The code review of 32.2 flagged this scope gap, and the gate was
+expanded to scan every detail route in **two states** per look×theme: the
+error/empty-state chrome (bogus id) and the populated page (real id seeded live
+from the engine; skipped-with-annotation when the entity has no rows). Matrix is
+now **90 index + 108 detail cells (max)**; the expansion surfaced — and 32.2
+fixed — **two further blocking violations** the index scan never reached:
+
+| Rule | Impact | Where | Fix |
+|---|---|---|---|
+| `scrollable-region-focusable` | serious | the `<pre class="code">` BPMN/DMN XML viewers ([ProcessDefinitionDetail](../src/components/ProcessDefinitionDetail.tsx), [DecisionDetail](../src/components/DecisionDetail.tsx)) + the `<pre class="stacktrace">` panels ([JobStacktracePanel](../src/components/JobStacktracePanel.tsx), [BatchPartsPanel](../src/components/BatchPartsPanel.tsx)) | added `role="region"` + `aria-label` + `tabIndex={0}` (same canonical fix as the PageHead snippet) |
+| `color-contrast` | serious | the `<ErrorBox>` message text ([error-box.tsx](../src/lib/error-box.tsx)) rendered in `var(--bad)` — failed AA on the lightest background (terminal/light, `--bad` = 58% L) | repointed to the AA-safe `var(--bad-fg)` (the on-tint foreground token 32.2 introduced); the tint-pair P-008 guard already bounds `--bad-fg`, and `--bad-fg`-on-`--bg` is a strictly easier case than the audited tint |
+
+Post-expansion re-run (2026-06-14): **0 blocking violations** across all index +
+detail cells (168 passed, 30 seeded cells skipped for entities with no rows on
+the default `make stack` engine — instances/tasks/batches/groups/app-definitions).
+Score holds at **100**.
 
 ## Per-rule summary
 
@@ -177,7 +198,8 @@ combos ~45 nodes/cell, dark ~36). Distinct node families:
 - **`.ep-method[data-m="GET|POST|PUT|DELETE"]`** — the API endpoint method chips
   in the PageHead / ApiInspector. The coloured method labels fail AA against
   their chip background in multiple look/theme combos.
-- **`.out-row > span` and `.out-row > .kind`** — ApiInspector output-row text.
+- **`.out-row > span` and `.out-row > .kind`** — BPMN modeler outline
+  element-row text (`.mod-outline-tree .out-row`, dark theme).
 - **`.badge[data-tone="ok"]`** — the success-tone status badges on list rows.
 
 These tokens are **NOT** among the four pairs the predecessor token-math audit
@@ -258,7 +280,7 @@ All items closed. Fixing the shared components cleared all 90 cells.
       text sat on `#efefef`. Reset `appearance:none; background:transparent` on
       `.mod-outline-tree .out-row` ([src/styles/components.css](../src/styles/components.css))
       so the row inherits the dark panel surface.
-- [x] `color-contrast` @ **dmn-js decision-table FEEL cells**
+- [x] `color-contrast` @ **dmn-js decision-table JUEL cells**
       (`.dmn-decision-table-container .content-editable`, DMN modeler, dark) —
       out-of-tree dmn-js editor DOM (it ships its own dark-mode styling, like
       `.djs-container`). Extended the scan's canvas exclusion to also exclude

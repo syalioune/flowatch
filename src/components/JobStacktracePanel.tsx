@@ -125,9 +125,14 @@ export function JobStacktracePanel({ jobId, jobType = "executable", onClose }: P
           <EmptyState entry={getEmptyState("stacktrace")} />
         )}
         {!stack.loading && !stack.error && stack.data && (
+          // biome-ignore lint/a11y/useSemanticElements: a <pre> is the correct monospace container for a stacktrace; role="region" only adds the scrollable-region semantics axe wants (Story 32.2 D1).
           <pre
             className="stacktrace"
             data-testid="job-stacktrace-pre"
+            role="region"
+            aria-label="Job stacktrace"
+            // biome-ignore lint/a11y/noNoninteractiveTabindex: WCAG SC 2.1.1 / axe scrollable-region-focusable — the stacktrace scrolls and MUST be keyboard-reachable (Story 32.2 D1).
+            tabIndex={0}
             style={{
               margin: 0,
               padding: 12,

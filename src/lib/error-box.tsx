@@ -33,8 +33,11 @@ export interface ErrorBoxProps {
 export const ErrorBox = ({ error, onRetry }: ErrorBoxProps) => {
   const message = (error as { message?: string } | null)?.message ?? String(error ?? "");
   const status = errorStatus(error);
+  // Story 32.2 (D1): use the AA-safe --bad-fg foreground (not the brighter
+  // semantic --bad) — the message text inherits this color, and --bad failed
+  // axe color-contrast on the lightest bg (terminal/light).
   return (
-    <div className="empty" data-testid="error-box" style={{ padding: 24, color: "var(--bad)" }}>
+    <div className="empty" data-testid="error-box" style={{ padding: 24, color: "var(--bad-fg)" }}>
       {status > 0 && (
         <div className="mono" style={{ fontSize: 11, color: "var(--fg-mute)", marginBottom: 4 }}>
           HTTP {status}

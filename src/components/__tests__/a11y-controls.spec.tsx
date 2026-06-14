@@ -3,11 +3,13 @@
 /**
  * Story 32.2 — targeted a11y regression assertions (AC #6).
  *
- * The axe matrix scan (e2e/a11y/axe-scan.spec.ts) is the broad live gate; these
- * are the component-local pins for the specific accessible-name defects 32.1
- * found, so the exact regression can't silently return even without a live
- * stack. Browser-tier (real Chromium via Vitest's Playwright provider) like the
- * sibling component specs.
+ * The axe matrix scan (e2e/a11y/axe-scan.spec.ts) is the broad live gate — it
+ * pins the BPMN-panel labels, the Events <select>, the filter aria-labels and
+ * the PageHead region (now across index AND detail routes, Story 32.2 D1). THIS
+ * file adds the one stack-free pin worth keeping: the Topbar global search box,
+ * the single biggest `label` contributor, which renders in every screen's chrome
+ * and is cheap to assert without a live engine. Browser-tier (real Chromium via
+ * Vitest's Playwright provider) like the sibling component specs.
  */
 
 import "@testing-library/jest-dom/vitest";
