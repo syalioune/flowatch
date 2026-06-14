@@ -210,9 +210,14 @@ export function BatchPartsPanel({ batchId }: Props) {
                               <EmptyState entry={getEmptyState("batchPartStacktrace")} />
                             )}
                             {trace && !trace.loading && !trace.error && trace.data && (
+                              // biome-ignore lint/a11y/useSemanticElements: a <pre> is the correct monospace container for a stacktrace; role="region" only adds the scrollable-region semantics axe wants (Story 32.2 D1).
                               <pre
                                 className="stacktrace"
                                 data-testid={`batch-part-stacktrace-${p.id}`}
+                                role="region"
+                                aria-label="Batch part stacktrace"
+                                // biome-ignore lint/a11y/noNoninteractiveTabindex: WCAG SC 2.1.1 / axe scrollable-region-focusable — the stacktrace scrolls and MUST be keyboard-reachable (Story 32.2 D1).
+                                tabIndex={0}
                                 style={{
                                   margin: 0,
                                   padding: 12,

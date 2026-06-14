@@ -92,3 +92,133 @@ export const SCREENS = {
 export type ScreenKey = keyof typeof SCREENS;
 
 export const SCREEN_LIST: ReadonlyArray<ScreenEntry> = Object.values(SCREENS);
+
+/**
+ * Detail-route registry (Story 32.2 review — D1 gate-scope expansion).
+ *
+ * The top-level `SCREENS` list only covers index routes. The 9 `$id`/`$key`
+ * detail routes host their own input-bearing surfaces (action buttons, panel
+ * forms) that a label/aria regression could slip into unscanned. Each detail
+ * route is audited in TWO states:
+ *   - **error state** — navigated with `bogusId` (an id that won't resolve), so
+ *     the accessible ErrorBox / empty-state chrome is scanned. Deterministic,
+ *     no seed data required.
+ *   - **seeded state** — the populated detail page, navigated with a real id
+ *     fetched live from the engine via `seed` (a Flowable REST page-list
+ *     endpoint, proxied through Vite). The seeded cell runs ONLY for entities
+ *     the axe suite deterministically seeds in `beforeAll` (a BPMN + a DMN
+ *     deploy → deployment / process-definition / decision always present). The
+ *     other detail routes carry `seed: null` and are covered by the
+ *     error-state cell only — NO conditional `test.skip`, because a test that
+ *     silently skips on missing data is noise (it either runs or it doesn't
+ *     exist). Adding deterministic seeding for those entities (start an
+ *     instance, create a batch/group) is the way to promote them to a seeded
+ *     cell later.
+ */
+export interface DetailScreenEntry {
+  key: string;
+  label: string;
+  /** Build the detail-route path from a real or bogus id/key. */
+  toPath: (id: string) => string;
+  /** Sentinel id that won't resolve — drives the error/empty-state scan. */
+  bogusId: string;
+  /**
+   * Live-engine seed: a Flowable REST page-list endpoint (Vite-proxy path) and
+   * the field to read off `data[0]`. Non-null ONLY for the entities the axe
+   * suite deterministically seeds (deployment / definition / decision). `null`
+   * = error-state cell only (no seeded cell is generated — no skip).
+   */
+  seed: { listPath: string; idField: string } | null;
+  /** Ready selector — populated `.page`, an ErrorBox, or an empty placeholder. */
+  ready: string;
+  /** instances/$id embeds the Epic-26 bpmn-js marker canvas (out-of-tree). */
+  excludeCanvas?: boolean;
+}
+
+const DETAIL_READY = ".page, [data-testid='error-box'], .empty, [data-testid='empty-state']";
+
+export const DETAIL_SCREENS = {
+  instance: {
+    key: "instance",
+    label: "Process instance detail",
+    toPath: (id) => `/instances/${id}`,
+    bogusId: "axe-nonexistent",
+    seed: null,
+    ready: DETAIL_READY,
+    excludeCanvas: true,
+  },
+  task: {
+    key: "task",
+    label: "Task detail",
+    toPath: (id) => `/tasks/${id}`,
+    bogusId: "axe-nonexistent",
+    seed: null,
+    ready: DETAIL_READY,
+  },
+  deployment: {
+    key: "deployment",
+    label: "Deployment detail",
+    toPath: (id) => `/deployments/${id}`,
+    bogusId: "axe-nonexistent",
+    seed: { listPath: "/flowable-rest/service/repository/deployments?size=1", idField: "id" },
+    ready: DETAIL_READY,
+  },
+  definition: {
+    key: "definition",
+    label: "Process definition detail",
+    toPath: (id) => `/definitions/${id}`,
+    bogusId: "axe-nonexistent",
+    seed: {
+      listPath: "/flowable-rest/service/repository/process-definitions?size=1",
+      idField: "id",
+    },
+    ready: DETAIL_READY,
+  },
+  decision: {
+    key: "decision",
+    label: "Decision detail",
+    toPath: (key) => `/decisions/${key}`,
+    bogusId: "axe-nonexistent",
+    seed: {
+      listPath: "/flowable-rest/dmn-api/dmn-repository/decision-tables?size=1",
+      idField: "key",
+    },
+    ready: DETAIL_READY,
+  },
+  user: {
+    key: "user",
+    label: "User detail",
+    toPath: (id) => `/identity/users/${id}`,
+    bogusId: "axe-nonexistent",
+    seed: null,
+    ready: DETAIL_READY,
+  },
+  group: {
+    key: "group",
+    label: "Group detail",
+    toPath: (id) => `/identity/groups/${id}`,
+    bogusId: "axe-nonexistent",
+    seed: null,
+    ready: DETAIL_READY,
+  },
+  appDefinition: {
+    key: "appDefinition",
+    label: "App definition detail",
+    toPath: (id) => `/app-definitions/${id}`,
+    bogusId: "axe-nonexistent",
+    seed: null,
+    ready: DETAIL_READY,
+  },
+  batch: {
+    key: "batch",
+    label: "Batch detail",
+    toPath: (id) => `/batches/${id}`,
+    bogusId: "axe-nonexistent",
+    seed: null,
+    ready: DETAIL_READY,
+  },
+} as const satisfies Record<string, DetailScreenEntry>;
+
+export type DetailScreenKey = keyof typeof DETAIL_SCREENS;
+
+export const DETAIL_SCREEN_LIST: ReadonlyArray<DetailScreenEntry> = Object.values(DETAIL_SCREENS);
