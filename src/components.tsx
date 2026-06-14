@@ -232,7 +232,7 @@ const Logo = () => (
       <Mark />
     </div>
     <div className="brand-name">Flowatch</div>
-    <div className="brand-tag">v0.0.2</div>
+    <div className="brand-tag">v1.0.0</div>
   </div>
 );
 
