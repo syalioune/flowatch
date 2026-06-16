@@ -7,10 +7,12 @@ import { API_LOG, type ApiLogEntry, api, type FlowableConfig, type HTTPMethod } 
 import { ConnectionSwitch } from "./components/ConnectionSwitch";
 import { ManageConnectionsPanel } from "./components/ManageConnectionsPanel";
 import { SettingsAuthTab } from "./components/SettingsAuthTab";
+import { SubAppPrefixFields } from "./components/SubAppPrefixFields";
 import { buildCurlCommand, CURL_MULTIPART, CURL_UNSERIALIZABLE } from "./lib/curl";
 import { errorStatus } from "./lib/error";
 import { randomId } from "./lib/random-id";
 import { type RouteEndpoint, useRouteMeta } from "./lib/route-meta";
+import { normalizePrefix } from "./lib/saved-connections";
 
 interface ApiLogEvent extends CustomEvent<ApiLogEntry> {}
 interface AppToastEvent
@@ -501,12 +503,22 @@ export const SettingsModal = ({ open, onClose, initialTab }: SettingsModalProps)
     if (open && initialTab) setTab(initialTab);
   }, [open, initialTab]);
   if (!open) return null;
+  // Story 34.1: normalize the per-sub-app prefix fields before persisting so a
+  // blank/whitespace value clears the override (→ standard default) and a
+  // non-blank value is stored as a single leading-slash-normalized segment.
+  const cfgWithNormalizedPrefixes = (): FlowableConfig => ({
+    ...cfg,
+    servicePath: normalizePrefix(cfg.servicePath),
+    dmnPath: normalizePrefix(cfg.dmnPath),
+    cmmnPath: normalizePrefix(cfg.cmmnPath),
+    appPath: normalizePrefix(cfg.appPath),
+  });
   const save = () => {
-    api.setConfig(cfg);
+    api.setConfig(cfgWithNormalizedPrefixes());
     onClose();
   };
   const test = async () => {
-    api.setConfig(cfg);
+    api.setConfig(cfgWithNormalizedPrefixes());
     setPinging(true);
     setPingRes(null);
     try {
@@ -606,6 +618,19 @@ export const SettingsModal = ({ open, onClose, initialTab }: SettingsModalProps)
                   onChange={(e) => setCfg({ ...cfg, tenantId: e.target.value })}
                 />
               </div>
+              {/* Story 34.1: per-sub-app URI prefix overrides on the runtime cfg.
+                  Normalized on Save (cfgWithNormalizedPrefixes). */}
+              <SubAppPrefixFields
+                idPrefix="settings-conn"
+                servicePath={cfg.servicePath ?? ""}
+                onServicePathChange={(v) => setCfg({ ...cfg, servicePath: v })}
+                dmnPath={cfg.dmnPath ?? ""}
+                onDmnPathChange={(v) => setCfg({ ...cfg, dmnPath: v })}
+                cmmnPath={cfg.cmmnPath ?? ""}
+                onCmmnPathChange={(v) => setCfg({ ...cfg, cmmnPath: v })}
+                appPath={cfg.appPath ?? ""}
+                onAppPathChange={(v) => setCfg({ ...cfg, appPath: v })}
+              />
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
                 <button type="button" className="btn" onClick={test} disabled={pinging}>
                   {pinging ? "Pinging…" : "Test connection"}

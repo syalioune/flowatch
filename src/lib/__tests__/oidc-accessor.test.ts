@@ -17,7 +17,7 @@ import { type SavedConnectionsState, STORAGE_KEY } from "../saved-connections";
 
 const seed = (asc: AuthStrategyConfig | undefined) => {
   const state: SavedConnectionsState = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     activeId: "c1",
     connections: [
       {

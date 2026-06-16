@@ -18,13 +18,14 @@
 import React from "react";
 import { Icon } from "../components";
 import { AuthStrategyFields } from "../components/AuthStrategyFields";
+import { SubAppPrefixFields } from "../components/SubAppPrefixFields";
 import {
   type AuthStrategyKind,
   formatErrors,
   parseAuthStrategyConfig,
 } from "./auth-strategy-config";
 import { ErrorBox } from "./error-box";
-import { type SavedConnection, updateConnection } from "./saved-connections";
+import { normalizePrefix, type SavedConnection, updateConnection } from "./saved-connections";
 
 export interface EditConnectionModalProps {
   open: boolean;
@@ -46,6 +47,10 @@ type Inputs = {
   oidcIssuer: string;
   oidcClientId: string;
   oidcScopes: string;
+  servicePath: string;
+  dmnPath: string;
+  cmmnPath: string;
+  appPath: string;
 };
 
 const inputsFrom = (c: SavedConnection): Inputs => {
@@ -75,6 +80,11 @@ const inputsFrom = (c: SavedConnection): Inputs => {
     oidcIssuer,
     oidcClientId,
     oidcScopes,
+    // Story 34.1: hydrate prefix overrides (undefined → blank input).
+    servicePath: c.servicePath ?? "",
+    dmnPath: c.dmnPath ?? "",
+    cmmnPath: c.cmmnPath ?? "",
+    appPath: c.appPath ?? "",
   };
 };
 
@@ -99,6 +109,10 @@ export const EditConnectionModal: React.FC<EditConnectionModalProps> = ({
           oidcIssuer: "",
           oidcClientId: "",
           oidcScopes: "",
+          servicePath: "",
+          dmnPath: "",
+          cmmnPath: "",
+          appPath: "",
         },
   );
   const [error, setError] = React.useState<Error | null>(null);
@@ -225,6 +239,14 @@ export const EditConnectionModal: React.FC<EditConnectionModalProps> = ({
   } else {
     if (connection.username !== undefined) diff.username = undefined;
     if (connection.password !== undefined) diff.password = undefined;
+  }
+  // Story 34.1: prefix diffs. normalizePrefix(input) (string | undefined)
+  // compared against the persisted (already-normalized) value; a change emits
+  // either the new segment or `undefined` (tombstone via updateConnection,
+  // clearing the override → standard default).
+  for (const field of ["servicePath", "dmnPath", "cmmnPath", "appPath"] as const) {
+    const next = normalizePrefix(inputs[field]);
+    if (next !== connection[field]) diff[field] = next;
   }
 
   const diffEmpty = Object.keys(diff).length === 0 && !authConfigChanged;
@@ -396,6 +418,21 @@ export const EditConnectionModal: React.FC<EditConnectionModalProps> = ({
                   style={{ width: "100%", fontSize: 12 }}
                 />
               </div>
+              {/* Story 34.1: per-sub-app URI prefix overrides (N=3 idPrefix
+                  extraction). Changed fields ride the diff (tombstone when
+                  cleared); the diff-empty guard already accounts for them. */}
+              <SubAppPrefixFields
+                idPrefix="edit-connection"
+                servicePath={inputs.servicePath}
+                onServicePathChange={(v) => setField("servicePath", v)}
+                dmnPath={inputs.dmnPath}
+                onDmnPathChange={(v) => setField("dmnPath", v)}
+                cmmnPath={inputs.cmmnPath}
+                onCmmnPathChange={(v) => setField("cmmnPath", v)}
+                appPath={inputs.appPath}
+                onAppPathChange={(v) => setField("appPath", v)}
+                disabled={busy}
+              />
             </div>
           </div>
           <div className="modal-ft">

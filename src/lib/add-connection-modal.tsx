@@ -22,13 +22,14 @@
 import React from "react";
 import { Icon } from "../components";
 import { AuthStrategyFields } from "../components/AuthStrategyFields";
+import { SubAppPrefixFields } from "../components/SubAppPrefixFields";
 import {
   type AuthStrategyKind,
   formatErrors,
   parseAuthStrategyConfig,
 } from "./auth-strategy-config";
 import { ErrorBox } from "./error-box";
-import { addConnection, type SavedConnection } from "./saved-connections";
+import { addConnection, normalizePrefix, type SavedConnection } from "./saved-connections";
 
 export interface AddConnectionModalProps {
   open: boolean;
@@ -60,6 +61,11 @@ export const AddConnectionModal: React.FC<AddConnectionModalProps> = ({
   const [oidcIssuer, setOidcIssuer] = React.useState("");
   const [oidcClientId, setOidcClientId] = React.useState("");
   const [oidcScopes, setOidcScopes] = React.useState("");
+  // Story 34.1: per-sub-app URI prefix overrides. Blank → no override (default).
+  const [servicePath, setServicePath] = React.useState("");
+  const [dmnPath, setDmnPath] = React.useState("");
+  const [cmmnPath, setCmmnPath] = React.useState("");
+  const [appPath, setAppPath] = React.useState("");
   const [error, setError] = React.useState<Error | null>(null);
   const [busy, setBusy] = React.useState(false);
   const labelRef = React.useRef<HTMLInputElement | null>(null);
@@ -76,6 +82,10 @@ export const AddConnectionModal: React.FC<AddConnectionModalProps> = ({
     setOidcIssuer("");
     setOidcClientId("");
     setOidcScopes("");
+    setServicePath("");
+    setDmnPath("");
+    setCmmnPath("");
+    setAppPath("");
     setError(null);
     setBusy(false);
     setTimeout(() => labelRef.current?.focus(), 0);
@@ -180,6 +190,15 @@ export const AddConnectionModal: React.FC<AddConnectionModalProps> = ({
         payload.username = username;
         payload.password = password;
       }
+      // Story 34.1: blank → no override (omitted); non-blank → normalizePrefix.
+      const sp = normalizePrefix(servicePath);
+      const dp = normalizePrefix(dmnPath);
+      const cp = normalizePrefix(cmmnPath);
+      const ap = normalizePrefix(appPath);
+      if (sp !== undefined) payload.servicePath = sp;
+      if (dp !== undefined) payload.dmnPath = dp;
+      if (cp !== undefined) payload.cmmnPath = cp;
+      if (ap !== undefined) payload.appPath = ap;
       const created = addConnection(payload);
       setBusy(false);
       onSuccess(created);
@@ -314,6 +333,20 @@ export const AddConnectionModal: React.FC<AddConnectionModalProps> = ({
                   style={{ width: "100%", fontSize: 12 }}
                 />
               </div>
+              {/* Story 34.1: per-sub-app URI prefix overrides (N=3 idPrefix
+                  extraction). State stays here; blank → no override on submit. */}
+              <SubAppPrefixFields
+                idPrefix="add-connection"
+                servicePath={servicePath}
+                onServicePathChange={setServicePath}
+                dmnPath={dmnPath}
+                onDmnPathChange={setDmnPath}
+                cmmnPath={cmmnPath}
+                onCmmnPathChange={setCmmnPath}
+                appPath={appPath}
+                onAppPathChange={setAppPath}
+                disabled={busy}
+              />
             </div>
           </div>
           <div className="modal-ft">

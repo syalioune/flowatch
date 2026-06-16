@@ -19,7 +19,7 @@ import { loadConnections, type SavedConnectionsState, STORAGE_KEY } from "../lib
 
 const seedBasic = () => {
   const state: SavedConnectionsState = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     activeId: "c1",
     connections: [
       {

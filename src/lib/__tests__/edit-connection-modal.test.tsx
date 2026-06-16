@@ -372,4 +372,21 @@ describe("<EditConnectionModal>", () => {
       expect(persisted?.authStrategyConfig?.kind).toBe("bearer");
     });
   });
+
+  it("Save enabled when a prefix field changes (Story 34.1 — covers onDmnPathChange callback)", async () => {
+    const c = seed();
+    const user = userEvent.setup();
+    render(
+      <EditConnectionModal
+        open
+        connection={c}
+        onClose={() => undefined}
+        onSuccess={() => undefined}
+      />,
+    );
+    await screen.findByTestId("edit-connection-label");
+    await user.click(screen.getByText("Advanced: sub-app URI prefixes"));
+    await user.type(screen.getByTestId("edit-connection-path-dmn"), "/dmn-v2");
+    expect(screen.getByTestId("edit-connection-submit")).not.toBeDisabled();
+  });
 });

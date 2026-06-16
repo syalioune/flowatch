@@ -134,14 +134,39 @@ const saveCfg = (cfg: FlowableConfig): void => {
 let cfg: FlowableConfig = loadCfg();
 
 // Flowable splits its REST API across sub-apps. The BPMN/runtime/identity endpoints
-// live under `/flowable-rest/service`, but DMN is mounted at `/flowable-rest/dmn-api`.
-// We derive the DMN root from the configured base URL.
-const dmnBase = (): string => cfg.baseUrl.replace(/\/service\/?$/, "/dmn-api");
+// live under `/flowable-rest/service`, but DMN is mounted at `/flowable-rest/dmn-api`
+// (and CMMN at `/cmmn-api`, the App API at `/app-api`).
+//
+// Story 34.1: per-sub-app URI prefixes are configurable per connection (FR-59).
+// connectionRoot() strips the configured servicePath suffix from baseUrl to
+// recover the deployment root; each sub-app base = root + its configured
+// segment, falling back to the standard flowable-rest:7.2.0 default when the
+// operator leaves the field blank. Backward-compat: with all fields blank,
+// servicePath defaults to "/service" and dmnBase resolves identically to the
+// pre-34.1 `baseUrl.replace(/\/service\/?$/, "/dmn-api")`.
+const trimTrailingSlash = (s: string): string => s.replace(/\/+$/, "");
+const servicePath = (): string => cfg.servicePath || "/service";
+// Exported for the api-base derivation unit tests (Story 34.1 AC-5) — no live
+// non-standard-mount engine exists for make stack (COMPAT-BOUNDARY, Story 29.1).
+export const connectionRoot = (): string => {
+  const base = trimTrailingSlash(cfg.baseUrl);
+  const sp = servicePath();
+  // When baseUrl does NOT end with the configured servicePath (operator typed a
+  // bare root, or a non-standard service mount), return baseUrl as-is — the
+  // sub-app segment still appends, degrading gracefully rather than throwing.
+  return base.endsWith(sp) ? base.slice(0, base.length - sp.length) : base;
+};
+export const dmnBase = (): string => connectionRoot() + (cfg.dmnPath || "/dmn-api");
+// Story 34.1: forward-reserved — no Flowatch CMMN consumer yet (FR-50). Added
+// for four-helper symmetry so a future CMMN list/detail screen inherits the
+// helper rather than re-deriving the prefix. Exported (unlike a purely-internal
+// helper) precisely because it has no production call site yet; the api-base
+// unit test is its only exerciser until FR-50 lands.
+export const cmmnBase = (): string => connectionRoot() + (cfg.cmmnPath || "/cmmn-api");
 // Story 25.1: Flowable App API sub-app — mirrors the `dmnBase()` shape per
-// compat.md row 28. /service → /app-api. Read-only at this story; app-runtime
-// (app-instances) is not exposed in flowable-rest:7.2.0 (PRD FR-55
-// scope-reduced).
-const appBase = (): string => cfg.baseUrl.replace(/\/service\/?$/, "/app-api");
+// compat.md row 28. Read-only at this story; app-runtime (app-instances) is not
+// exposed in flowable-rest:7.2.0 (PRD FR-55 scope-reduced).
+export const appBase = (): string => connectionRoot() + (cfg.appPath || "/app-api");
 
 export const API_LOG: ApiLogEntry[] = [];
 const MAX_LOG = 60;
