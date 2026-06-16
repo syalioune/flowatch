@@ -56,12 +56,48 @@ export interface SavedConnection {
   tenantId: string;
   /** Story 23.2 reserves; 23.1 leaves typed-but-unread. */
   authStrategyConfig?: AuthStrategyConfig | undefined;
+  // Story 34.1 — per-sub-app URI prefix overrides (FR-59). Blank/undefined →
+  // the *Base() helper's standard flowable-rest:7.2.0 default. Single
+  // leading-slash-normalized URI segments, NOT full URLs. `undefined` is an
+  // accepted value so `updateConnection` can tombstone a cleared field.
+  servicePath?: string | undefined;
+  dmnPath?: string | undefined;
+  cmmnPath?: string | undefined;
+  appPath?: string | undefined;
 }
 
 export interface SavedConnectionsState {
-  schemaVersion: 1;
+  schemaVersion: 2; // Story 34.1: bumped from 1 (per-sub-app prefix overrides).
   activeId: string | null;
   connections: SavedConnection[];
+}
+
+/** Story 34.1: the four per-sub-app prefix slots, kept in one place. */
+const PREFIX_FIELDS = ["servicePath", "dmnPath", "cmmnPath", "appPath"] as const;
+
+/**
+ * Normalize a per-sub-app URI prefix to a single leading-slash-prefixed,
+ * trailing-slash-stripped segment. Returns `undefined` for null/undefined/
+ * empty-after-trim (→ the *Base() helper's standard default applies) and for
+ * any non-string (defensive — a corrupt persisted shape silent-drops to the
+ * default rather than corrupting the derived sub-app URL).
+ *
+ * NOT a full URL, NOT multi-segment-with-query, NOT a regex — a single URI
+ * segment. Hand-written (no Zod), mirroring the no-dep validator choice in
+ * auth-strategy-config.ts (Story 23.2).
+ */
+export function normalizePrefix(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (trimmed === "") return undefined;
+  const noTrailing = trimmed.replace(/\/+$/, "");
+  if (noTrailing === "") return undefined; // value was only slashes
+  const segment = noTrailing.startsWith("/") ? noTrailing : `/${noTrailing}`;
+  // Reject multi-segment paths (e.g. "/rest/service") — a servicePath with an
+  // internal slash matches mid-URL in connectionRoot(), silently truncating
+  // baseUrl to a garbage host prefix. Single segment only.
+  if (segment.indexOf("/", 1) !== -1) return undefined;
+  return segment;
 }
 
 export const STORAGE_KEY = "flowatch.connections.v1";
@@ -93,10 +129,15 @@ const dispatch = (): void => {
   }
 };
 
-const isValidStateShape = (raw: unknown): raw is SavedConnectionsState => {
+// Story 34.1: accept both v1 (pre-prefix) and v2 payloads. A valid v1 payload
+// is migrated in-place by loadConnections() (NOT re-seeded from legacy — that
+// would orphan the operator's connections).
+const isValidStateShape = (
+  raw: unknown,
+): raw is SavedConnectionsState & { schemaVersion: 1 | 2 } => {
   if (!raw || typeof raw !== "object") return false;
-  const s = raw as Partial<SavedConnectionsState>;
-  if (s.schemaVersion !== 1) return false;
+  const s = raw as { schemaVersion?: unknown; connections?: unknown; activeId?: unknown };
+  if (s.schemaVersion !== 1 && s.schemaVersion !== 2) return false;
   if (!Array.isArray(s.connections)) return false;
   if (s.activeId !== null && typeof s.activeId !== "string") return false;
   for (const c of s.connections) {
@@ -111,6 +152,8 @@ const isValidStateShape = (raw: unknown): raw is SavedConnectionsState => {
     if (conn.username !== undefined && typeof conn.username !== "string") return false;
     if (conn.password !== undefined && typeof conn.password !== "string") return false;
     if (typeof conn.tenantId !== "string") return false;
+    // Story 34.1: prefix fields are validated/narrowed at load (normalizePrefix
+    // silent-drops corrupt shapes), so they don't gate shape validity here.
   }
   return true;
 };
@@ -141,7 +184,7 @@ export function migrateLegacyConnection(): SavedConnectionsState {
   }
   const id = newId();
   const state: SavedConnectionsState = {
-    schemaVersion: 1,
+    schemaVersion: 2, // Story 34.1: seeds are born v2 (prefix fields undefined).
     activeId: id,
     connections: [
       {
@@ -167,6 +210,15 @@ export function migrateLegacyConnection(): SavedConnectionsState {
  * `undefined`. The operator's recovery is the Edit modal (where kind
  * defaults to `"basic"` when the slot is empty). The connection itself
  * survives — only the bad config is dropped.
+ *
+ * Story 34.1: a `schemaVersion: 1` payload is migrated in-place to `2` by
+ * bumping the version (the four prefix fields stay `undefined` → standard
+ * defaults → ZERO behavior change) and re-persisting. The migration is
+ * lossless (no connection or field is dropped; `authStrategyConfig` survives)
+ * and idempotent (an already-v2 payload re-persists identically). Each present
+ * prefix field is run through {@link normalizePrefix}; a corrupt (non-string)
+ * shape silent-drops to `undefined` (→ standard default), mirroring the
+ * authStrategyConfig narrowing pass — the operator re-fills from the Edit modal.
  */
 export function loadConnections(): SavedConnectionsState {
   try {
@@ -174,17 +226,39 @@ export function loadConnections(): SavedConnectionsState {
     if (!raw) return migrateLegacyConnection();
     const parsed = JSON.parse(raw);
     if (!isValidStateShape(parsed)) return migrateLegacyConnection();
+    const needsMigration = parsed.schemaVersion !== 2;
+    let prefixModified = false;
     for (const c of parsed.connections) {
       if (c.authStrategyConfig !== undefined) {
         const r = parseAuthStrategyConfig(c.authStrategyConfig);
         if (r.ok) c.authStrategyConfig = r.value;
-        // Review patch: `delete` rather than assigning `undefined` so the slot
-        // doesn't become an enumerable own-property carrying a `undefined`
-        // value that JSON.stringify would still skip but Object.keys would
-        // surface.
         else delete c.authStrategyConfig;
       }
+      // Story 34.1: narrow each present prefix field; silent-drop corrupt shapes.
+      const conn = c as unknown as Record<string, unknown>;
+      for (const field of PREFIX_FIELDS) {
+        if (conn[field] === undefined) continue;
+        const norm = normalizePrefix(conn[field]);
+        if (norm === undefined) {
+          delete conn[field];
+          prefixModified = true;
+        } else {
+          // normalizePrefix may normalize the stored value (e.g. strip trailing
+          // slash); treat a changed value as modified so it gets re-persisted.
+          if (conn[field] !== norm) {
+            conn[field] = norm;
+            prefixModified = true;
+          }
+        }
+      }
     }
+    // Story 34.1: bump v1 → v2 and re-persist so the next read is a no-op.
+    // Also re-persist when prefix normalization changed or deleted a corrupt
+    // field from an already-v2 payload (needsMigration=false) so the fix
+    // survives the next cold load rather than being re-applied silently every
+    // time.
+    parsed.schemaVersion = 2;
+    if (needsMigration || prefixModified) saveConnections(parsed);
     return parsed;
   } catch {
     return migrateLegacyConnection();
@@ -295,6 +369,13 @@ export function setActiveConnection(id: string): SavedConnection {
     username: selected.username ?? "",
     password: selected.password ?? "",
     tenantId: selected.tenantId,
+    // Story 34.1: propagate per-sub-app prefix overrides into the runtime cfg
+    // so dmnBase()/appBase()/cmmnBase() immediately reflect the active
+    // connection (no reload). `undefined` → the *Base() helper's default.
+    servicePath: selected.servicePath,
+    dmnPath: selected.dmnPath,
+    cmmnPath: selected.cmmnPath,
+    appPath: selected.appPath,
   });
   dispatch();
   return selected;

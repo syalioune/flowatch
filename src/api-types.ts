@@ -20,6 +20,14 @@ export interface FlowableConfig {
   username: string;
   password: string;
   tenantId: string;
+  // Story 34.1 — per-sub-app URI prefix overrides (FR-59). Blank/undefined →
+  // the *Base() helper's standard flowable-rest:7.2.0 default. Single
+  // leading-slash-normalized URI segments, NOT full URLs. servicePath is the
+  // suffix connectionRoot() strips from baseUrl to recover the deployment root.
+  servicePath?: string | undefined;
+  dmnPath?: string | undefined;
+  cmmnPath?: string | undefined;
+  appPath?: string | undefined;
 }
 
 export interface FlowablePage<T> {

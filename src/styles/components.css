@@ -1951,3 +1951,26 @@ html[data-look="industrial"] .kpi {
 .version-banner-dismiss:hover {
   border-color: var(--line-strong);
 }
+
+/* Story 34.1 — collapsible "Advanced: sub-app URI prefixes" group inside the
+   Add/Edit connection modals + Settings connection tab. Pattern P-007: reads
+   --gap / --pad / --line from data-density/data-look; no hard-coded values. */
+.adv-prefixes {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: calc(var(--pad) * 0.5) var(--pad);
+}
+.adv-prefixes > summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.adv-prefixes[open] > summary {
+  margin-bottom: var(--gap);
+}
+.adv-prefixes-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap);
+}

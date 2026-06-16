@@ -17,6 +17,7 @@ import {
   getActiveConnection,
   loadConnections,
   migrateLegacyConnection,
+  normalizePrefix,
   STORAGE_KEY,
   saveConnections,
   setActiveConnection,
@@ -43,7 +44,7 @@ afterEach(() => {
 describe("loadConnections — migration", () => {
   it("empty localStorage → seeds one Default entry from DEFAULT_CFG", () => {
     const state = loadConnections();
-    expect(state.schemaVersion).toBe(1);
+    expect(state.schemaVersion).toBe(2); // Story 34.1: seeds born v2
     expect(state.connections).toHaveLength(1);
     expect(state.connections[0]?.label).toBe("Default");
     expect(state.connections[0]?.baseUrl).toBe(DEFAULTS.baseUrl);
@@ -77,7 +78,7 @@ describe("loadConnections — migration", () => {
   it("missing schemaVersion → migration fallback fires", () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ activeId: "x", connections: [] }));
     const state = loadConnections();
-    expect(state.schemaVersion).toBe(1);
+    expect(state.schemaVersion).toBe(2); // Story 34.1: seeds born v2
     expect(state.connections).toHaveLength(1);
   });
 
@@ -329,5 +330,185 @@ describe("saveConnections — quota error is silent", () => {
     // confirm subsequent writes work.
     setItem(STORAGE_KEY, JSON.stringify(state));
     expect(loadConnections().connections.length).toBeGreaterThan(0);
+  });
+});
+
+// ── Story 34.1 — per-sub-app URI prefix overrides ─────────────────────────
+
+describe("normalizePrefix", () => {
+  it("returns undefined for null/undefined/empty/whitespace", () => {
+    expect(normalizePrefix(undefined)).toBeUndefined();
+    expect(normalizePrefix(null)).toBeUndefined();
+    expect(normalizePrefix("")).toBeUndefined();
+    expect(normalizePrefix("   ")).toBeUndefined();
+  });
+
+  it("returns undefined for non-string (corrupt shape)", () => {
+    expect(normalizePrefix(42)).toBeUndefined();
+    expect(normalizePrefix({ path: "/dmn" })).toBeUndefined();
+    expect(normalizePrefix(["/dmn"])).toBeUndefined();
+  });
+
+  it("prepends a leading slash when absent", () => {
+    expect(normalizePrefix("dmn-api")).toBe("/dmn-api");
+  });
+
+  it("preserves an existing leading slash", () => {
+    expect(normalizePrefix("/dmn-api")).toBe("/dmn-api");
+  });
+
+  it("strips trailing slashes", () => {
+    expect(normalizePrefix("/dmn-api/")).toBe("/dmn-api");
+    expect(normalizePrefix("/dmn-api///")).toBe("/dmn-api");
+  });
+
+  it("trims surrounding whitespace", () => {
+    expect(normalizePrefix("  /dmn-api  ")).toBe("/dmn-api");
+  });
+
+  it("returns undefined for a slash-only value", () => {
+    expect(normalizePrefix("/")).toBeUndefined();
+    expect(normalizePrefix("///")).toBeUndefined();
+  });
+
+  it("returns undefined for multi-segment paths (internal slash after leading)", () => {
+    expect(normalizePrefix("/rest/service")).toBeUndefined();
+    expect(normalizePrefix("rest/service")).toBeUndefined();
+    expect(normalizePrefix("/dmn-api/v2")).toBeUndefined();
+  });
+});
+
+describe("loadConnections — v1 → v2 migration (Story 34.1)", () => {
+  const seedV1 = (overrides: Record<string, unknown> = {}) => {
+    const state = {
+      schemaVersion: 1,
+      activeId: "c1",
+      connections: [
+        {
+          id: "c1",
+          label: "Prod",
+          baseUrl: "http://prod:8080/flowable-rest/service",
+          username: "alice",
+          password: "s3cret",
+          tenantId: "acme",
+          ...overrides,
+        },
+      ],
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  };
+
+  it("bumps schemaVersion 1 → 2 and leaves prefix fields undefined (zero behavior change)", () => {
+    seedV1();
+    const state = loadConnections();
+    expect(state.schemaVersion).toBe(2);
+    const c = state.connections[0];
+    expect(c?.servicePath).toBeUndefined();
+    expect(c?.dmnPath).toBeUndefined();
+    expect(c?.cmmnPath).toBeUndefined();
+    expect(c?.appPath).toBeUndefined();
+  });
+
+  it("is lossless — no connection or field is dropped", () => {
+    seedV1();
+    const c = loadConnections().connections[0];
+    expect(c?.label).toBe("Prod");
+    expect(c?.baseUrl).toBe("http://prod:8080/flowable-rest/service");
+    expect(c?.username).toBe("alice");
+    expect(c?.password).toBe("s3cret");
+    expect(c?.tenantId).toBe("acme");
+  });
+
+  it("re-persists the migrated payload (next read is already v2)", () => {
+    seedV1();
+    loadConnections();
+    const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
+    expect(persisted.schemaVersion).toBe(2);
+  });
+
+  it("is idempotent — loading an already-v2 payload is a no-op", () => {
+    seedV1();
+    const first = loadConnections();
+    const second = loadConnections();
+    expect(second).toEqual(first);
+    expect(second.schemaVersion).toBe(2);
+  });
+
+  it("preserves a present authStrategyConfig across migration", () => {
+    seedV1({
+      authStrategyConfig: { kind: "bearer", config: { token: "tok123" } },
+    });
+    const c = loadConnections().connections[0];
+    expect(c?.authStrategyConfig).toEqual({ kind: "bearer", config: { token: "tok123" } });
+  });
+
+  it("normalizes a present prefix field on load", () => {
+    seedV1({ dmnPath: "custom-dmn/" });
+    const c = loadConnections().connections[0];
+    expect(c?.dmnPath).toBe("/custom-dmn");
+  });
+
+  it("silent-drops a corrupt (non-string) prefix shape to undefined", () => {
+    seedV1({ dmnPath: 42, appPath: { foo: 1 } });
+    const c = loadConnections().connections[0];
+    expect(c?.dmnPath).toBeUndefined();
+    expect(c?.appPath).toBeUndefined();
+  });
+});
+
+describe("addConnection / updateConnection — prefix fields (Story 34.1)", () => {
+  it("addConnection persists provided prefix overrides", () => {
+    const created = addConnection({
+      label: "Custom",
+      baseUrl: "http://x:8080/flowable-rest/service",
+      tenantId: "",
+      dmnPath: "/custom-dmn",
+    });
+    const reread = loadConnections().connections.find((c) => c.id === created.id);
+    expect(reread?.dmnPath).toBe("/custom-dmn");
+  });
+
+  it("updateConnection tombstones a cleared prefix (undefined deletes the key)", () => {
+    const created = addConnection({
+      label: "Custom",
+      baseUrl: "http://x:8080/flowable-rest/service",
+      tenantId: "",
+      dmnPath: "/custom-dmn",
+    });
+    updateConnection(created.id, { dmnPath: undefined });
+    const reread = loadConnections().connections.find((c) => c.id === created.id);
+    expect(reread?.dmnPath).toBeUndefined();
+    expect(Object.hasOwn(reread ?? {}, "dmnPath")).toBe(false);
+  });
+});
+
+describe("setActiveConnection — propagates prefixes into cfg (Story 34.1)", () => {
+  it("active connection's dmnPath lands in api.config()", () => {
+    const created = addConnection({
+      label: "Custom",
+      baseUrl: "http://x:8080/flowable-rest/service",
+      tenantId: "",
+      dmnPath: "/custom-dmn",
+    });
+    setActiveConnection(created.id);
+    expect(api.config().dmnPath).toBe("/custom-dmn");
+  });
+
+  it("switching to a connection without overrides clears the prior cfg prefix", () => {
+    const custom = addConnection({
+      label: "Custom",
+      baseUrl: "http://x:8080/flowable-rest/service",
+      tenantId: "",
+      dmnPath: "/custom-dmn",
+    });
+    const plain = addConnection({
+      label: "Plain",
+      baseUrl: "http://y:8080/flowable-rest/service",
+      tenantId: "",
+    });
+    setActiveConnection(custom.id);
+    expect(api.config().dmnPath).toBe("/custom-dmn");
+    setActiveConnection(plain.id);
+    expect(api.config().dmnPath).toBeUndefined();
   });
 });
