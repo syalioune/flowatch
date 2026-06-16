@@ -72,7 +72,6 @@ import type {
   AddAttachmentPayload,
   ApiLogEntry,
   ExecuteDecisionBody,
-  FlowableAppDefinition,
   FlowableAttachment,
   FlowableBatch,
   FlowableBatchPart,
@@ -83,11 +82,7 @@ import type {
   FlowableDmnExecutionAudit,
   FlowableEngineInfo,
   FlowableEventSubscription,
-  FlowableHistoricActivity,
   FlowableHistoricDecisionExecution,
-  FlowableHistoricProcessInstance,
-  FlowableHistoricTask,
-  FlowableHistoricVariable,
   FlowableJob,
   FlowablePage,
   FlowableProcessDefinition,
@@ -793,29 +788,27 @@ const batchPartStacktrace = (id: string): Promise<string> =>
   });
 
 // ── History ──────────────────────────────────────────────────────────────
-const listHistoricInstances = (params?: QueryParams) =>
-  request<FlowablePage<FlowableHistoricProcessInstance>>(
-    "GET",
-    "/history/historic-process-instances",
-    { params },
-  );
-// Story 13.1: per-id GET for the historic detail panel — the runtime sibling
-// is api.getProcessInstance. Returns the same DTO as items in the list
-// response (Flowable's historic surface re-uses the shape).
-const getHistoricProcessInstance = (id: string) =>
-  request<FlowableHistoricProcessInstance>("GET", `/history/historic-process-instances/${id}`);
-const listHistoricActivities = (params?: QueryParams) =>
-  request<FlowablePage<FlowableHistoricActivity>>("GET", "/history/historic-activity-instances", {
-    params,
-  });
-const listHistoricVariables = (params?: QueryParams) =>
-  request<FlowablePage<FlowableHistoricVariable>>("GET", "/history/historic-variable-instances", {
-    params,
-  });
-const listHistoricTasks = (params?: QueryParams) =>
-  request<FlowablePage<FlowableHistoricTask>>("GET", "/history/historic-task-instances", {
-    params,
-  });
+// Historic-process-instance wrappers extracted to src/api-history.ts per NFR-21
+// navigability (50 KB per-source-file limit). Pattern P-001 preserved.
+import {
+  getHistoricProcessInstance,
+  listHistoricActivities,
+  listHistoricInstances,
+  listHistoricTasks,
+  listHistoricVariables,
+} from "./api-history";
+
+// ── App (mounted under /flowable-rest/app-api, not /service) ─────────────
+// App-sub-app read wrappers extracted to src/api-app.ts per NFR-21
+// navigability (50 KB per-source-file limit). Pattern P-001 preserved.
+// The write path (deployBar) stays here — it uses multipartFetch/uploadDeployment.
+import {
+  getAppDefinition,
+  getAppDeploymentResource,
+  listAppDefinitions,
+  listAppDeploymentResources,
+  listAppDeployments,
+} from "./api-app";
 
 // ── Identity ─────────────────────────────────────────────────────────────
 // Identity-surface wrappers extracted to src/api-identity.ts per NFR-21
@@ -961,46 +954,6 @@ const removeDmnDeployment = (id: string, params?: { cascade?: boolean }) =>
     "DELETE",
     `/dmn-repository/deployments/${id}`,
     params?.cascade ? { params: { cascade: true }, base: dmnBase() } : { base: dmnBase() },
-  );
-
-// ── App (mounted under /flowable-rest/app-api, not /service) ─────────────
-// Story 25.1: FR-55 scope-reduced — repository side only. The /app-runtime
-// half (app-instances) is unmounted in flowable-rest:7.2.0 (compat.md row 28).
-const listAppDefinitions = (params?: QueryParams) =>
-  request<FlowablePage<FlowableAppDefinition>>("GET", "/app-repository/app-definitions", {
-    params,
-    base: appBase(),
-  });
-
-// Story 25.1: list App-sub-app deployments.
-const listAppDeployments = (params?: QueryParams) =>
-  request<FlowablePage<FlowableDeployment>>("GET", "/app-repository/deployments", {
-    params,
-    base: appBase(),
-  });
-
-// Story 25.1: get a single app-definition by id — backs the
-// /app-definitions/$id detail route.
-const getAppDefinition = (id: string) =>
-  request<FlowableAppDefinition>("GET", `/app-repository/app-definitions/${id}`, {
-    base: appBase(),
-  });
-
-// Story 25.1: list resources bundled in an app-deployment. Returns an array
-// of { id, mediaType, type, url, contentUrl } where `type` is either
-// "appDefinition" (for the .app manifest) or "resource" (everything else).
-const listAppDeploymentResources = (deploymentId: string) =>
-  request<FlowableResource[]>("GET", `/app-repository/deployments/${deploymentId}/resources`, {
-    base: appBase(),
-  });
-
-// Story 25.1: binary content fetch for an app-deployment resource. Returns
-// the raw Response so callers pick .blob() / .text().
-const getAppDeploymentResource = (deploymentId: string, resourceName: string) =>
-  request<Response>(
-    "GET",
-    `/app-repository/deployments/${deploymentId}/resourcedata/${encodeURIComponent(resourceName)}`,
-    { asResponse: true, base: appBase() },
   );
 
 // ── Deployment helpers (multipart upload) ────────────────────────────────
