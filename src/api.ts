@@ -68,6 +68,36 @@ export type {
 } from "./api-types";
 export { FlowableError } from "./api-types";
 
+import {
+  getAppDefinition,
+  getAppDeploymentResource,
+  listAppDefinitions,
+  listAppDeploymentResources,
+  listAppDeployments,
+} from "./api-app";
+import {
+  getHistoricProcessInstance,
+  listHistoricActivities,
+  listHistoricInstances,
+  listHistoricTasks,
+  listHistoricVariables,
+} from "./api-history";
+import {
+  addUserToGroup,
+  createGroup,
+  createUser,
+  deleteGroup,
+  deleteUser,
+  getGroup,
+  getUser,
+  getUserGroups,
+  listGroupMembers,
+  listGroups,
+  listUsers,
+  removeUserFromGroup,
+  updateGroup,
+  updateUser,
+} from "./api-identity";
 import type {
   AddAttachmentPayload,
   ApiLogEntry,
@@ -790,46 +820,16 @@ const batchPartStacktrace = (id: string): Promise<string> =>
 // ── History ──────────────────────────────────────────────────────────────
 // Historic-process-instance wrappers extracted to src/api-history.ts per NFR-21
 // navigability (50 KB per-source-file limit). Pattern P-001 preserved.
-import {
-  getHistoricProcessInstance,
-  listHistoricActivities,
-  listHistoricInstances,
-  listHistoricTasks,
-  listHistoricVariables,
-} from "./api-history";
 
 // ── App (mounted under /flowable-rest/app-api, not /service) ─────────────
 // App-sub-app read wrappers extracted to src/api-app.ts per NFR-21
 // navigability (50 KB per-source-file limit). Pattern P-001 preserved.
 // The write path (deployBar) stays here — it uses multipartFetch/uploadDeployment.
-import {
-  getAppDefinition,
-  getAppDeploymentResource,
-  listAppDefinitions,
-  listAppDeploymentResources,
-  listAppDeployments,
-} from "./api-app";
 
 // ── Identity ─────────────────────────────────────────────────────────────
 // Identity-surface wrappers extracted to src/api-identity.ts per NFR-21
 // navigability (50 KB per-source-file limit). All wrappers funnel through
 // the same `request<T>` exported above; Pattern P-001 preserved.
-import {
-  addUserToGroup,
-  createGroup,
-  createUser,
-  deleteGroup,
-  deleteUser,
-  getGroup,
-  getUser,
-  getUserGroups,
-  listGroupMembers,
-  listGroups,
-  listUsers,
-  removeUserFromGroup,
-  updateGroup,
-  updateUser,
-} from "./api-identity";
 
 // Tenants are not exposed as a dedicated endpoint in flowable-rest 7.2.
 // Derive distinct tenantIds from deployments (truthy values only).
