@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Start the Flowatch dev environment.
 #
-# Brings up the Flowable Docker stack (Postgres + flowable-rest + nginx CORS proxy)
+# Brings up the Flowable Docker stack (Postgres + flowable-rest with native CORS)
 # and the Vite dev server. Assumes Docker, Docker Compose, and Node are installed.
 #
 # Usage:
@@ -22,7 +22,7 @@ for arg in "$@"; do
 done
 
 if [ "$skip_engine" = "0" ] && [ -f docker-compose.yml ]; then
-  echo "▶ Starting Flowable stack (postgres + flowable-rest + nginx)…"
+  echo "▶ Starting Flowable stack (postgres + flowable-rest with native CORS)…"
   docker compose up -d
   echo "  Waiting for engine on http://localhost:8080…"
   until curl -sf -m 2 -u rest-admin:test \

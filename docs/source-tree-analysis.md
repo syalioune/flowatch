@@ -47,7 +47,7 @@ flowatch/                          # local dir currently still named `conduit/`
 │                                 # Scripts: dev, build, preview — no test/lint
 ├── vite.config.js                # React plugin, Flowable proxy on :5173,
 │                                 # manualChunks (bpmn, dmn, react)
-├── docker-compose.yml            # postgres + flowable + nginx
+├── docker-compose.yml            # postgres + flowable (native CORS)
 ├── index.html                    # Vite entry HTML — loads /src/main.jsx
 ├── CLAUDE.md                     # AI-agent contract (conventions, no-go's)
 └── README.md                     # ⚠️ Stale handoff bundle notice — see note below
