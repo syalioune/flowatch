@@ -89,6 +89,7 @@ Each Flowable engine module exposes a separate REST root URL. From this image:
 | `/history/historic-task-instances/{id}/comments` | ❌ | Historical comments not exposed. |
 | `/runtime/tasks/{id}/identitylinks` | ✅ | Allows querying / adding / removing candidate users and groups on a task. Useful for FR-44 (task edit). |
 | `/repository/process-definitions/{id}/identitylinks` | ✅ | Same for definition-level identity links (who can start a process). |
+| **Native CORS via `flowable.rest.app.cors.*` env vars (NFR-31 / Story 34.2)** | ✅ | **Live-verified 2026-06-17.** Working env-var set: `FLOWABLE_REST_APP_CORS_ENABLED=true`, `FLOWABLE_REST_APP_CORS_ALLOWEDORIGINS=<origin>`, `FLOWABLE_REST_APP_CORS_ALLOWEDHEADERS=Authorization,Content-Type,Accept`, `FLOWABLE_REST_APP_CORS_ALLOWEDMETHODS=GET,POST,PUT,DELETE,OPTIONS`, `FLOWABLE_REST_APP_CORS_ALLOWCREDENTIALS=true`. OPTIONS preflight returns `Access-Control-Allow-Origin`, `Access-Control-Allow-Headers: authorization, content-type, accept`, `Access-Control-Allow-Credentials: true` (HTTP 200). Authed cross-origin GET returns 200 with `Access-Control-Allow-Origin`. Spring relaxed-binding: hyphens within a property segment collapse (`allowed-origins` → `ALLOWEDORIGINS`). nginx sidecar removed (Story 34.2). |
 
 ---
 

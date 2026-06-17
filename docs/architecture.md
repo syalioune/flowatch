@@ -38,7 +38,7 @@ Layered SPA with a thin API client and event-driven UI feedback.
                              ▼
               http://localhost:8080/flowable-rest/
                      (via Vite proxy in dev,
-                      via nginx CORS proxy in Docker)
+                      via native Flowable CORS in Docker)
                              │
                              ▼
                     ┌────────────────┐
@@ -183,7 +183,7 @@ External integrations: **only** Flowable's REST API.
 | Authentication      | HTTP Basic via `Authorization: Basic <base64>` (`api.js:48`)                      |
 | Content negotiation | `Accept: application/json` (default) or `*/*` (when `raw: true`)                  |
 | Multipart upload    | Used for deployments; `FormData` with the BPMN/DMN file plus optional `tenantId`  |
-| CORS handling       | nginx in Docker; Vite proxy in dev — never reach Flowable directly from the browser |
+| CORS handling       | Native Flowable CORS (`flowable.rest.app.cors.*` env vars) in Docker; Vite proxy in dev — never reach Flowable directly from the browser |
 | Error handling      | Thrown `Error` with `.status` (HTTP code) and `.message` (server body or `HTTP NNN`) |
 
 ## Build & dev pipeline

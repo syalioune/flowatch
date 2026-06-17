@@ -1,6 +1,6 @@
 # ===== Flowatch top-level Makefile ============================================
 # Single-package React + Vite GUI for Flowable 7+. The Flowable engine itself
-# runs via docker compose (postgres + flowable-rest + nginx CORS proxy).
+# runs via docker compose (postgres + flowable-rest with native CORS).
 
 SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
@@ -24,14 +24,14 @@ install:  ## npm ci
 	npm ci
 dev:      ## Vite dev server on :5173 (assumes engine already running)
 	npm run dev
-stack:    ## Full local stack: postgres + flowable + nginx + Vite (one-shot via scripts/dev/run-dev.sh)
+stack:    ## Full local stack: postgres + flowable (native CORS) + Vite (one-shot via scripts/dev/run-dev.sh)
 	bash scripts/dev/run-dev.sh
 build:    ## Production bundle to dist/
 	npm run build
 preview:  ## Serve the production bundle locally
 	npm run preview
 
-# --- Engine (Docker Compose: postgres + flowable-rest + nginx CORS proxy) --
+# --- Engine (Docker Compose: postgres + flowable-rest with native CORS) ----
 .PHONY: engine-up engine-up-flowatch engine-down engine-stop engine-restart engine-ps engine-logs engine-clean engine-health engine-shell engine-psql
 engine-up:       ## Start the engine stack (detached)
 	$(COMPOSE) up -d

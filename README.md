@@ -70,7 +70,7 @@ The image carries only the static SPA bundle and a tiny nginx — no Node, no JR
 
 ```bash
 make install     # npm ci
-make stack       # postgres + flowable-rest 7.2.0 + nginx (:8080) + Vite (:5173)
+make stack       # postgres + flowable-rest 7.2.0 (native CORS :8080) + Vite (:5173)
 ```
 
 Without `make`:
@@ -92,7 +92,7 @@ Default credentials (configurable in the Settings modal): `rest-admin` / `test`.
 
 Health-check the engine: `make engine-health` (or `curl -u rest-admin:test http://localhost:8080/flowable-rest/service/management/engine`).
 
-**First boot pulls ~700 MB of Docker images** (postgres + flowable-rest 7.2.0 + nginx). Expect a green-light Dashboard within 2 minutes on broadband. Subsequent boots reuse the images and finish in well under a minute.
+**First boot pulls ~500 MB of Docker images** (postgres + flowable-rest 7.2.0). Expect a green-light Dashboard within 2 minutes on broadband. Subsequent boots reuse the images and finish in well under a minute.
 
 The sidebar footer shows a connection pill: **green** = engine reachable, **red** = unreachable. Click the pill to open the Settings modal and reconfigure the base URL or credentials.
 
@@ -103,7 +103,7 @@ The sidebar footer shows a connection pill: **green** = engine reachable, **red*
 
 **If the indicator stays red:**
 
-- `make engine-logs` to tail flowable + nginx + postgres.
+- `make engine-logs` to tail flowable + postgres.
 - `lsof -i :8080` (or `ss -ltnp '( sport = :8080 )'`) to check the port isn't held.
 - Docker daemon running? `docker ps` should return without error.
 - Credentials in the Settings modal match `rest-admin` / `test` (or whatever you've set).
@@ -120,7 +120,7 @@ The sidebar footer shows a connection pill: **green** = engine reachable, **red*
 | `make dev`            | `npm run dev`                            | Vite dev server with HMR (assumes engine is up)       |
 | `make build`          | `npm run build`                          | Production bundle to `dist/`                          |
 | `make preview`        | `npm run preview`                        | Serve the production bundle locally                   |
-| `make engine-up`      | `docker compose up -d`                   | Start the Docker stack (postgres + flowable + nginx)  |
+| `make engine-up`      | `docker compose up -d`                   | Start the Docker stack (postgres + flowable with native CORS) |
 | `make engine-up-flowatch` | `docker compose --profile flowatch up -d` | Same stack + the published Flowatch SPA image on `:5173` |
 | `make engine-down`    | `docker compose down`                    | Stop & remove engine containers                       |
 | `make engine-logs`    | `docker compose logs -f`                 | Tail logs from all engine services                    |
@@ -136,7 +136,7 @@ No test suite, linter, or formatter is configured yet.
 | A guided overview of what Flowatch is        | [docs/project-overview.md](docs/project-overview.md) |
 | Architecture, request flow, theming layers  | [docs/architecture.md](docs/architecture.md)         |
 | Local setup & build details                 | [docs/development-guide.md](docs/development-guide.md) |
-| Docker stack & nginx CORS proxy             | [docs/deployment-guide.md](docs/deployment-guide.md) |
+| Docker stack & native Flowable CORS         | [docs/deployment-guide.md](docs/deployment-guide.md) |
 | Flowable REST wrappers exported by `api.js` | [docs/api-contracts.md](docs/api-contracts.md)       |
 
 The full doc index lives at [docs/index.md](docs/index.md).

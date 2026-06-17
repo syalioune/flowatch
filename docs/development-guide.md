@@ -4,7 +4,7 @@
 
 - **Node.js** ≥ 18 (Vite 5 requirement). No `.nvmrc` or `engines` pin is set in [package.json](../package.json).
 - **npm** (or any compatible package manager — only `package-lock.json` is committed, so npm is the path of least friction).
-- **Docker + Docker Compose** to run the Flowable engine, PostgreSQL, and the nginx CORS proxy locally.
+- **Docker + Docker Compose** to run the Flowable engine and PostgreSQL locally.
 
 ## First-time setup
 
@@ -12,7 +12,7 @@
 git clone <repo-url> flowatch
 cd flowatch
 npm install
-docker compose up -d   # postgres + flowable + nginx (CORS proxy on :8080)
+docker compose up -d   # postgres + flowable (native CORS on :8080)
 ```
 
 Wait until Flowable is reachable — usually 20-30 seconds after `up`:

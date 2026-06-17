@@ -50,7 +50,7 @@ _Generated: 2026-05-11 by `bmad-document-project` (deep scan)._
 ## Getting started
 
 1. `npm install`
-2. `docker compose up -d` (starts Postgres + Flowable REST + nginx CORS proxy)
+2. `docker compose up -d` (starts Postgres + Flowable REST with native CORS)
 3. Wait for engine to be ready: `curl -sf -u rest-admin:test http://localhost:8080/flowable-rest/service/management/engine | jq .`
 4. `npm run dev` → open `http://localhost:5173`
 

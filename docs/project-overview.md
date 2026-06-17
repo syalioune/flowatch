@@ -27,7 +27,7 @@ The app talks **only to the live Flowable engine** — there is no mock fallback
 | DMN modeler    | dmn-js                  | ^16.6.1  | Same wrapping pattern                                          |
 | Process engine  | Flowable REST           | 7.2.0    | External — runs in Docker (`flowable/flowable-rest:7.2.0`)     |
 | Database        | PostgreSQL              | 16-alpine | Persistence for Flowable only; Flowatch doesn't touch it       |
-| CORS proxy      | nginx                   | alpine   | Required because flowable-rest rejects browser-origin requests |
+| CORS            | Native Flowable CORS    | n/a      | `flowable.rest.app.cors.*` env vars configure cross-origin access directly on the engine |
 | Dev proxy       | Vite proxy              | n/a      | Forwards `/flowable-rest` → `http://localhost:8080`            |
 
 ## Architecture type
@@ -53,7 +53,7 @@ Theming uses **data attributes on `<html>`** (`data-look`, `data-theme`, `data-d
 
 ## Repository structure
 
-Monolith. All source under [src/](../src/), no client/server split. Flowable, PostgreSQL, and the nginx proxy are containerized externally via [docker-compose.yml](../docker-compose.yml).
+Monolith. All source under [src/](../src/), no client/server split. Flowable and PostgreSQL are containerized externally via [docker-compose.yml](../docker-compose.yml); native Flowable CORS handles cross-origin access.
 
 ## Linked documentation
 
@@ -61,6 +61,6 @@ Monolith. All source under [src/](../src/), no client/server split. Flowable, Po
 - [Source tree analysis](./source-tree-analysis.md) — annotated file/folder reference
 - [Component inventory](./component-inventory.md) — all React components catalogued
 - [Development guide](./development-guide.md) — setup, build, run commands
-- [Deployment guide](./deployment-guide.md) — Docker stack and nginx CORS proxy
+- [Deployment guide](./deployment-guide.md) — Docker stack and native Flowable CORS
 - [API contracts](./api-contracts.md) — Flowable REST wrappers exported by `api.js`
 - [CLAUDE.md](../CLAUDE.md) — AI-agent contract and conventions for this repo

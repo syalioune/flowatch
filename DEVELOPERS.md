@@ -2,7 +2,7 @@
 
 A living guide for contributors to **Flowatch**. Environment setup, coding conventions, the branching model, testing, reviews, CI/CD, and release practices.
 
-> TL;DR: `make stack` brings up Docker (postgres + flowable-rest + nginx) and the Vite dev server in one go. Run `make help` to see every target.
+> TL;DR: `make stack` brings up Docker (postgres + flowable-rest with native CORS) and the Vite dev server in one go. Run `make help` to see every target.
 
 ---
 
@@ -22,7 +22,7 @@ Flowatch is a **single-package React + Vite SPA**. There is no backend of its ow
 ├── public/                       # Static assets served verbatim by Vite (TBD)
 ├── branding/                     # Logo SVGs (mark, lockup, favicon)
 ├── bruno/                        # Bruno API collection for the Flowable REST API
-├── docker/                       # nginx CORS proxy config for the dev stack
+├── docker/                       # nginx SPA config for the published image (nginx-spa.conf.template)
 ├── docs/                         # Living documentation (architecture, dev guide, compat matrix, ...)
 ├── _bmad-output/                 # ⤴ symlink → flowatch-bmad (private)  Planning artifacts (PRD, UX, …)
 ├── _bmad/                        # ⤴ symlink → flowatch-bmad (private)  BMad install + team overrides
@@ -33,7 +33,7 @@ Flowatch is a **single-package React + Vite SPA**. There is no backend of its ow
 │   ├── dev/                      # run-dev.sh
 │   ├── release/                  # semantic-release helpers (preview, scope-check)
 │   └── user-stories/             # Optional: keep local story files in sync with GitHub issues
-├── docker-compose.yml            # Postgres + flowable-rest + nginx for local dev
+├── docker-compose.yml            # Postgres + flowable-rest (native CORS) for local dev
 ├── vite.config.js                # Vite config (proxy, chunk splitting)
 ├── Makefile                      # Top-level entry point — `make help` lists all targets
 ├── package.json                  # Single npm package at the root
@@ -88,7 +88,7 @@ make stack
 # bash scripts/dev/run-dev.sh
 
 # Or step-by-step:
-make engine-up                                    # postgres + flowable-rest + nginx (= docker compose up -d)
+make engine-up                                    # postgres + flowable-rest with native CORS (= docker compose up -d)
 make install                                      # dependencies (= npm ci)
 make dev                                          # Vite dev server on :5173 (= npm run dev)
 ```

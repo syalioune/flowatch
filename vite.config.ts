@@ -98,7 +98,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    // Proxy Flowable REST to avoid CORS when running both locally
+    // Proxy Flowable REST for same-origin dev access (prod uses native Flowable CORS instead)
     proxy: {
       "/flowable-rest": {
         target: "http://localhost:8080",

@@ -15,6 +15,8 @@ services:
 
   flowable:
     image: flowable/flowable-rest:7.2.0
+    ports:
+      - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -26,6 +28,15 @@ services:
       FLOWABLE_REST_APP_ADMIN_PASSWORD: test
       FLOWABLE_REST_APP_ADMIN_FIRST_NAME: REST
       FLOWABLE_REST_APP_ADMIN_LAST_NAME: Admin
+      # Native CORS — verified live against flowable-rest:7.2.0 (Story 34.2, 2026-06-17).
+      # Spring relaxed-binding: hyphens within a segment collapse (allowed-origins → ALLOWEDORIGINS).
+      # Reproduces the nginx CORS contract: single explicit origin, Authorization header allowed,
+      # credentials enabled. Note: no fail-fast on a malformed ALLOWED_ORIGIN — see docs/deployment-guide.md.
+      FLOWABLE_REST_APP_CORS_ENABLED: "true"
+      FLOWABLE_REST_APP_CORS_ALLOWEDORIGINS: ${ALLOWED_ORIGIN:-http://localhost:5173}
+      FLOWABLE_REST_APP_CORS_ALLOWEDHEADERS: Authorization,Content-Type,Accept
+      FLOWABLE_REST_APP_CORS_ALLOWEDMETHODS: GET,POST,PUT,DELETE,OPTIONS
+      FLOWABLE_REST_APP_CORS_ALLOWCREDENTIALS: "true"
     healthcheck:
       # Probe the Swagger UI landing at /flowable-rest/docs/ — it is served
       # unauthenticated by Flowable 7.2.0 and returns 200 once Spring + Tomcat
@@ -39,28 +50,9 @@ services:
       retries: 30
       start_period: 30s
 
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "8080:8080"
-    environment:
-      ALLOWED_ORIGIN: ${ALLOWED_ORIGIN:-http://localhost:5173}
-      # Restrict envsubst to ALLOWED_ORIGIN so nginx's own $host/$remote_addr/etc. are preserved.
-      NGINX_ENVSUBST_FILTER: ALLOWED_ORIGIN
-    volumes:
-      - ./docker/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
-      # 40-validate-origin runs after the official image's envsubst step (30-)
-      # and fails the container start if ALLOWED_ORIGIN is empty, has a
-      # trailing slash, is a wildcard, or contains a comma. See the script for
-      # the full contract.
-      - ./docker/40-validate-origin.sh:/docker-entrypoint.d/40-validate-origin.sh:ro
-    depends_on:
-      flowable:
-        condition: service_healthy
-
   # Served only when the `flowatch` profile is activated:
   #   docker compose --profile flowatch up -d
-  # The default stack (postgres + flowable + nginx) keeps starting as-is when
+  # The default stack (postgres + flowable) keeps starting as-is when
   # no profile is passed. Override the tag with FLOWATCH_TAG (defaults to
   # :latest; common alternates are :develop and :sha-<short>).
   flowatch:
@@ -69,8 +61,8 @@ services:
     ports:
       - "${FLOWATCH_PORT:-5173}:8080"
     depends_on:
-      nginx:
-        condition: service_started
+      flowable:
+        condition: service_healthy
 
 volumes:
   postgres_data:
