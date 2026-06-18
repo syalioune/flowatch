@@ -22,10 +22,10 @@
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
 
-  <div class="pre-alpha-banner" role="status" aria-live="polite">
-    <strong>Pre-alpha</strong> — Flowatch development is ongoing.
-    No compatibility guarantees between pre-1.0 releases.
-    <a href="https://github.com/syalioune/flowatch/releases">Latest release ›</a>
+  <div class="release-banner" role="status" aria-live="polite">
+    <strong>Flowatch 1.0.0 is here.</strong>
+    The complete browser GUI for Flowable 7+ OSS — stable, versioned, and ready to self-host.
+    <a href="https://github.com/syalioune/flowatch/releases">Release notes ›</a>
   </div>
 
   <header class="topbar">
@@ -66,7 +66,28 @@
       </ul>
     </section>
 
-    <!-- 2. WHY FLOWATCH EXISTS -->
+    <!-- 2. SCREENSHOTS -->
+    <section class="screenshots" aria-labelledby="screenshots-title">
+      <h2 id="screenshots-title" class="sr-only">Screenshots</h2>
+      <div class="screenshots-triple">
+        <img src="./screenshots/dashboard-editorial-light.png"
+             alt="Flowatch Dashboard in the editorial look (light theme): process-engine overview tiles for deployments, running instances, open tasks, and jobs."
+             width="800" height="500" loading="lazy" />
+        <img src="./screenshots/dashboard-terminal-dark.png"
+             alt="Flowatch Dashboard in the terminal look (dark theme): the same overview in a monospace, high-contrast dark identity."
+             width="800" height="500" loading="lazy" />
+        <img src="./screenshots/dashboard-industrial-dark.png"
+             alt="Flowatch Dashboard in the industrial look (dark theme): the same overview in the industrial type identity."
+             width="800" height="500" loading="lazy" />
+      </div>
+      <div class="screenshots-single">
+        <img src="./screenshots/instance-detail-editorial-light.png"
+             alt="Flowatch process-instance detail: a running BPMN diagram with the live current-activity overlay, the Runtime/History/Audit tabs, and the API Inspector endpoint chips listing every REST call the screen makes."
+             width="1600" height="900" loading="lazy" />
+      </div>
+    </section>
+
+    <!-- 3. WHY FLOWATCH EXISTS -->
     <section class="why" aria-labelledby="why-title">
       <h2 id="why-title">Why Flowatch exists</h2>
       <p>
@@ -86,7 +107,7 @@
       </p>
     </section>
 
-    <!-- 3. WHAT YOU GET -->
+    <!-- 4. WHAT YOU GET -->
     <section class="tiles" id="what-you-get" aria-labelledby="tiles-title">
       <h2 id="tiles-title">What you get</h2>
       <div class="tile-grid">
@@ -112,7 +133,7 @@
       </p>
     </section>
 
-    <!-- 4. WHAT MAKES IT DIFFERENT -->
+    <!-- 5. WHAT MAKES IT DIFFERENT -->
     <section class="different" id="different" aria-labelledby="different-title">
       <h2 id="different-title">What makes it different</h2>
       <ol class="diff-list">
@@ -145,7 +166,7 @@
       </ol>
     </section>
 
-    <!-- 5. GET STARTED -->
+    <!-- 6. GET STARTED -->
     <section class="get-started" id="get-started" aria-labelledby="get-started-title">
       <h2 id="get-started-title">Get started</h2>
 
@@ -168,7 +189,7 @@ make stack       # boot-to-Dashboard in under 2 minutes</code></pre>
       </p>
     </section>
 
-    <!-- 6. OSS PROMISES -->
+    <!-- 7. OSS PROMISES -->
     <section class="promises" aria-labelledby="promises-title">
       <h2 id="promises-title">What we promise</h2>
       <ul class="promise-list">
@@ -179,15 +200,14 @@ make stack       # boot-to-Dashboard in under 2 minutes</code></pre>
       </ul>
     </section>
 
-    <!-- 7. PROJECT STATUS -->
+    <!-- 8. PROJECT STATUS -->
     <section class="status" aria-labelledby="status-title">
       <h2 id="status-title">Project status</h2>
       <p>
-        <strong>Pre-alpha.</strong> Flowatch runs against <code>flowable-rest:7.2.0</code> end-to-end
-        today, and is being put on a defensible engineering footing &mdash; TypeScript strict,
-        Vitest + Playwright against a live Dockerized engine, Biome lint+format, TanStack Router,
-        GitHub Actions CI &mdash; before adding net-new capabilities. Treat current implementation
-        choices as starting points, not as permanent decisions.
+        <strong>Stable 1.0.0.</strong> Flowatch ships against <code>flowable-rest:7.2.0</code>
+        end-to-end, with TypeScript strict, Vitest + Playwright against a live Dockerized engine,
+        Biome lint+format, TanStack Router, and GitHub Actions CI. Ten screens covering the full
+        operator surface of the legacy 6.x OSS UI.
       </p>
       <p>
         Built openly with AI as a first-class collaborator: every commit is human-reviewed and the
@@ -238,5 +258,43 @@ make stack       # boot-to-Dashboard in under 2 minutes</code></pre>
     </p>
   </footer>
 
+  <!-- Lightbox dialog — opened by JS when any .screenshots img is clicked -->
+  <dialog id="img-lightbox" aria-label="Screenshot viewer">
+    <button class="lightbox-close" aria-label="Close screenshot">&#x2715;</button>
+    <img id="lightbox-img" src="" alt="" />
+  </dialog>
+
+  <script>
+    (function () {
+      var dialog = document.getElementById('img-lightbox');
+      var lbImg  = document.getElementById('lightbox-img');
+
+      document.querySelectorAll('.screenshots img').forEach(function (img) {
+        img.classList.add('screenshots-zoomable');
+        img.setAttribute('tabindex', '0');
+        img.setAttribute('role', 'button');
+        img.setAttribute('aria-label', 'Enlarge: ' + img.alt);
+
+        function open() {
+          lbImg.src = img.src;
+          lbImg.alt = img.alt;
+          dialog.showModal();
+        }
+        img.addEventListener('click', open);
+        img.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+        });
+      });
+
+      /* Close on backdrop click */
+      dialog.addEventListener('click', function (e) {
+        if (e.target === dialog) dialog.close();
+      });
+
+      document.querySelector('.lightbox-close').addEventListener('click', function () {
+        dialog.close();
+      });
+    })();
+  </script>
 </body>
 </html>

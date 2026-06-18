@@ -134,13 +134,14 @@ LANDING_STAGE := _site
 .PHONY: landing-stage landing-preview landing-check
 landing-stage: ## Assemble _site/ from landing/ + branding/ (idempotent)
 	@rm -rf $(LANDING_STAGE)
-	@mkdir -p $(LANDING_STAGE)/fonts
+	@mkdir -p $(LANDING_STAGE)/fonts $(LANDING_STAGE)/screenshots
 	@cp landing/index.html landing/style.css landing/.nojekyll $(LANDING_STAGE)/
 	@cp branding/flowatch-lockup.svg $(LANDING_STAGE)/
 	@cp branding/flowatch-favicon.svg $(LANDING_STAGE)/favicon.svg
 	@cp branding/fonts/ibm-plex-sans-400.woff2 branding/fonts/ibm-plex-sans-500.woff2 branding/fonts/ibm-plex-sans-600.woff2 $(LANDING_STAGE)/fonts/
 	@cp branding/fonts/ibm-plex-mono-400.woff2 branding/fonts/ibm-plex-mono-500.woff2 $(LANDING_STAGE)/fonts/
 	@cp branding/fonts/ibm-plex-serif-400.woff2 branding/fonts/ibm-plex-serif-500.woff2 $(LANDING_STAGE)/fonts/
+	@cp branding/screenshots/*.png $(LANDING_STAGE)/screenshots/
 	@echo "Staged → $(LANDING_STAGE)/"
 landing-preview: landing-stage ## Serve the staged landing site on http://localhost:4173
 	@echo "Serving $(LANDING_STAGE)/ at http://localhost:4173  (Ctrl+C to stop)"
