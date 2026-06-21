@@ -57,7 +57,7 @@ Layered SPA with a thin API client and event-driven UI feedback.
 
 ## Source code organization
 
-The source has grown from a flat-file layout into a multi-directory structure. See [source-tree-analysis.md](./source-tree-analysis.md) for the original snapshot (2026-05-11); the current structure is described in [CLAUDE.md](../CLAUDE.md). Key files and directories:
+The source has grown from a flat-file layout into a multi-directory structure. The current structure is described in [CLAUDE.md](../CLAUDE.md). Key files and directories:
 
 | Path                         | Responsibility                                                                   |
 | ---------------------------- | -------------------------------------------------------------------------------- |

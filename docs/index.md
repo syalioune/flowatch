@@ -28,7 +28,6 @@ _Generated: 2026-05-11 by `bmad-document-project` (deep scan). Last updated: 202
 
 - [Project overview](./project-overview.md) — purpose, exec summary, tech stack table
 - [Architecture](./architecture.md) — components, data flow, integrations, risks
-- [Source tree analysis](./source-tree-analysis.md) — annotated directory tree _(snapshot: 2026-05-11; see CLAUDE.md for current structure)_
 - [Component inventory](./component-inventory.md) — React components catalogued _(snapshot: 2026-05-11; many new components added since)_
 - [Development guide](./development-guide.md) — setup, build, run, conventions
 - [Deployment guide](./deployment-guide.md) — Docker stack, native CORS, prod notes

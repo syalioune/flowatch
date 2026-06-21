@@ -66,7 +66,6 @@ Monolith. All source under [src/](../src/), no client/server split. Flowable and
 ## Linked documentation
 
 - [Architecture](./architecture.md) — detailed component, data, and integration design
-- [Source tree analysis](./source-tree-analysis.md) — annotated file/folder reference
 - [Component inventory](./component-inventory.md) — all React components catalogued
 - [Development guide](./development-guide.md) — setup, build, run commands
 - [Deployment guide](./deployment-guide.md) — Docker stack and native Flowable CORS
