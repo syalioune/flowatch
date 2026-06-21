@@ -1,0 +1,28 @@
+meta {
+  name: Delete task attachment
+  type: http
+  seq: 20
+}
+
+delete {
+  url: {{baseUrl}}/runtime/tasks/{{taskId}}/attachments/{{attachmentId}}
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  taskId: PASTE_A_TASK_ID
+  attachmentId: PASTE_AN_ATTACHMENT_ID
+}
+
+docs {
+  # Delete task attachment
+
+  Symmetric pair to Add task attachment. Returns 204 No Content.
+  Related: PRD FR-45, Story 21.3.
+}

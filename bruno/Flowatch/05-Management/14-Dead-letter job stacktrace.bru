@@ -1,0 +1,32 @@
+meta {
+  name: Dead-letter job exception stacktrace
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{baseUrl}}/management/deadletter-jobs/{{jobId}}/exception-stacktrace
+  body: none
+  auth: basic
+}
+
+headers {
+  Accept: text/plain
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  jobId: PASTE_A_FAILED_DEADLETTER_JOB_ID
+}
+
+docs {
+  # Dead-letter job exception stacktrace
+
+  Returns raw text. Dead-letter stacktraces live under
+  /management/deadletter-jobs/{id}/exception-stacktrace — separate namespace
+  from /management/jobs/ and /management/timer-jobs/. Related: RC-11.
+}

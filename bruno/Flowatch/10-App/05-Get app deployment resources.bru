@@ -1,0 +1,28 @@
+meta {
+  name: Get app deployment resources
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{appBase}}/app-repository/deployments/{{deploymentId}}/resources
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  deploymentId: PASTE_AN_APP_DEPLOYMENT_ID
+}
+
+docs {
+  # Get app deployment resources
+
+  Returns an array of { id, mediaType, type, url, contentUrl } where `type`
+  is "appDefinition" for the .app manifest or "resource" for everything else.
+  Related: PRD FR-55, Story 25.1.
+}

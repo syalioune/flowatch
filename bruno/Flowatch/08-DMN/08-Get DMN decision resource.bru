@@ -1,0 +1,34 @@
+meta {
+  name: Get DMN decision resource (by decision id)
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{dmnBase}}/dmn-repository/decision-tables/{{decisionId}}/resourcedata
+  body: none
+  auth: basic
+}
+
+headers {
+  Accept: application/xml
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  decisionId: PASTE_DMN_DECISION_ID
+}
+
+docs {
+  # Get DMN decision resource
+
+  Fetches the raw DMN XML for a decision-table by its decision id.
+  This is the route Flowatch's DMN modeler uses (api.getDmnDecisionResource).
+  The DMN sub-app does NOT expose /deployments/{id}/resources listing (returns
+  500 on flowable-rest 7.2), so the decision-id route is the only viable path.
+  Related: PRD FR-34.
+}

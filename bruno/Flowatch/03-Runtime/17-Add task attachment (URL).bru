@@ -1,0 +1,38 @@
+meta {
+  name: Add task attachment (URL)
+  type: http
+  seq: 17
+}
+
+post {
+  url: {{baseUrl}}/runtime/tasks/{{taskId}}/attachments
+  body: json
+  auth: basic
+}
+
+body:json {
+  {
+    "name": "Specification",
+    "description": "Link to external spec",
+    "type": "text/html",
+    "externalUrl": "https://example.com/spec"
+  }
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  taskId: PASTE_A_TASK_ID
+}
+
+docs {
+  # Add task attachment (URL mode)
+
+  JSON POST. `externalUrl` is required; `description` and `type` are optional.
+  Engine returns 201 Created with the echoed FlowableAttachment.
+  For file uploads use the multipart route (see next request).
+  Related: PRD FR-45, Story 21.2.
+}

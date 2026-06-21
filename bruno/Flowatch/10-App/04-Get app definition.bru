@@ -1,0 +1,22 @@
+meta {
+  name: Get app definition
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{appBase}}/app-repository/app-definitions/{{appDefinitionId}}
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  appDefinitionId: PASTE_AN_APP_DEFINITION_ID
+}
+
+docs { Related: PRD FR-55. }

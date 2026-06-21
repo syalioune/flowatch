@@ -1,0 +1,33 @@
+meta {
+  name: Timer job exception stacktrace
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/management/timer-jobs/{{jobId}}/exception-stacktrace
+  body: none
+  auth: basic
+}
+
+headers {
+  Accept: text/plain
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  jobId: PASTE_A_FAILED_TIMER_JOB_ID
+}
+
+docs {
+  # Timer job exception stacktrace
+
+  Returns raw text (plain-text stacktrace). Timer job stacktraces live under
+  /management/timer-jobs/{id}/exception-stacktrace — NOT under /management/jobs/
+  (which is a different namespace). Mirrors the executable-jobs stacktrace
+  endpoint shape. Related: RC-11 in docs/runtime-caveats.md.
+}

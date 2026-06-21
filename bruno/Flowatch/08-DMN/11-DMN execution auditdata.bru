@@ -1,0 +1,29 @@
+meta {
+  name: DMN execution auditdata
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{dmnBase}}/dmn-history/historic-decision-executions/{{executionId}}/auditdata
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  executionId: PASTE_DMN_EXECUTION_ID
+}
+
+docs {
+  # DMN execution auditdata
+
+  Returns the rich audit object for a single historic decision execution:
+  hit policy, typed input/output maps, and per-rule condition+conclusion trace.
+  Used by the executions row-expand panel to surface rule-evaluation detail.
+  Related: PRD FR-57.
+}

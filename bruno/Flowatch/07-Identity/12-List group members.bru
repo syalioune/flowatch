@@ -1,0 +1,32 @@
+meta {
+  name: List group members
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/identity/users?memberOfGroup={{groupId}}
+  body: none
+  auth: basic
+}
+
+params:query {
+  memberOfGroup: managers
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  groupId: managers
+}
+
+docs {
+  # List group members
+
+  Flowable 7.2 does not expose GET /identity/groups/{id}/members. The
+  supported recipe is GET /identity/users?memberOfGroup={groupId}, which
+  returns a FlowablePage<FlowableUser> of members. Related: PRD FR-30.
+}

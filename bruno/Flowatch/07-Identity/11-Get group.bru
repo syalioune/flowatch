@@ -1,0 +1,20 @@
+meta {
+  name: Get group
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/identity/groups/{{groupId}}
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  groupId: managers
+}

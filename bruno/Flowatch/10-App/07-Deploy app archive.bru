@@ -1,0 +1,32 @@
+meta {
+  name: Deploy app archive (.bar / .zip)
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{appBase}}/app-repository/deployments
+  body: multipartForm
+  auth: basic
+}
+
+body:multipart-form {
+  file: @file()
+  deploymentName: Example app deployment
+  ~tenantId: {{tenantId}}
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+docs {
+  # Deploy app archive
+
+  Multipart POST. Uploads a .bar or .zip archive to the App sub-app.
+  The AppDeployer cascades into BpmnDeployer + DmnDeployer for bundled
+  .bpmn / .dmn entries. Child BPMN/DMN deployments are linked via
+  parentDeploymentId to this app deployment. See RC-17 in docs/runtime-caveats.md.
+  Related: PRD FR-55, Story 25.1.
+}
