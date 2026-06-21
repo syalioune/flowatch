@@ -19,7 +19,14 @@
       "Bash(curl -fsS -o /dev/null -w \"%{http_code}\" http://localhost:5173)",
       "Bash(npx playwright *)",
       "Bash(tee /tmp/axe-run.log)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(git -C /media/alioune/Data/dev/flowatch status --short)",
+      "Bash(git -C /media/alioune/Data/dev/flowatch log --oneline -5)",
+      "Bash(git -C /media/alioune/Data/dev/flowatch add src/modeler/FlowablePropertiesPanel.tsx _bmad-output/implementation-artifacts/spec-surface-flowable-topic-in-service-task-panel.md)",
+      "Bash(git -C /media/alioune/Data/dev/flowatch add src/modeler/FlowablePropertiesPanel.tsx)",
+      "Bash(git -C /media/alioune/Data/dev/flowatch log --oneline -3)",
+      "Bash(git -C /media/alioune/Data/dev/flowatch commit -m ' *)",
+      "Bash(git -C /media/alioune/Data/dev/flowatch log --format=\"%H %s%n%b\" -2)"
     ]
   },
   "hooks": {

@@ -657,6 +657,7 @@ export const FlowablePropertiesPanel = ({
                 {textField("expression", "Expression", "${myBean.method()}")}
                 {textField("delegateExpression", "Delegate expression", "${myDelegate}")}
                 {textField("type", "Built-in type", "http")}
+                {textField("topic", "Topic", "my-worker-topic")}
                 {textField("resultVariableName", "Result variable")}
                 {fieldInjection()}
                 {boolField("async", "Run asynchronously")}
