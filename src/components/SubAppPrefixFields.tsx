@@ -33,6 +33,11 @@ export interface SubAppPrefixFieldsProps {
   appPath: string;
   onAppPathChange: (v: string) => void;
   disabled?: boolean;
+  /**
+   * The current Base URL. When provided, the component warns if a prefix value
+   * is already embedded in the baseUrl (double-append risk).
+   */
+  baseUrl?: string | undefined;
 }
 
 interface FieldSpec {
@@ -54,7 +59,20 @@ export const SubAppPrefixFields: React.FC<SubAppPrefixFieldsProps> = ({
   appPath,
   onAppPathChange,
   disabled = false,
+  baseUrl,
 }) => {
+  // Warn if a prefix value appears embedded in baseUrl — likely double-append.
+  // e.g. baseUrl="http://host/flowable-rest" + servicePath="/flowable-rest/service"
+  // → effectiveBaseUrl would be "http://host/flowable-rest/flowable-rest/service".
+  const overlapWarning = (fieldValue: string): string | null => {
+    if (!baseUrl || !fieldValue.trim()) return null;
+    const seg = fieldValue.trim().replace(/\/+$/, "").replace(/^\/+/, "");
+    if (!seg) return null;
+    const urlPath = baseUrl.replace(/^https?:\/\/[^/]+/, "");
+    return urlPath.includes(seg)
+      ? `"${seg}" appears in Base URL — check for double-appending.`
+      : null;
+  };
   const fields: FieldSpec[] = [
     {
       key: "service",
@@ -90,30 +108,42 @@ export const SubAppPrefixFields: React.FC<SubAppPrefixFieldsProps> = ({
       <summary>Advanced: sub-app URI prefixes</summary>
       <p className="mute" style={{ fontSize: 11, marginTop: 4 }}>
         Override per-sub-app mount paths for engines deployed differently from the reference image.
-        Leave blank for the standard defaults.
+        Paths are relative to Base URL — e.g. <code>/service</code> or{" "}
+        <code>/flowable-rest/service</code>. Leave blank for standard defaults.
       </p>
       <div className="adv-prefixes-grid">
-        {fields.map((f) => (
-          <div key={f.key}>
-            <label
-              htmlFor={`${idPrefix}-path-${f.key}`}
-              style={{ display: "block", marginBottom: 4, fontSize: 12 }}
-            >
-              {f.label}
-            </label>
-            <input
-              id={`${idPrefix}-path-${f.key}`}
-              data-testid={`${idPrefix}-path-${f.key}`}
-              type="text"
-              value={f.value}
-              onChange={(e) => f.onChange(e.target.value)}
-              disabled={disabled}
-              maxLength={128}
-              placeholder={f.placeholder}
-              style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: 12 }}
-            />
-          </div>
-        ))}
+        {fields.map((f) => {
+          const warn = overlapWarning(f.value);
+          return (
+            <div key={f.key}>
+              <label
+                htmlFor={`${idPrefix}-path-${f.key}`}
+                style={{ display: "block", marginBottom: 4, fontSize: 12 }}
+              >
+                {f.label}
+              </label>
+              <input
+                id={`${idPrefix}-path-${f.key}`}
+                data-testid={`${idPrefix}-path-${f.key}`}
+                type="text"
+                value={f.value}
+                onChange={(e) => f.onChange(e.target.value)}
+                disabled={disabled}
+                maxLength={128}
+                placeholder={f.placeholder}
+                style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: 12 }}
+              />
+              {warn && (
+                <p
+                  className="mute"
+                  style={{ fontSize: 11, margin: "2px 0 0", color: "var(--accent)" }}
+                >
+                  ⚠ {warn}
+                </p>
+              )}
+            </div>
+          );
+        })}
       </div>
     </details>
   );

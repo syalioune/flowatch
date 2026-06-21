@@ -6,13 +6,10 @@ import noticeContent from "../NOTICE?raw";
 import { API_LOG, type ApiLogEntry, api, type FlowableConfig, type HTTPMethod } from "./api";
 import { ConnectionSwitch } from "./components/ConnectionSwitch";
 import { ManageConnectionsPanel } from "./components/ManageConnectionsPanel";
-import { SettingsAuthTab } from "./components/SettingsAuthTab";
-import { SubAppPrefixFields } from "./components/SubAppPrefixFields";
 import { buildCurlCommand, CURL_MULTIPART, CURL_UNSERIALIZABLE } from "./lib/curl";
 import { errorStatus } from "./lib/error";
 import { randomId } from "./lib/random-id";
 import { type RouteEndpoint, useRouteMeta } from "./lib/route-meta";
-import { normalizePrefix } from "./lib/saved-connections";
 
 interface ApiLogEvent extends CustomEvent<ApiLogEntry> {}
 interface AppToastEvent
@@ -484,52 +481,17 @@ export const Topbar = ({
 interface SettingsModalProps {
   open: boolean;
   onClose: () => void;
-  /** Story 28.3: open directly on a given tab (e.g. "authentication" on 401). */
   initialTab?: SettingsTab | undefined;
 }
 
-type PingResult = { ok: true; name?: string; version?: string } | { ok: false; error: string };
-
-export type SettingsTab = "connection" | "authentication" | "about";
+export type SettingsTab = "connection" | "about";
 
 export const SettingsModal = ({ open, onClose, initialTab }: SettingsModalProps) => {
-  const [cfg, setCfg] = React.useState<FlowableConfig>(api.config());
-  const [pinging, setPinging] = React.useState(false);
-  const [pingRes, setPingRes] = React.useState<PingResult | null>(null);
   const [tab, setTab] = React.useState<SettingsTab>("connection");
-  // Story 28.3: when opened with an explicit initialTab (e.g. a 401 routes the
-  // operator to "authentication"), jump straight to it.
   React.useEffect(() => {
     if (open && initialTab) setTab(initialTab);
   }, [open, initialTab]);
   if (!open) return null;
-  // Story 34.1: normalize the per-sub-app prefix fields before persisting so a
-  // blank/whitespace value clears the override (→ standard default) and a
-  // non-blank value is stored as a single leading-slash-normalized segment.
-  const cfgWithNormalizedPrefixes = (): FlowableConfig => ({
-    ...cfg,
-    servicePath: normalizePrefix(cfg.servicePath),
-    dmnPath: normalizePrefix(cfg.dmnPath),
-    cmmnPath: normalizePrefix(cfg.cmmnPath),
-    appPath: normalizePrefix(cfg.appPath),
-  });
-  const save = () => {
-    api.setConfig(cfgWithNormalizedPrefixes());
-    onClose();
-  };
-  const test = async () => {
-    api.setConfig(cfgWithNormalizedPrefixes());
-    setPinging(true);
-    setPingRes(null);
-    try {
-      const r = await api.ping();
-      setPingRes({ ok: true, name: r?.name, version: r?.version });
-    } catch (e) {
-      setPingRes({ ok: false, error: String((e as Error)?.message || e) });
-    } finally {
-      setPinging(false);
-    }
-  };
   return (
     <div className="modal-back" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 620 }}>
@@ -538,6 +500,7 @@ export const SettingsModal = ({ open, onClose, initialTab }: SettingsModalProps)
           <button
             type="button"
             className="icon-btn"
+            aria-label="Close Settings"
             onClick={onClose}
             style={{ marginLeft: "auto" }}
           >
@@ -556,15 +519,6 @@ export const SettingsModal = ({ open, onClose, initialTab }: SettingsModalProps)
           <button
             type="button"
             className="tab"
-            data-active={tab === "authentication" ? "1" : "0"}
-            data-testid="settings-tab-authentication"
-            onClick={() => setTab("authentication")}
-          >
-            Authentication
-          </button>
-          <button
-            type="button"
-            className="tab"
             data-active={tab === "about" ? "1" : "0"}
             onClick={() => setTab("about")}
           >
@@ -572,95 +526,10 @@ export const SettingsModal = ({ open, onClose, initialTab }: SettingsModalProps)
           </button>
         </div>
         {tab === "connection" && (
-          <>
-            <div className="modal-bd">
-              <div className="form-row">
-                <label>
-                  Base URL <span className="mono">REST service root</span>
-                </label>
-                <input
-                  className="input"
-                  value={cfg.baseUrl}
-                  onChange={(e) => setCfg({ ...cfg, baseUrl: e.target.value })}
-                />
-                <div className="mute text-xs">
-                  Default OSS path:{" "}
-                  <span className="mono">http://localhost:8080/flowable-rest/service</span>
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div className="form-row">
-                  <label>Username</label>
-                  <input
-                    className="input"
-                    value={cfg.username}
-                    onChange={(e) => setCfg({ ...cfg, username: e.target.value })}
-                  />
-                </div>
-                <div className="form-row">
-                  <label>Password</label>
-                  <input
-                    className="input"
-                    type="password"
-                    value={cfg.password}
-                    onChange={(e) => setCfg({ ...cfg, password: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="form-row">
-                <label>
-                  Tenant ID <span className="mono">optional</span>
-                </label>
-                <input
-                  className="input"
-                  value={cfg.tenantId}
-                  placeholder="leave blank for default"
-                  onChange={(e) => setCfg({ ...cfg, tenantId: e.target.value })}
-                />
-              </div>
-              {/* Story 34.1: per-sub-app URI prefix overrides on the runtime cfg.
-                  Normalized on Save (cfgWithNormalizedPrefixes). */}
-              <SubAppPrefixFields
-                idPrefix="settings-conn"
-                servicePath={cfg.servicePath ?? ""}
-                onServicePathChange={(v) => setCfg({ ...cfg, servicePath: v })}
-                dmnPath={cfg.dmnPath ?? ""}
-                onDmnPathChange={(v) => setCfg({ ...cfg, dmnPath: v })}
-                cmmnPath={cfg.cmmnPath ?? ""}
-                onCmmnPathChange={(v) => setCfg({ ...cfg, cmmnPath: v })}
-                appPath={cfg.appPath ?? ""}
-                onAppPathChange={(v) => setCfg({ ...cfg, appPath: v })}
-              />
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
-                <button type="button" className="btn" onClick={test} disabled={pinging}>
-                  {pinging ? "Pinging…" : "Test connection"}
-                </button>
-                {pingRes?.ok && (
-                  <span className="badge" data-tone="ok">
-                    <span className="sr-only">Status: connected — </span>
-                    {pingRes.name} {pingRes.version}
-                  </span>
-                )}
-                {pingRes && !pingRes.ok && (
-                  <span className="badge" data-tone="bad">
-                    <span className="sr-only">Status: error — </span>
-                    {pingRes.error}
-                  </span>
-                )}
-              </div>
-              <ManageConnectionsPanel onCloseSettings={onClose} />
-            </div>
-            <div className="modal-ft">
-              <button type="button" className="btn" onClick={onClose}>
-                Cancel
-              </button>
-              <button type="button" className="btn" data-variant="primary" onClick={save}>
-                Save
-              </button>
-            </div>
-          </>
+          <div className="modal-bd">
+            <ManageConnectionsPanel onCloseSettings={onClose} />
+          </div>
         )}
-        {tab === "authentication" && <SettingsAuthTab />}
         {tab === "about" && (
           <div className="modal-bd">
             <AboutTab />

@@ -136,12 +136,21 @@ test.describe("/tasks list (Story 11.1)", () => {
     // rendered `.toast` element TTL elapses before the assertion catches it.
     await page.addInitScript(() => {
       localStorage.setItem(
-        "flowatch.connection.v1",
+        "flowatch.connections.v1",
         JSON.stringify({
-          baseUrl: "/flowable-rest/service",
-          username: "",
-          password: "test",
-          tenantId: "",
+          schemaVersion: 2,
+          activeId: "test-conn-ac6",
+          connections: [
+            {
+              id: "test-conn-ac6",
+              label: "Default",
+              baseUrl: "/flowable-rest/service",
+              username: "",
+              // gitguardian:ignore - test fixture, not a real secret
+              password: "test",
+              tenantId: "",
+            },
+          ],
         }),
       );
       const w = window as unknown as { __captured?: Array<{ text?: string; kind?: string }> };

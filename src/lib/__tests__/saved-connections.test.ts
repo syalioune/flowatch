@@ -4,8 +4,8 @@
  * Vitest unit suite for src/lib/saved-connections.ts (Story 23.1 — FR-49).
  *
  * Pattern P-009: we do NOT vi.mock("../../api"). We exercise the real
- * `api.setConfig` path so the integration with the legacy single-cfg
- * write-through is verified end-to-end.
+ * `api.setConfig` path so the integration between setActiveConnection and
+ * the in-memory cfg is verified end-to-end.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,7 +16,6 @@ import {
   deleteConnection,
   getActiveConnection,
   loadConnections,
-  migrateLegacyConnection,
   normalizePrefix,
   STORAGE_KEY,
   saveConnections,
@@ -24,7 +23,6 @@ import {
   updateConnection,
 } from "../saved-connections";
 
-const LEGACY_KEY = "flowatch.connection.v1";
 const DEFAULTS = {
   baseUrl: "http://localhost:8080/flowable-rest/service",
   username: "rest-admin",
@@ -51,23 +49,6 @@ describe("loadConnections — migration", () => {
     expect(state.activeId).toBe(state.connections[0]?.id);
   });
 
-  it("legacy flowatch.connection.v1 present + multi-key empty → seeds from legacy + preserves legacy", () => {
-    const legacy = {
-      baseUrl: "http://prod:8080/flowable-rest/service",
-      username: "alice",
-      password: "s3cret",
-      tenantId: "acme",
-    };
-    localStorage.setItem(LEGACY_KEY, JSON.stringify(legacy));
-    const state = loadConnections();
-    expect(state.connections).toHaveLength(1);
-    expect(state.connections[0]?.label).toBe("Default");
-    expect(state.connections[0]?.baseUrl).toBe(legacy.baseUrl);
-    expect(state.connections[0]?.username).toBe(legacy.username);
-    expect(state.connections[0]?.tenantId).toBe("acme");
-    expect(localStorage.getItem(LEGACY_KEY)).not.toBeNull();
-  });
-
   it("corrupt JSON on the multi-key → migration fallback fires", () => {
     localStorage.setItem(STORAGE_KEY, "{bad json");
     expect(() => loadConnections()).not.toThrow();
@@ -89,8 +70,9 @@ describe("loadConnections — migration", () => {
     expect(persisted.connections[0]?.id).toBe(initial.connections[0]?.id);
   });
 
-  it("migrateLegacyConnection persists the seeded state", () => {
-    migrateLegacyConnection();
+  it("missing key seeds a default state and persists it", () => {
+    localStorage.removeItem(STORAGE_KEY);
+    loadConnections();
     expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
   });
 });
@@ -228,23 +210,6 @@ describe("setActiveConnection", () => {
     loadConnections();
     expect(() => setActiveConnection("missing")).toThrowError(/not found/);
   });
-
-  it("legacy flowatch.connection.v1 receives the write-through", () => {
-    loadConnections();
-    const added = addConnection({
-      label: "Other",
-      baseUrl: "http://other/flowable-rest/service",
-      username: "u",
-      password: "p",
-      tenantId: "t",
-    });
-    setActiveConnection(added.id);
-    const raw = localStorage.getItem(LEGACY_KEY);
-    expect(raw).not.toBeNull();
-    const legacy = JSON.parse(raw as string);
-    expect(legacy.baseUrl).toBe("http://other/flowable-rest/service");
-    expect(legacy.username).toBe("u");
-  });
 });
 
 describe("getActiveConnection", () => {
@@ -371,10 +336,10 @@ describe("normalizePrefix", () => {
     expect(normalizePrefix("///")).toBeUndefined();
   });
 
-  it("returns undefined for multi-segment paths (internal slash after leading)", () => {
-    expect(normalizePrefix("/rest/service")).toBeUndefined();
-    expect(normalizePrefix("rest/service")).toBeUndefined();
-    expect(normalizePrefix("/dmn-api/v2")).toBeUndefined();
+  it("accepts multi-segment paths", () => {
+    expect(normalizePrefix("/flowable-rest/service")).toBe("/flowable-rest/service");
+    expect(normalizePrefix("flowable-rest/service")).toBe("/flowable-rest/service");
+    expect(normalizePrefix("/dmn-api/v2")).toBe("/dmn-api/v2");
   });
 });
 

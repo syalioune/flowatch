@@ -131,32 +131,16 @@ import { FlowableError } from "./api-types";
 import { type AuthStrategy, BasicAuthStrategy } from "./lib/auth-strategy";
 import { randomId } from "./lib/random-id";
 
-// ── Config + storage ──────────────────────────────────────────────────────
+// ── Config (purely in-memory — flowatch.connections.v1 is the sole persistence key) ──
 
-const STORAGE_KEY = "flowatch.connection.v1";
 const defaultCfg: FlowableConfig = {
   baseUrl: "http://localhost:8080/flowable-rest/service",
   username: "rest-admin",
   password: "test",
   tenantId: "",
 };
-export const loadCfg = (): FlowableConfig => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? { ...defaultCfg, ...JSON.parse(raw) } : { ...defaultCfg };
-  } catch {
-    return { ...defaultCfg };
-  }
-};
-const saveCfg = (cfg: FlowableConfig): void => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
-  } catch {
-    /* localStorage may be unavailable (private mode, quota) */
-  }
-};
 
-let cfg: FlowableConfig = loadCfg();
+let cfg: FlowableConfig = { ...defaultCfg };
 
 // Flowable splits its REST API across sub-apps. The BPMN/runtime/identity endpoints
 // live under `/flowable-rest/service`, but DMN is mounted at `/flowable-rest/dmn-api`
@@ -278,7 +262,7 @@ const qs = (params?: QueryParams): string => {
     usp.append(k, String(v));
   });
   const s = usp.toString();
-  return s ? "?" + s : "";
+  return s ? `?${s}` : "";
 };
 
 // ── Pluggable auth strategy (Story 28.1 — ADR-009) ────────────────────────
@@ -1024,6 +1008,30 @@ const deployBar = (filename: string, file: Blob | File) =>
 
 const ping = () => request<FlowableEngineInfo>("GET", "/management/engine");
 
+// Test a specific saved connection without mutating the global cfg.
+// Temporarily swaps authStrategy so the call routes through the full request()
+// funnel (API_LOG entry + NFR-8 redaction). Safe in single-tab browser context.
+const pingForConn = async (conn: {
+  baseUrl: string;
+  servicePath?: string | undefined;
+  username?: string | undefined;
+  password?: string | undefined;
+}): Promise<FlowableEngineInfo> => {
+  const sp = conn.servicePath;
+  const rawBase = conn.baseUrl.replace(/\/+$/, "");
+  const effectiveBase = sp && !rawBase.endsWith(sp) ? rawBase + sp : rawBase;
+  const prev = authStrategy;
+  authStrategy = new BasicAuthStrategy(() => ({
+    username: conn.username ?? "",
+    password: conn.password ?? "",
+  }));
+  try {
+    return await request<FlowableEngineInfo>("GET", "/management/engine", { base: effectiveBase });
+  } finally {
+    authStrategy = prev;
+  }
+};
+
 // Send an ad-hoc request from the API Inspector "Try it" panel.
 // Path may include a query string; DMN sub-app paths (/dmn-*) are auto-rerouted.
 const runRaw = (method: HTTPMethod, path: string, body?: unknown) => {
@@ -1046,7 +1054,6 @@ export const api = {
       (next.username !== undefined && next.username !== cfg.username) ||
       (next.password !== undefined && next.password !== cfg.password);
     cfg = { ...cfg, ...next };
-    saveCfg(cfg);
     if (connectionChanged) {
       // Story 14.4 AC-9: an engine switch invalidates the cached tenants —
       // the new engine's /repository/deployments has its own tenantIds.
@@ -1150,5 +1157,6 @@ export const api = {
   deployDmn,
   deployBar,
   ping,
+  pingForConn,
   runRaw,
 };

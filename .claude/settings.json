@@ -26,7 +26,9 @@
       "Bash(git -C /media/alioune/Data/dev/flowatch add src/modeler/FlowablePropertiesPanel.tsx)",
       "Bash(git -C /media/alioune/Data/dev/flowatch log --oneline -3)",
       "Bash(git -C /media/alioune/Data/dev/flowatch commit -m ' *)",
-      "Bash(git -C /media/alioune/Data/dev/flowatch log --format=\"%H %s%n%b\" -2)"
+      "Bash(git -C /media/alioune/Data/dev/flowatch log --format=\"%H %s%n%b\" -2)",
+      "Bash(cat /media/alioune/Data/dev/flowatch/_bmad/_config/bmad-help.csv 2>/dev/null | head -5)",
+      "Read(//media/alioune/Data/dev/flowatch-bmad/_bmad/_config/**)"
     ]
   },
   "hooks": {

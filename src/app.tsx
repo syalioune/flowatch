@@ -14,6 +14,7 @@ import {
 import { VersionDriftBanner } from "./components/VersionDriftBanner";
 import {
   installStrategyForActiveConnection,
+  REOPEN_SETTINGS_AFTER_RELOAD_KEY,
   reloadIfOidcProviderMismatch,
 } from "./lib/install-auth-strategy";
 import { KeyboardCheatsheetModal } from "./lib/keyboard-cheatsheet-modal";
@@ -107,6 +108,17 @@ function App() {
     Partial<Record<"tasks" | "jobs" | "instances" | "batches" | "events", number | null>>
   >({});
 
+  // After an OIDC-provider reload, reopen Settings (Connection tab) so the
+  // operator can sign in without manually reopening the modal.
+  React.useEffect(() => {
+    const flag = sessionStorage.getItem(REOPEN_SETTINGS_AFTER_RELOAD_KEY);
+    if (flag) {
+      sessionStorage.removeItem(REOPEN_SETTINGS_AFTER_RELOAD_KEY);
+      setSettingsInitialTab("connection");
+      setSettingsOpen(true);
+    }
+  }, []);
+
   React.useEffect(() => {
     document.title = meta.title ? `${meta.title} · Flowatch` : "Flowatch";
   }, [meta.title]);
@@ -196,7 +208,7 @@ function App() {
   // open modal at the same tab is a no-op (React bails on identical state).
   React.useEffect(() => {
     const handler = (): void => {
-      setSettingsInitialTab("authentication");
+      setSettingsInitialTab("connection");
       setSettingsOpen(true);
     };
     window.addEventListener(OPEN_SETTINGS_AUTH, handler);

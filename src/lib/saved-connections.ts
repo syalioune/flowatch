@@ -7,12 +7,7 @@
  * the project's first non-engine-backed entity with full CRUD UI (Tweaks
  * panel is key/value tweaks, not entities). Persists under the
  * `flowatch.connections.v1` key with a {schemaVersion, activeId, connections}
- * envelope.
- *
- * Migration on first read seeds from the legacy `flowatch.connection.v1`
- * single-cfg key (see [src/api.ts loadCfg/saveCfg](../api.ts)); the legacy
- * key is intentionally NOT deleted — `api.setConfig` keeps writing through
- * to it so a rollback to < v0.0.4 finds the last-active cfg intact.
+ * envelope. This is the SOLE persistence key — `api.ts` is purely in-memory.
  *
  * `authStrategyConfig?` is RESERVED for Story 23.2 — typed but unread here.
  * Story 23.2 narrows the union per `kind`; no schemaVersion bump.
@@ -93,15 +88,10 @@ export function normalizePrefix(value: unknown): string | undefined {
   const noTrailing = trimmed.replace(/\/+$/, "");
   if (noTrailing === "") return undefined; // value was only slashes
   const segment = noTrailing.startsWith("/") ? noTrailing : `/${noTrailing}`;
-  // Reject multi-segment paths (e.g. "/rest/service") — a servicePath with an
-  // internal slash matches mid-URL in connectionRoot(), silently truncating
-  // baseUrl to a garbage host prefix. Single segment only.
-  if (segment.indexOf("/", 1) !== -1) return undefined;
   return segment;
 }
 
 export const STORAGE_KEY = "flowatch.connections.v1";
-const LEGACY_STORAGE_KEY = "flowatch.connection.v1";
 
 const DEFAULT_CFG = {
   baseUrl: "http://localhost:8080/flowable-rest/service",
@@ -159,41 +149,23 @@ const isValidStateShape = (
 };
 
 /**
- * Read the legacy single-cfg `flowatch.connection.v1` key and seed a new
- * {@link SavedConnectionsState}. Called as fallback when the multi-connection
- * key is missing or malformed. Falls back to {@link DEFAULT_CFG} when the
- * legacy key is also missing/corrupt.
- *
- * Persists the seeded state to localStorage and does NOT delete the legacy
- * key (rollback safety net).
- *
- * Exported for tests; production code calls `loadConnections()`.
+ * Seed a fresh single-connection state from {@link DEFAULT_CFG}, persist it,
+ * and return it. Called as fallback when `flowatch.connections.v1` is missing
+ * or malformed — `api.ts` is purely in-memory and owns no legacy key.
  */
-export function migrateLegacyConnection(): SavedConnectionsState {
-  let legacy = { ...DEFAULT_CFG };
-  try {
-    const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object") {
-        legacy = { ...DEFAULT_CFG, ...parsed };
-      }
-    }
-  } catch {
-    /* corrupt legacy → defaults */
-  }
+function makeDefaultState(): SavedConnectionsState {
   const id = newId();
   const state: SavedConnectionsState = {
-    schemaVersion: 2, // Story 34.1: seeds are born v2 (prefix fields undefined).
+    schemaVersion: 2,
     activeId: id,
     connections: [
       {
         id,
         label: "Default",
-        baseUrl: legacy.baseUrl,
-        username: legacy.username,
-        password: legacy.password,
-        tenantId: legacy.tenantId,
+        baseUrl: DEFAULT_CFG.baseUrl,
+        username: DEFAULT_CFG.username,
+        password: DEFAULT_CFG.password,
+        tenantId: DEFAULT_CFG.tenantId,
       },
     ],
   };
@@ -203,7 +175,7 @@ export function migrateLegacyConnection(): SavedConnectionsState {
 
 /**
  * Read the persisted state. Defensive — corrupt JSON, missing schemaVersion,
- * or a non-array `connections` triggers {@link migrateLegacyConnection}.
+ * or a non-array `connections` calls {@link makeDefaultState}.
  *
  * Story 23.2: each connection's `authStrategyConfig` (if present) is run
  * through {@link parseAuthStrategyConfig}; corrupt shapes silent-drop to
@@ -223,9 +195,9 @@ export function migrateLegacyConnection(): SavedConnectionsState {
 export function loadConnections(): SavedConnectionsState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return migrateLegacyConnection();
+    if (!raw) return makeDefaultState();
     const parsed = JSON.parse(raw);
-    if (!isValidStateShape(parsed)) return migrateLegacyConnection();
+    if (!isValidStateShape(parsed)) return makeDefaultState();
     const needsMigration = parsed.schemaVersion !== 2;
     let prefixModified = false;
     for (const c of parsed.connections) {
@@ -261,14 +233,11 @@ export function loadConnections(): SavedConnectionsState {
     if (needsMigration || prefixModified) saveConnections(parsed);
     return parsed;
   } catch {
-    return migrateLegacyConnection();
+    return makeDefaultState();
   }
 }
 
-/**
- * Persist the state. Silent-fail on quota/unavailable per the existing
- * `saveCfg` shape at [src/api.ts:116-122](../api.ts).
- */
+/** Persist the state. Silent-fail on localStorage quota/unavailable. */
 export function saveConnections(state: SavedConnectionsState): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -348,11 +317,9 @@ export function deleteConnection(id: string): void {
 }
 
 /**
- * Set the active connection AND funnel the cfg through `api.setConfig` —
- * which writes through to the legacy `flowatch.connection.v1` key (rollback
- * safety) and fires the existing `conn:config-changed` event so the
- * App-level probe re-fires. Throws on missing id. Dispatches
- * {@link SAVED_CONNECTIONS_CHANGED}.
+ * Set the active connection AND funnel the cfg through `api.setConfig` so
+ * `request()` immediately uses the right base URL. Throws on missing id.
+ * Dispatches {@link SAVED_CONNECTIONS_CHANGED}.
  */
 export function setActiveConnection(id: string): SavedConnection {
   const state = loadConnections();
@@ -361,22 +328,34 @@ export function setActiveConnection(id: string): SavedConnection {
   if (!selected) throw new Error(`Connection ${id} not found`);
   state.activeId = id;
   saveConnections(state);
+  // Compute the URL that request() uses as its direct base.
+  // If servicePath is set and baseUrl doesn't already end with it, append it
+  // so request("/runtime/tasks") → baseUrl + "/runtime/tasks" (correct).
+  // Backward-compat: existing connections that embed the service path in
+  // baseUrl and have no servicePath fall through unchanged (sp is falsy).
+  const sp = selected.servicePath;
+  const rawBase = selected.baseUrl.replace(/\/+$/, "");
+  const effectiveBaseUrl = sp && !rawBase.endsWith(sp) ? rawBase + sp : rawBase;
   api.setConfig({
-    baseUrl: selected.baseUrl,
-    // Missing username/password (Bearer/OIDC connections) defaults to "" —
-    // the runtime call path is still Basic auth today; Story 28.x activates
-    // the AuthStrategy interface that consumes `authStrategyConfig`.
+    baseUrl: effectiveBaseUrl,
+    servicePath: sp,
+    // Missing username/password (Bearer/OIDC connections) defaults to "".
     username: selected.username ?? "",
     password: selected.password ?? "",
     tenantId: selected.tenantId,
-    // Story 34.1: propagate per-sub-app prefix overrides into the runtime cfg
-    // so dmnBase()/appBase()/cmmnBase() immediately reflect the active
-    // connection (no reload). `undefined` → the *Base() helper's default.
-    servicePath: selected.servicePath,
     dmnPath: selected.dmnPath,
     cmmnPath: selected.cmmnPath,
     appPath: selected.appPath,
   });
+  // api.setConfig only dispatches "conn:config-changed" when baseUrl/username/
+  // password differ from the current in-memory cfg. An active-connection switch
+  // always warrants a re-probe (the new connection may have different health
+  // even with identical parameters), so force the event unconditionally.
+  try {
+    window.dispatchEvent(new CustomEvent("conn:config-changed"));
+  } catch {
+    /* non-DOM */
+  }
   dispatch();
   return selected;
 }

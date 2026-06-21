@@ -4,6 +4,7 @@ import { createRouter, RouterProvider } from "@tanstack/react-router";
 import ReactDOM from "react-dom/client";
 import { installStrategyForActiveConnection } from "./lib/install-auth-strategy";
 import { resolveOidcProviderConfig } from "./lib/oidc-accessor";
+import { loadConnections, setActiveConnection } from "./lib/saved-connections";
 // Self-hosted IBM Plex faces must register before any layout-affecting CSS.
 import "./styles/fonts.css";
 import "./lib/route-meta";
@@ -52,6 +53,20 @@ if (!rootEl) throw new Error("root element not found");
 // the react-oidc-context provider (its own `oidc` Vite chunk) and wrap the app
 // in <AuthProvider>. For Basic/Bearer users the chunk never loads — the
 // tree-shake intent. The dynamic import is the lazy boundary.
+//
+// Seed api.cfg from the persisted active connection BEFORE the first render so
+// the earliest API calls (probe, nav counts, assignee=me username check) use
+// the correct base URL and credentials instead of the in-memory defaults.
+// setActiveConnection dispatches conn:config-changed and SAVED_CONNECTIONS_CHANGED
+// here — no listeners are mounted yet so both are harmless no-ops.
+const { activeId: persistedActiveId } = loadConnections();
+if (persistedActiveId) {
+  try {
+    setActiveConnection(persistedActiveId);
+  } catch {
+    /* stale or corrupt activeId — makeDefaultState heals on next loadConnections call */
+  }
+}
 // Install the AuthStrategy matching the active connection BEFORE the first
 // render — otherwise the module-default BasicAuthStrategy (empty creds →
 // "Basic Og==") fires on the earliest API calls (probe / nav counts) that run

@@ -96,11 +96,20 @@ export function installStrategyForActiveConnection(): void {
  * no-ops and cannot loop). Documented as the deliberate scope boundary; a fully
  * dynamic provider swap without reload is a future refinement (deferred-work).
  */
+/** sessionStorage key: when set, app.tsx opens Settings (Connection tab) after reload. */
+export const REOPEN_SETTINGS_AFTER_RELOAD_KEY = "flowatch.reopen-settings-after-reload";
+
 export function reloadIfOidcProviderMismatch(): void {
   const conn = getActiveConnection();
   const wantOidc = conn?.authStrategyConfig?.kind === "oidc";
   if (wantOidc === isOidcProviderMounted()) return;
   try {
+    // When switching INTO OIDC the operator needs to sign in immediately after
+    // the provider mounts — persist a flag so app.tsx re-opens Settings
+    // (Connection tab) on the post-reload paint.
+    if (wantOidc) {
+      sessionStorage.setItem(REOPEN_SETTINGS_AFTER_RELOAD_KEY, "1");
+    }
     window.dispatchEvent(
       new CustomEvent("app:toast", {
         detail: { kind: "ok", text: "Reloading to apply the authentication change…", ttl: 2000 },

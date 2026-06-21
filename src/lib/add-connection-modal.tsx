@@ -290,7 +290,7 @@ export const AddConnectionModal: React.FC<AddConnectionModalProps> = ({
                   value={baseUrl}
                   onChange={(e) => setBaseUrl(e.target.value)}
                   disabled={busy}
-                  placeholder="http://localhost:8080/flowable-rest/service"
+                  placeholder="http://localhost:8080"
                   style={{ width: "100%", fontFamily: "var(--font-mono)", fontSize: 12 }}
                 />
               </div>
@@ -346,6 +346,7 @@ export const AddConnectionModal: React.FC<AddConnectionModalProps> = ({
                 appPath={appPath}
                 onAppPathChange={setAppPath}
                 disabled={busy}
+                baseUrl={baseUrl}
               />
             </div>
           </div>

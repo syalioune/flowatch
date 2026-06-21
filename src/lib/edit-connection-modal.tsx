@@ -432,6 +432,7 @@ export const EditConnectionModal: React.FC<EditConnectionModalProps> = ({
                 appPath={inputs.appPath}
                 onAppPathChange={(v) => setField("appPath", v)}
                 disabled={busy}
+                baseUrl={inputs.baseUrl}
               />
             </div>
           </div>

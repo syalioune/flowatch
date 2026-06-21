@@ -76,7 +76,7 @@ test.describe("Saved connections (Story 23.1 — FR-49)", () => {
     await page.getByTestId("add-connection-submit").click();
     await expect(page.getByTestId("add-connection-modal")).toBeHidden();
     // Close Settings.
-    await page.getByRole("button", { name: "Cancel" }).first().click();
+    await page.getByRole("button", { name: "Close Settings" }).click();
     await expect(page.getByTestId("manage-connections-heading")).toBeHidden();
     await page.getByTestId("connection-switch").click();
     const popover = page.getByTestId("connection-picker-popover");
@@ -151,7 +151,7 @@ test.describe("Saved connections (Story 23.1 — FR-49)", () => {
     // The active select close-on-change behaviour means selecting another row
     // closes Settings; open the Topbar popover to switch active.
     await expect(page.getByTestId("add-connection-modal")).toBeHidden();
-    await page.getByRole("button", { name: "Cancel" }).first().click();
+    await page.getByRole("button", { name: "Close Settings" }).click();
     await page.getByTestId("connection-switch").click();
     await page
       .getByTestId("connection-picker-popover")
