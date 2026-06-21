@@ -1,5 +1,17 @@
 # Source Tree Analysis
 
+> **⚠️ Snapshot: 2026-05-11.** This tree is significantly stale. Major structural changes since this scan:
+> - All source files migrated from `.jsx`/`.js` to `.tsx`/`.ts`
+> - TanStack Router installed — screens are now file-based routes under `src/routes/`
+> - `src/modeler.jsx` split into `src/modeler/` directory (BpmnModeler.tsx, DmnModeler.tsx, starters.ts, flowable-moddle.json, …)
+> - `src/styles.css` split into `src/styles/{tokens,components,index,fonts}.css`
+> - Many new components added to `src/components/` and `src/lib/`
+> - `api.js` split into `api.ts`, `api-app.ts`, `api-history.ts`, `api-identity.ts`, `api-types.ts`
+> - `docker/nginx.conf` removed (Story 34.2 — native Flowable CORS replaces the nginx sidecar)
+> - CI workflows added under `.github/workflows/`
+>
+> For the current source structure, use `ls src/` and read [CLAUDE.md](../CLAUDE.md).
+
 Annotated directory tree of the Flowatch repository, scanned 2026-05-11.
 
 ```
@@ -25,9 +37,8 @@ flowatch/                          # local dir currently still named `conduit/`
 │   └── styles.css                # Single ~32 KB stylesheet — all theming via
 │                                 # data attributes on <html>; no Tailwind/CSS-in-JS
 │
-├── docker/                       # ─── Local infrastructure ─────────────
-│   └── nginx.conf                # CORS proxy: listens on :8080, forwards
-│                                 # /flowable-rest/* to the flowable container
+├── docker/                       # ─── Local infrastructure (see stale note above) ──
+│   └── nginx-spa.conf.template   # SPA image internal web server config (not CORS)
 │
 ├── docs/                         # ─── This documentation (BMad output) ─
 │
@@ -74,7 +85,7 @@ Flat structure, no subfolders. Nine source files; the largest are [styles.css](.
 
 ### [docker/](../docker/)
 
-Houses the nginx config used by the local Docker stack. nginx is a hard requirement when running through Docker because `flowable-rest` does not return CORS headers; nginx injects them. The Vite proxy plays the same role during `npm run dev`.
+> **Outdated.** The `docker/nginx.conf` nginx CORS sidecar was removed in Story 34.2 (2026-06-17). `flowable-rest:7.2.0` now exposes native CORS via `flowable.rest.app.cors.*` Spring Boot env vars directly on `:8080`. The `docker/` directory now only contains `nginx-spa.conf.template` (the published SPA image's internal web server config — unrelated to CORS). The Vite proxy still forwards `/flowable-rest` → `http://localhost:8080` during `npm run dev` but only as a same-origin pass-through, not for CORS injection.
 
 ### [.claude/commands/](../.claude/commands/)
 

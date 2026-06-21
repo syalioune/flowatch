@@ -84,16 +84,26 @@ There is no committed production Dockerfile or CI pipeline. To deploy:
 1. `npm install && npm run build` — produces `dist/`.
 2. Serve `dist/` as static files behind any HTTP server (nginx, Cloudflare Pages, S3+CloudFront, etc.).
 3. Provide a Flowable REST engine reachable from the browser with CORS configured (native, or any proxy that sets `Access-Control-Allow-Origin` + `Access-Control-Allow-Credentials: true` for your SPA's origin).
-4. Either point users to `Settings → Connection` to set the `baseUrl`, or change the `defaultCfg` in [src/api.js](../src/api.js#L6) before building and rebuild.
+4. Either point users to `Settings → Connection` to set the `baseUrl`, or change the `defaultCfg` in [src/api.ts](../src/api.ts) before building and rebuild.
 
-The Vite build splits vendor code into separate chunks (`bpmn`, `dmn`, `react`) per [vite.config.js](../vite.config.js), so the initial bundle stays small until the user opens a modeler.
+The Vite build splits vendor code into separate chunks (`bpmn`, `dmn`, `react`, `oidc`) per [vite.config.ts](../vite.config.ts), so the initial bundle stays small until the user opens a modeler or OIDC connection.
 
 ## CI/CD
 
-**None configured.** No `.github/workflows`, `.gitlab-ci.yml`, `Jenkinsfile`, or equivalent exists in the repository. Build/deploy is fully manual today.
+GitHub Actions workflows live under `.github/workflows/`. The pipeline runs on every push to `develop` and on PRs:
+
+| Job | Trigger | What it does |
+|---|---|---|
+| `check` | push / PR | Biome lint + format check (`npm run check`) |
+| `unit` | push / PR | Vitest unit + browser-mode tests (`npm test`) |
+| `e2e` | push / PR | Playwright E2E against Docker Compose Flowable engine |
+| `build` | push / PR | `npm run build` + dist artifact upload |
+| `release` | push to `main` | semantic-release (changelog, GitHub release, npm publish) |
+
+Dependabot runs weekly SHA-pin bumps for both npm and GitHub Actions deps.
 
 ## Operational notes
 
-- **Credentials**: `rest-admin` / `test` are hard-coded in [docker-compose.yml](../docker-compose.yml) and in `defaultCfg` of [src/api.js](../src/api.js). For any non-local deployment, change both _and_ rotate the Postgres password (`POSTGRES_PASSWORD`).
+- **Credentials**: `rest-admin` / `test` are hard-coded in [docker-compose.yml](../docker-compose.yml) and in `defaultCfg` of [src/api.ts](../src/api.ts). For any non-local deployment, change both _and_ rotate the Postgres password (`POSTGRES_PASSWORD`).
 - **Persistence**: only Flowable's Postgres volume needs backing up. Flowatch itself stores nothing server-side; its only state lives in the browser's `localStorage` under `flowatch.connection.v1`.
 - **Tenant isolation**: Flowable supports multi-tenancy. Flowatch reads tenant IDs via `api.listTenants()` (derived from `/repository/deployments`, since `/identity/tenants` is not available in flowable-rest 7.2) and the active tenant is set via `api.setConfig({ tenantId })`.

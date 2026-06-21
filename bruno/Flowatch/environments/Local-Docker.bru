@@ -9,6 +9,6 @@ vars {
 }
 
 # Local-Docker = the dev stack from docker-compose.yml. All four sub-app
-# roots resolve to the nginx CORS proxy on :8080 in front of the
-# `flowable` container. Use this environment when running the Flowable
-# stack via `docker compose up -d` (or `bash scripts/dev/run-dev.sh`).
+# roots hit :8080 (the `flowable` container directly — Story 34.2 replaced
+# the nginx CORS sidecar with native Flowable CORS). Use this environment
+# when running the stack via `make engine-up` / `docker compose up -d`.

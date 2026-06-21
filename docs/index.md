@@ -1,26 +1,26 @@
 # Flowatch Documentation Index
 
-_Generated: 2026-05-11 by `bmad-document-project` (deep scan)._
+_Generated: 2026-05-11 by `bmad-document-project` (deep scan). Last updated: 2026-06-18._
 
 ## Project overview
 
 - **Type:** monolith, web project (single-page application)
-- **Primary language:** JavaScript / JSX (no TypeScript by policy)
+- **Primary language:** TypeScript / TSX
 - **Architecture:** layered SPA, hooks-only React, single `request()` funnel over Flowable REST
-- **Repository:** [github → flowatch](.) (URL change to `github.com/syalioune/flowatch` pending — see rename checklist)
+- **Repository:** [github.com/syalioune/flowatch](https://github.com/syalioune/flowatch)
 
 ## Quick reference
 
 | Attribute              | Value                                                                            |
 | ---------------------- | -------------------------------------------------------------------------------- |
 | Framework              | React 18.3.1                                                                     |
-| Bundler                | Vite 5.4.8                                                                       |
-| Modeler libs           | bpmn-js 17.11.1, dmn-js 16.6.1                                                   |
+| Bundler                | Vite 5 (`vite.config.ts`)                                                        |
+| Modeler libs           | bpmn-js 17.x, dmn-js 16.x, @bpmn-io/form-js-viewer                              |
 | Engine consumed        | Flowable REST 7.2.0 (external, runs in Docker)                                   |
 | Persistence            | None client-side beyond `localStorage`; PostgreSQL 16 for Flowable               |
-| Tests / lint / format  | None configured                                                                  |
-| Entry point            | [src/main.jsx](../src/main.jsx) → `<App/>` in [src/app.jsx](../src/app.jsx)      |
-| Routing                | Single `view` string + `switch` in [app.jsx](../src/app.jsx) — no router         |
+| Tests / lint / format  | Vitest (unit) · Biome v2 (lint/format) · Playwright (E2E)                        |
+| Entry point            | [src/main.tsx](../src/main.tsx) → `<App/>` in [src/app.tsx](../src/app.tsx)      |
+| Routing                | TanStack Router — file-based routes under [src/routes/](../src/routes/)          |
 | State                  | `useState` / `useEffect` only; `window` events for cross-cutting signals         |
 | Design system          | CSS variables × `data-look` / `data-theme` / `data-density` on `<html>`          |
 
@@ -28,15 +28,23 @@ _Generated: 2026-05-11 by `bmad-document-project` (deep scan)._
 
 - [Project overview](./project-overview.md) — purpose, exec summary, tech stack table
 - [Architecture](./architecture.md) — components, data flow, integrations, risks
-- [Source tree analysis](./source-tree-analysis.md) — annotated directory tree
-- [Component inventory](./component-inventory.md) — every React component catalogued
+- [Source tree analysis](./source-tree-analysis.md) — annotated directory tree _(snapshot: 2026-05-11; see CLAUDE.md for current structure)_
+- [Component inventory](./component-inventory.md) — React components catalogued _(snapshot: 2026-05-11; many new components added since)_
 - [Development guide](./development-guide.md) — setup, build, run, conventions
-- [Deployment guide](./deployment-guide.md) — Docker stack, CORS proxy, prod notes
-- [API contracts](./api-contracts.md) — Flowable REST wrappers exported by `api.js`
+- [Deployment guide](./deployment-guide.md) — Docker stack, native CORS, prod notes
+- [API contracts](./api-contracts.md) — Flowable REST wrappers exported by `api.ts`
+- [Compatibility matrix](./compat.md) — which PRD FRs are viable against `flowable-rest:7.2.0`
+- [Runtime caveats](./runtime-caveats.md) — browser/API quirks that produced real review patches
+- [OIDC testing guide](./oidc-testing.md) — Keycloak smoke-test setup for OIDC auth
+
+### Tooling metrics
+
+- [Claude Code token usage — Road to 1.0.0](./claude-code-token-metrics.md) — token consumption breakdown across Stories 8.1 → 34.2 (2026-05-19 → 2026-06-18, 27 active dev days).
 
 ### Accessibility
 
 - [WCAG 2.1 AA contrast audit — 2026-05](./a11y-audit-2026-05.md) — 32 contrast computations across 8 look × theme combinations. Locked behind [src/__tests__/wcag-contrast.test.ts](../src/__tests__/wcag-contrast.test.ts) (Pattern P-008 — token-contract guard test).
+- [A11y audit — 1.0.0](./a11y-audit-1.0.0.md) — full axe-core audit across 8 look × theme combinations × 11 screens (Story 32.1).
 
 > Data models — _Not applicable._ Flowatch is a frontend-only client and owns no persistent data models. Flowable's Postgres schema is internal to the engine.
 
@@ -58,13 +66,9 @@ Defaults connect to `http://localhost:8080/flowable-rest/service` with `rest-adm
 
 ## Working in this repo
 
-Three places to update when adding a new screen (see [development-guide.md](./development-guide.md#add-a-new-screen)):
+To add a new screen, create a route file under [src/routes/](../src/routes/) following the TanStack Router file-based pattern. See [development-guide.md](./development-guide.md#add-a-new-screen) for details.
 
-1. `switch` in [src/app.jsx](../src/app.jsx)
-2. `VIEW_TITLE` in [src/app.jsx](../src/app.jsx)
-3. `ENDPOINT_BY_VIEW` in [src/app.jsx](../src/app.jsx)
-
-For new API endpoints, add a wrapper in [src/api.js](../src/api.js) that goes through `request(...)` and export it from the `api` object at the bottom.
+For new API endpoints, add a wrapper in [src/api.ts](../src/api.ts) (or the relevant split file — `api-app.ts`, `api-history.ts`, `api-identity.ts`) that goes through `request(...)` and export it from the `api` object at the bottom. See [API contracts](./api-contracts.md).
 
 ## Brownfield PRD pointer
 

@@ -293,7 +293,7 @@ The runtime-variable endpoint at `/runtime/process-instances/{id}/variables` kee
 
 ---
 
-## RC-13 — `/history/historic-process-instances/{id}` is created EAGERLY at start, not lazily at end
+## RC-19 — `/history/historic-process-instances/{id}` is created EAGERLY at start, not lazily at end
 
 **Naive intuition:** the historic surface only knows about an instance once it has ENDED. `GET /history/historic-process-instances/{id}` 404s for a currently-running instance; the historic record appears only after the engine archives the lifecycle.
 
@@ -306,6 +306,8 @@ This means:
 **Workaround:** treat the historic panel's `endTime`-missing case as "this is a snapshot of an instance currently in flight" rather than as a "no historic record" path. The `<InstanceHistoricPanel>` already does this via the warn/`historic` badge. Render code that wants to gate on "instance has truly ended" should check `h.endTime != null` rather than `historic.data != null`. E2E assertions should target the badge element (`.badge[data-tone="mute"]` for ended, `.badge[data-tone="warn"]` for in-flight) — not the bare text "ended" / "historic", which collides with the `<td>Ended</td>` row label under Playwright's case-insensitive substring match.
 
 **Surfaced by:** Story 13.1 post-PR E2E run (2026-05-26) — the dual-fetch spec's "running instance ⇒ historic panel empty state" assertion failed because the historic record was populated; the panel was already rendering the in-flight badge correctly (matching the spec author's "endTime unpopulated — uncommon but possible" branch), but the test's empty-state assertion was the wrong contract for a running-instance shape.
+
+_(Previously mis-numbered RC-13 — renumbered to RC-19 to resolve collision with the JUEL-not-FEEL entry below.)_
 
 ---
 

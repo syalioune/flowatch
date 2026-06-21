@@ -147,7 +147,7 @@ The full doc index lives at [docs/index.md](docs/index.md).
 
 ## AI-assisted development
 
-Flowatch is built openly with AI as a first-class collaborator. Treat that as a feature, not a disclaimer: it's how a single maintainer can deliver Flowable-grade scope on a community budget. Every commit is human-reviewed and the maintainer (`Signed-off-by: Alioune SY`) carries the DCO; an `Co-Authored-By: Claude Opus 4.x` trailer is appended whenever an agent materially co-wrote the change.
+Flowatch is built openly with AI as a first-class collaborator. Treat that as a feature, not a disclaimer: it's how a single maintainer can deliver Flowable-grade scope on a community budget. See [docs/claude-code-token-metrics.md](docs/claude-code-token-metrics.md) for the full token-usage breakdown across the road to v1.0.0. Every commit is human-reviewed and the maintainer (`Signed-off-by: Alioune SY`) carries the DCO; an `Co-Authored-By: Claude Opus 4.x` trailer is appended whenever an agent materially co-wrote the change.
 
 **Tools the project uses:**
 
