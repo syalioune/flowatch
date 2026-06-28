@@ -36,6 +36,14 @@
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+
+  /* On-tint status foregrounds (Story 32.2) — fallback defaults; every
+     look × theme block overrides these. See --ok-fg/--warn-fg/--bad-fg/
+     --info-fg below. */
+  --ok-fg: oklch(48.5% 0.13 145);
+  --warn-fg: oklch(50% 0.15 70);
+  --bad-fg: oklch(50.5% 0.18 27);
+  --info-fg: oklch(47.5% 0.12 230);
 }
 
 /* ── EDITORIAL (default light) ─────────────────────────────────────────── */
@@ -58,6 +66,15 @@ html[data-look="editorial"][data-theme="light"] {
   --warn: oklch(62% 0.15 70);
   --bad: oklch(55% 0.18 27);
   --info: oklch(55% 0.12 230);
+  /* On-tint foregrounds for status chips/badges (Story 32.2). The semantic
+     tokens above fail AA when used as TEXT over their faint same-hue tint
+     backgrounds (.ep-method / .badge[data-tone]); these darkened variants
+     clear ≥4.5:1 against the tint. Light only — dark tints already pass, so
+     the dark blocks set --*-fg equal to the semantic token. */
+  --ok-fg: oklch(48.5% 0.13 145);
+  --warn-fg: oklch(50% 0.15 70);
+  --bad-fg: oklch(50.5% 0.18 27);
+  --info-fg: oklch(47.5% 0.12 230);
 
   --font-display: var(--font-serif);
   --font-body: var(--font-sans);
@@ -83,6 +100,11 @@ html[data-look="editorial"][data-theme="dark"] {
   --warn: oklch(78% 0.15 70);
   --bad: oklch(70% 0.17 27);
   --info: oklch(72% 0.13 230);
+  /* Dark tints already clear AA (Story 32.2) — mirror the semantic tokens. */
+  --ok-fg: oklch(72% 0.14 145);
+  --warn-fg: oklch(78% 0.15 70);
+  --bad-fg: oklch(70% 0.17 27);
+  --info-fg: oklch(72% 0.13 230);
 
   --font-display: var(--font-serif);
   --font-body: var(--font-sans);
@@ -112,6 +134,11 @@ html[data-look="terminal"][data-theme="light"] {
   --warn: oklch(68% 0.17 80);
   --bad: oklch(58% 0.21 27);
   --info: oklch(58% 0.16 230);
+  /* On-tint status foregrounds (Story 32.2) — darkened for AA over the tint. */
+  --ok-fg: oklch(47% 0.18 145);
+  --warn-fg: oklch(50.5% 0.17 80);
+  --bad-fg: oklch(50.5% 0.21 27);
+  --info-fg: oklch(46.5% 0.16 230);
 
   --font-display: var(--font-mono);
   --font-body: var(--font-sans);
@@ -137,6 +164,11 @@ html[data-look="terminal"][data-theme="dark"] {
   --warn: oklch(82% 0.16 80);
   --bad: oklch(72% 0.19 27);
   --info: oklch(75% 0.15 230);
+  /* Dark tints already clear AA (Story 32.2) — mirror the semantic tokens. */
+  --ok-fg: oklch(78% 0.17 145);
+  --warn-fg: oklch(82% 0.16 80);
+  --bad-fg: oklch(72% 0.19 27);
+  --info-fg: oklch(75% 0.15 230);
 
   --font-display: var(--font-mono);
   --font-body: var(--font-sans);
@@ -162,6 +194,11 @@ html[data-look="industrial"][data-theme="light"] {
   --warn: oklch(66% 0.15 75);
   --bad: oklch(56% 0.19 22);
   --info: oklch(58% 0.14 230);
+  /* On-tint status foregrounds (Story 32.2) — darkened for AA over the tint. */
+  --ok-fg: oklch(46.5% 0.14 160);
+  --warn-fg: oklch(49.5% 0.15 75);
+  --bad-fg: oklch(50% 0.19 22);
+  --info-fg: oklch(46.5% 0.14 230);
 
   --font-display: var(--font-sans);
   --font-body: var(--font-sans);
@@ -185,6 +222,11 @@ html[data-look="industrial"][data-theme="dark"] {
   --warn: oklch(82% 0.16 75);
   --bad: oklch(72% 0.2 22);
   --info: oklch(74% 0.15 230);
+  /* Dark tints already clear AA (Story 32.2) — mirror the semantic tokens. */
+  --ok-fg: oklch(74% 0.15 160);
+  --warn-fg: oklch(82% 0.16 75);
+  --bad-fg: oklch(72% 0.2 22);
+  --info-fg: oklch(74% 0.15 230);
 
   --font-display: var(--font-sans);
   --font-body: var(--font-sans);

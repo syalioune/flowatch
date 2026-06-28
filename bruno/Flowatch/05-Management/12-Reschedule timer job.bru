@@ -1,0 +1,35 @@
+meta {
+  name: Reschedule timer job
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/management/timer-jobs/{{jobId}}
+  body: json
+  auth: basic
+}
+
+body:json {
+  {
+    "action": "reschedule",
+    "dueDate": "2026-12-31T12:00:00Z"
+  }
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  jobId: PASTE_A_TIMER_JOB_ID
+}
+
+docs {
+  # Reschedule timer job
+
+  Sets a new dueDate on a timer job. `dueDate` must be ISO-8601 UTC.
+  Only timer jobs support `reschedule` — executable and dead-letter jobs
+  do not. Related: PRD FR-25, RC-11 in docs/runtime-caveats.md.
+}

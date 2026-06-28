@@ -68,11 +68,40 @@ export type {
 } from "./api-types";
 export { FlowableError } from "./api-types";
 
+import {
+  getAppDefinition,
+  getAppDeploymentResource,
+  listAppDefinitions,
+  listAppDeploymentResources,
+  listAppDeployments,
+} from "./api-app";
+import {
+  getHistoricProcessInstance,
+  listHistoricActivities,
+  listHistoricInstances,
+  listHistoricTasks,
+  listHistoricVariables,
+} from "./api-history";
+import {
+  addUserToGroup,
+  createGroup,
+  createUser,
+  deleteGroup,
+  deleteUser,
+  getGroup,
+  getUser,
+  getUserGroups,
+  listGroupMembers,
+  listGroups,
+  listUsers,
+  removeUserFromGroup,
+  updateGroup,
+  updateUser,
+} from "./api-identity";
 import type {
   AddAttachmentPayload,
   ApiLogEntry,
   ExecuteDecisionBody,
-  FlowableAppDefinition,
   FlowableAttachment,
   FlowableBatch,
   FlowableBatchPart,
@@ -83,11 +112,7 @@ import type {
   FlowableDmnExecutionAudit,
   FlowableEngineInfo,
   FlowableEventSubscription,
-  FlowableHistoricActivity,
   FlowableHistoricDecisionExecution,
-  FlowableHistoricProcessInstance,
-  FlowableHistoricTask,
-  FlowableHistoricVariable,
   FlowableJob,
   FlowablePage,
   FlowableProcessDefinition,
@@ -103,58 +128,66 @@ import type {
   RequestOpts,
 } from "./api-types";
 import { FlowableError } from "./api-types";
+import { type AuthStrategy, BasicAuthStrategy } from "./lib/auth-strategy";
 import { randomId } from "./lib/random-id";
 
-// ── Config + storage ──────────────────────────────────────────────────────
+// ── Config (purely in-memory — flowatch.connections.v1 is the sole persistence key) ──
 
-const STORAGE_KEY = "flowatch.connection.v1";
 const defaultCfg: FlowableConfig = {
   baseUrl: "http://localhost:8080/flowable-rest/service",
   username: "rest-admin",
   password: "test",
   tenantId: "",
 };
-export const loadCfg = (): FlowableConfig => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? { ...defaultCfg, ...JSON.parse(raw) } : { ...defaultCfg };
-  } catch {
-    return { ...defaultCfg };
-  }
-};
-const saveCfg = (cfg: FlowableConfig): void => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
-  } catch {
-    /* localStorage may be unavailable (private mode, quota) */
-  }
-};
 
-let cfg: FlowableConfig = loadCfg();
+let cfg: FlowableConfig = { ...defaultCfg };
 
 // Flowable splits its REST API across sub-apps. The BPMN/runtime/identity endpoints
-// live under `/flowable-rest/service`, but DMN is mounted at `/flowable-rest/dmn-api`.
-// We derive the DMN root from the configured base URL.
-const dmnBase = (): string => cfg.baseUrl.replace(/\/service\/?$/, "/dmn-api");
+// live under `/flowable-rest/service`, but DMN is mounted at `/flowable-rest/dmn-api`
+// (and CMMN at `/cmmn-api`, the App API at `/app-api`).
+//
+// Story 34.1: per-sub-app URI prefixes are configurable per connection (FR-59).
+// connectionRoot() strips the configured servicePath suffix from baseUrl to
+// recover the deployment root; each sub-app base = root + its configured
+// segment, falling back to the standard flowable-rest:7.2.0 default when the
+// operator leaves the field blank. Backward-compat: with all fields blank,
+// servicePath defaults to "/service" and dmnBase resolves identically to the
+// pre-34.1 `baseUrl.replace(/\/service\/?$/, "/dmn-api")`.
+const trimTrailingSlash = (s: string): string => s.replace(/\/+$/, "");
+const servicePath = (): string => cfg.servicePath || "/service";
+// Exported for the api-base derivation unit tests (Story 34.1 AC-5) — no live
+// non-standard-mount engine exists for make stack (COMPAT-BOUNDARY, Story 29.1).
+export const connectionRoot = (): string => {
+  const base = trimTrailingSlash(cfg.baseUrl);
+  const sp = servicePath();
+  // When baseUrl does NOT end with the configured servicePath (operator typed a
+  // bare root, or a non-standard service mount), return baseUrl as-is — the
+  // sub-app segment still appends, degrading gracefully rather than throwing.
+  return base.endsWith(sp) ? base.slice(0, base.length - sp.length) : base;
+};
+export const dmnBase = (): string => connectionRoot() + (cfg.dmnPath || "/dmn-api");
+// Story 34.1: forward-reserved — no Flowatch CMMN consumer yet (FR-50). Added
+// for four-helper symmetry so a future CMMN list/detail screen inherits the
+// helper rather than re-deriving the prefix. Exported (unlike a purely-internal
+// helper) precisely because it has no production call site yet; the api-base
+// unit test is its only exerciser until FR-50 lands.
+export const cmmnBase = (): string => connectionRoot() + (cfg.cmmnPath || "/cmmn-api");
 // Story 25.1: Flowable App API sub-app — mirrors the `dmnBase()` shape per
-// compat.md row 28. /service → /app-api. Read-only at this story; app-runtime
-// (app-instances) is not exposed in flowable-rest:7.2.0 (PRD FR-55
-// scope-reduced).
-const appBase = (): string => cfg.baseUrl.replace(/\/service\/?$/, "/app-api");
+// compat.md row 28. Read-only at this story; app-runtime (app-instances) is not
+// exposed in flowable-rest:7.2.0 (PRD FR-55 scope-reduced).
+export const appBase = (): string => connectionRoot() + (cfg.appPath || "/app-api");
 
 export const API_LOG: ApiLogEntry[] = [];
 const MAX_LOG = 60;
+let logFrozen = false;
 const logCall = (entry: ApiLogEntry): void => {
+  if (logFrozen) return;
   API_LOG.unshift(entry);
   if (API_LOG.length > MAX_LOG) API_LOG.length = MAX_LOG;
   window.dispatchEvent(new CustomEvent<ApiLogEntry>("api:log", { detail: entry }));
 };
 
-// NFR-8: scheme-preserving redaction of the Authorization header before the
-// entry lands in API_LOG. Splits on the first space so "Basic <base64>" becomes
-// "Basic ***" and a future "Bearer <jwt>" becomes "Bearer ***". The clone via
-// spread is what makes this safe — the headers object passed to fetch() is
-// never mutated; only the captured copy is.
+// Clone-and-redact: keeps the headers object handed to fetch() untouched.
 function redactAuthHeader(headers: Record<string, string>): Record<string, string> {
   const out = { ...headers };
   if (out.Authorization) {
@@ -164,13 +197,7 @@ function redactAuthHeader(headers: Record<string, string>): Record<string, strin
   return out;
 }
 
-// Epic 9 retro A-3 (Story 10.2): body byte-budget guard. The Inspector's
-// previewBody synchronously JSON.stringifies entry.body on click; a 100 KB
-// variables blob from startProcessInstance would lock the main thread. We
-// truncate at capture time so the ring buffer's memory footprint is bounded
-// and the drawer's preview stays interactive. Bodies whose stringified form
-// throws (circular refs, BigInt, throwing toJSON) pass through unchanged —
-// the render-time fallback in previewBody handles those.
+// Truncate at capture time so large bodies don't lock the Inspector on render.
 export const BODY_BYTE_BUDGET = 16 * 1024;
 
 export interface TruncatedBody {
@@ -202,6 +229,8 @@ if (import.meta.env.DEV && typeof window !== "undefined") {
   const w = window as unknown as {
     __flowatchSeedApiLog?: (entries: ApiLogEntry[]) => void;
     __flowatchClearApiLog?: () => void;
+    __flowatchPauseApiLog?: () => void;
+    __flowatchResumeApiLog?: () => void;
   };
   w.__flowatchSeedApiLog = (entries) => {
     for (const entry of entries) {
@@ -217,6 +246,12 @@ if (import.meta.env.DEV && typeof window !== "undefined") {
     // subscribes to both events and re-reads API_LOG on either signal.
     window.dispatchEvent(new Event("api:log-cleared"));
   };
+  w.__flowatchPauseApiLog = () => {
+    logFrozen = true;
+  };
+  w.__flowatchResumeApiLog = () => {
+    logFrozen = false;
+  };
 }
 
 const qs = (params?: QueryParams): string => {
@@ -227,10 +262,23 @@ const qs = (params?: QueryParams): string => {
     usp.append(k, String(v));
   });
   const s = usp.toString();
-  return s ? "?" + s : "";
+  return s ? `?${s}` : "";
 };
 
-const basicAuth = (): string => "Basic " + btoa(`${cfg.username}:${cfg.password}`);
+// ── Pluggable auth strategy (Story 28.1 — ADR-009) ────────────────────────
+// Active strategy produces the Authorization header for request() +
+// multipartFetch(). Default BasicAuthStrategy reads cfg via a getter closure;
+// Story 28.2's dispatcher swaps it per the active authStrategyConfig.kind.
+let authStrategy: AuthStrategy = new BasicAuthStrategy(() => ({
+  username: cfg.username,
+  password: cfg.password,
+}));
+export function setAuthStrategy(s: AuthStrategy): void {
+  authStrategy = s;
+}
+export function getAuthStrategy(): AuthStrategy {
+  return authStrategy;
+}
 
 // Shared multipart POST envelope used by `uploadDeployment` (Story 9.2) and
 // `addTaskAttachment` file path (Story 21.2). Bypasses `request()` because the
@@ -256,7 +304,12 @@ const multipartFetch = async (
   };
   try {
     const fd = buildFd();
-    const headers: Record<string, string> = { Authorization: basicAuth() };
+    // Story 28.1: delegate the Authorization header to the active strategy
+    // (this path is the non-obvious SECOND seam point — miss it and Bearer/
+    // OIDC uploads silently leak Basic). `null` → no header sent.
+    const headers: Record<string, string> = {};
+    const authHeader = await authStrategy.authorizationHeader();
+    if (authHeader !== null) headers.Authorization = authHeader;
     entry.headers = redactAuthHeader(headers);
     const res = await fetch(url, { method: "POST", headers, body: fd });
     entry.status = res.status;
@@ -306,30 +359,21 @@ export async function request<T = unknown>(
   };
 
   try {
+    // Story 28.1: the active AuthStrategy produces the Authorization header
+    // (async — chosen for OIDC's on-demand token refresh, Story 28.4). `null`
+    // → no Authorization header sent (reserved no-auth / empty-token case).
     const headers: Record<string, string> = {
-      Authorization: basicAuth(),
       Accept: raw ? "*/*" : "application/json",
     };
+    const authHeader = await authStrategy.authorizationHeader();
+    if (authHeader !== null) headers.Authorization = authHeader;
     if (body) {
       headers["Content-Type"] = "application/json";
     }
     const init: RequestInit = { method, headers };
-    // Per AC-2/AC-6/AC-7: redact the Authorization header on the captured
-    // copy before any further work so success, 4xx, 5xx, network-error, AND
-    // body-serialization-error (circular ref, BigInt, throwing toJSON) paths
-    // all surface the redacted form in API_LOG. The `headers` object handed
-    // to fetch() is untouched — redactAuthHeader clones via spread.
     entry.headers = redactAuthHeader(headers);
     if (body) {
       init.body = JSON.stringify(body);
-      // Per Story 8.1 AC-3 + Story 10.2 A-3: capture the original JS value
-      // (not the stringified form) so the Inspector can pretty-print, but
-      // truncate at capture time when the stringified form exceeds the
-      // byte budget. Note: entry.body and init.body diverge above the
-      // budget — init.body always carries the real bytes sent on the
-      // wire; entry.body may carry the truncated envelope. The Inspector's
-      // "Copy as curl" surfaces entry.body and therefore the envelope on
-      // oversized requests — accepted (a 100 KB clipboard isn't useful).
       entry.body = captureBody(body);
     }
     const res = await fetch(url, init);
@@ -339,6 +383,12 @@ export async function request<T = unknown>(
       const text = await res.text().catch(() => "");
       entry.error = text || `HTTP ${res.status}`;
       logCall(entry);
+      // Story 28.1: 401-recovery seam. The active strategy's onUnauthorized
+      // hook is ADDITIVE — it fires a recovery side-channel (Bearer 28.3 →
+      // open Settings; OIDC 28.4 → silent renew / re-auth) but the error
+      // STILL propagates so the calling screen surfaces its ErrorBox. Basic
+      // leaves the hook undefined → optional-chaining no-ops.
+      if (res.status === 401) await authStrategy.onUnauthorized?.();
       throw new FlowableError(entry.error, res.status);
     }
     // Story 9.6: when asResponse is set, log the entry and hand the caller the
@@ -739,50 +789,18 @@ const batchPartStacktrace = (id: string): Promise<string> =>
   });
 
 // ── History ──────────────────────────────────────────────────────────────
-const listHistoricInstances = (params?: QueryParams) =>
-  request<FlowablePage<FlowableHistoricProcessInstance>>(
-    "GET",
-    "/history/historic-process-instances",
-    { params },
-  );
-// Story 13.1: per-id GET for the historic detail panel — the runtime sibling
-// is api.getProcessInstance. Returns the same DTO as items in the list
-// response (Flowable's historic surface re-uses the shape).
-const getHistoricProcessInstance = (id: string) =>
-  request<FlowableHistoricProcessInstance>("GET", `/history/historic-process-instances/${id}`);
-const listHistoricActivities = (params?: QueryParams) =>
-  request<FlowablePage<FlowableHistoricActivity>>("GET", "/history/historic-activity-instances", {
-    params,
-  });
-const listHistoricVariables = (params?: QueryParams) =>
-  request<FlowablePage<FlowableHistoricVariable>>("GET", "/history/historic-variable-instances", {
-    params,
-  });
-const listHistoricTasks = (params?: QueryParams) =>
-  request<FlowablePage<FlowableHistoricTask>>("GET", "/history/historic-task-instances", {
-    params,
-  });
+// Historic-process-instance wrappers extracted to src/api-history.ts per NFR-21
+// navigability (50 KB per-source-file limit). Pattern P-001 preserved.
+
+// ── App (mounted under /flowable-rest/app-api, not /service) ─────────────
+// App-sub-app read wrappers extracted to src/api-app.ts per NFR-21
+// navigability (50 KB per-source-file limit). Pattern P-001 preserved.
+// The write path (deployBar) stays here — it uses multipartFetch/uploadDeployment.
 
 // ── Identity ─────────────────────────────────────────────────────────────
 // Identity-surface wrappers extracted to src/api-identity.ts per NFR-21
 // navigability (50 KB per-source-file limit). All wrappers funnel through
 // the same `request<T>` exported above; Pattern P-001 preserved.
-import {
-  addUserToGroup,
-  createGroup,
-  createUser,
-  deleteGroup,
-  deleteUser,
-  getGroup,
-  getUser,
-  getUserGroups,
-  listGroupMembers,
-  listGroups,
-  listUsers,
-  removeUserFromGroup,
-  updateGroup,
-  updateUser,
-} from "./api-identity";
 
 // Tenants are not exposed as a dedicated endpoint in flowable-rest 7.2.
 // Derive distinct tenantIds from deployments (truthy values only).
@@ -909,46 +927,6 @@ const removeDmnDeployment = (id: string, params?: { cascade?: boolean }) =>
     params?.cascade ? { params: { cascade: true }, base: dmnBase() } : { base: dmnBase() },
   );
 
-// ── App (mounted under /flowable-rest/app-api, not /service) ─────────────
-// Story 25.1: FR-55 scope-reduced — repository side only. The /app-runtime
-// half (app-instances) is unmounted in flowable-rest:7.2.0 (compat.md row 28).
-const listAppDefinitions = (params?: QueryParams) =>
-  request<FlowablePage<FlowableAppDefinition>>("GET", "/app-repository/app-definitions", {
-    params,
-    base: appBase(),
-  });
-
-// Story 25.1: list App-sub-app deployments.
-const listAppDeployments = (params?: QueryParams) =>
-  request<FlowablePage<FlowableDeployment>>("GET", "/app-repository/deployments", {
-    params,
-    base: appBase(),
-  });
-
-// Story 25.1: get a single app-definition by id — backs the
-// /app-definitions/$id detail route.
-const getAppDefinition = (id: string) =>
-  request<FlowableAppDefinition>("GET", `/app-repository/app-definitions/${id}`, {
-    base: appBase(),
-  });
-
-// Story 25.1: list resources bundled in an app-deployment. Returns an array
-// of { id, mediaType, type, url, contentUrl } where `type` is either
-// "appDefinition" (for the .app manifest) or "resource" (everything else).
-const listAppDeploymentResources = (deploymentId: string) =>
-  request<FlowableResource[]>("GET", `/app-repository/deployments/${deploymentId}/resources`, {
-    base: appBase(),
-  });
-
-// Story 25.1: binary content fetch for an app-deployment resource. Returns
-// the raw Response so callers pick .blob() / .text().
-const getAppDeploymentResource = (deploymentId: string, resourceName: string) =>
-  request<Response>(
-    "GET",
-    `/app-repository/deployments/${deploymentId}/resourcedata/${encodeURIComponent(resourceName)}`,
-    { asResponse: true, base: appBase() },
-  );
-
 // ── Deployment helpers (multipart upload) ────────────────────────────────
 // Flowable expects multipart/form-data, not the JSON-with-base64 shape we used
 // in mock mode. We build a FormData and send via raw fetch (bypassing request()
@@ -1017,6 +995,30 @@ const deployBar = (filename: string, file: Blob | File) =>
 
 const ping = () => request<FlowableEngineInfo>("GET", "/management/engine");
 
+// Test a specific saved connection without mutating the global cfg.
+// Temporarily swaps authStrategy so the call routes through the full request()
+// funnel (API_LOG entry + NFR-8 redaction). Safe in single-tab browser context.
+const pingForConn = async (conn: {
+  baseUrl: string;
+  servicePath?: string | undefined;
+  username?: string | undefined;
+  password?: string | undefined;
+}): Promise<FlowableEngineInfo> => {
+  const sp = conn.servicePath;
+  const rawBase = conn.baseUrl.replace(/\/+$/, "");
+  const effectiveBase = sp && !rawBase.endsWith(sp) ? rawBase + sp : rawBase;
+  const prev = authStrategy;
+  authStrategy = new BasicAuthStrategy(() => ({
+    username: conn.username ?? "",
+    password: conn.password ?? "",
+  }));
+  try {
+    return await request<FlowableEngineInfo>("GET", "/management/engine", { base: effectiveBase });
+  } finally {
+    authStrategy = prev;
+  }
+};
+
 // Send an ad-hoc request from the API Inspector "Try it" panel.
 // Path may include a query string; DMN sub-app paths (/dmn-*) are auto-rerouted.
 const runRaw = (method: HTTPMethod, path: string, body?: unknown) => {
@@ -1039,7 +1041,6 @@ export const api = {
       (next.username !== undefined && next.username !== cfg.username) ||
       (next.password !== undefined && next.password !== cfg.password);
     cfg = { ...cfg, ...next };
-    saveCfg(cfg);
     if (connectionChanged) {
       // Story 14.4 AC-9: an engine switch invalidates the cached tenants —
       // the new engine's /repository/deployments has its own tenantIds.
@@ -1048,6 +1049,9 @@ export const api = {
     }
   },
   log: (): ApiLogEntry[] => [...API_LOG],
+  // Auth (Story 28.1 — pluggable AuthStrategy seam)
+  setAuthStrategy,
+  getAuthStrategy,
   // BPMN repository
   listDeployments,
   getDeployment,
@@ -1140,5 +1144,6 @@ export const api = {
   deployDmn,
   deployBar,
   ping,
+  pingForConn,
   runRaw,
 };

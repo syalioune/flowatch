@@ -1,0 +1,32 @@
+meta {
+  name: Delete DMN deployment
+  type: http
+  seq: 10
+}
+
+delete {
+  url: {{dmnBase}}/dmn-repository/deployments/{{deploymentId}}
+  body: none
+  auth: basic
+}
+
+params:query {
+  ~cascade: true
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  deploymentId: PASTE_DMN_DEPLOYMENT_ID
+}
+
+docs {
+  # Delete DMN deployment
+
+  `cascade=true` removes decisions still referenced by historic executions;
+  without it the engine returns 409 Conflict when historic executions exist.
+  Related: PRD FR-33, Story 15.2.
+}

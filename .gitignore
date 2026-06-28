@@ -12,6 +12,9 @@ __screenshots__/
 e2e/test-results/
 e2e/playwright-report/
 e2e/.playwright-cache/
+# Story 32.1 — machine-readable axe-core scan output (regenerated each run;
+# the human-readable deliverable is docs/a11y-audit-1.0.0.md).
+e2e/a11y/.axe-results.json
 # Vitest CI JUnit report (Story 4.1) — only the GitHub Actions runner writes
 # it; uploaded as an artifact on failure.
 test-results/

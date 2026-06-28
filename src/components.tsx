@@ -231,7 +231,7 @@ const Logo = () => (
       <Mark />
     </div>
     <div className="brand-name">Flowatch</div>
-    <div className="brand-tag">v0.0.2</div>
+    <div className="brand-tag">v1.0.0</div>
   </div>
 );
 
@@ -431,7 +431,7 @@ export const Topbar = ({
     </div>
     <div className="search">
       <Icon name="search" size={13} />
-      <input placeholder="Search processes, instances, tasks…" />
+      <input aria-label="Search" placeholder="Search processes, instances, tasks…" />
       <kbd>⌘K</kbd>
     </div>
     <div className="top-actions">
@@ -481,35 +481,17 @@ export const Topbar = ({
 interface SettingsModalProps {
   open: boolean;
   onClose: () => void;
+  initialTab?: SettingsTab | undefined;
 }
 
-type PingResult = { ok: true; name?: string; version?: string } | { ok: false; error: string };
+export type SettingsTab = "connection" | "about";
 
-type SettingsTab = "connection" | "about";
-
-export const SettingsModal = ({ open, onClose }: SettingsModalProps) => {
-  const [cfg, setCfg] = React.useState<FlowableConfig>(api.config());
-  const [pinging, setPinging] = React.useState(false);
-  const [pingRes, setPingRes] = React.useState<PingResult | null>(null);
+export const SettingsModal = ({ open, onClose, initialTab }: SettingsModalProps) => {
   const [tab, setTab] = React.useState<SettingsTab>("connection");
+  React.useEffect(() => {
+    if (open && initialTab) setTab(initialTab);
+  }, [open, initialTab]);
   if (!open) return null;
-  const save = () => {
-    api.setConfig(cfg);
-    onClose();
-  };
-  const test = async () => {
-    api.setConfig(cfg);
-    setPinging(true);
-    setPingRes(null);
-    try {
-      const r = await api.ping();
-      setPingRes({ ok: true, name: r?.name, version: r?.version });
-    } catch (e) {
-      setPingRes({ ok: false, error: String((e as Error)?.message || e) });
-    } finally {
-      setPinging(false);
-    }
-  };
   return (
     <div className="modal-back" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 620 }}>
@@ -518,6 +500,7 @@ export const SettingsModal = ({ open, onClose }: SettingsModalProps) => {
           <button
             type="button"
             className="icon-btn"
+            aria-label="Close Settings"
             onClick={onClose}
             style={{ marginLeft: "auto" }}
           >
@@ -543,80 +526,9 @@ export const SettingsModal = ({ open, onClose }: SettingsModalProps) => {
           </button>
         </div>
         {tab === "connection" && (
-          <>
-            <div className="modal-bd">
-              <div className="form-row">
-                <label>
-                  Base URL <span className="mono">REST service root</span>
-                </label>
-                <input
-                  className="input"
-                  value={cfg.baseUrl}
-                  onChange={(e) => setCfg({ ...cfg, baseUrl: e.target.value })}
-                />
-                <div className="mute text-xs">
-                  Default OSS path:{" "}
-                  <span className="mono">http://localhost:8080/flowable-rest/service</span>
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div className="form-row">
-                  <label>Username</label>
-                  <input
-                    className="input"
-                    value={cfg.username}
-                    onChange={(e) => setCfg({ ...cfg, username: e.target.value })}
-                  />
-                </div>
-                <div className="form-row">
-                  <label>Password</label>
-                  <input
-                    className="input"
-                    type="password"
-                    value={cfg.password}
-                    onChange={(e) => setCfg({ ...cfg, password: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="form-row">
-                <label>
-                  Tenant ID <span className="mono">optional</span>
-                </label>
-                <input
-                  className="input"
-                  value={cfg.tenantId}
-                  placeholder="leave blank for default"
-                  onChange={(e) => setCfg({ ...cfg, tenantId: e.target.value })}
-                />
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
-                <button type="button" className="btn" onClick={test} disabled={pinging}>
-                  {pinging ? "Pinging…" : "Test connection"}
-                </button>
-                {pingRes?.ok && (
-                  <span className="badge" data-tone="ok">
-                    <span className="sr-only">Status: connected — </span>
-                    {pingRes.name} {pingRes.version}
-                  </span>
-                )}
-                {pingRes && !pingRes.ok && (
-                  <span className="badge" data-tone="bad">
-                    <span className="sr-only">Status: error — </span>
-                    {pingRes.error}
-                  </span>
-                )}
-              </div>
-              <ManageConnectionsPanel onCloseSettings={onClose} />
-            </div>
-            <div className="modal-ft">
-              <button type="button" className="btn" onClick={onClose}>
-                Cancel
-              </button>
-              <button type="button" className="btn" data-variant="primary" onClick={save}>
-                Save
-              </button>
-            </div>
-          </>
+          <div className="modal-bd">
+            <ManageConnectionsPanel onCloseSettings={onClose} />
+          </div>
         )}
         {tab === "about" && (
           <div className="modal-bd">
@@ -1033,13 +945,15 @@ export const ApiInspector = ({
                 {firstEp.method}
               </span>
               <input
+                aria-label="Request path"
                 className="input mono"
                 style={{ flex: 1, fontSize: 12 }}
                 value={tryPath}
                 onChange={(e) => setTryPath(e.target.value)}
               />
             </div>
-            <div className="code">
+            {/* biome-ignore lint/a11y/noNoninteractiveTabindex: WCAG SC 2.1.1 / axe scrollable-region-focusable — the snippet block scrolls and MUST be keyboard-reachable; tabIndex=0 on the region is the canonical fix (Story 32.2). */}
+            <div className="code" role="region" aria-label="Request snippet" tabIndex={0}>
               {snippet === "fetch"
                 ? buildFetchSnippet(cfg, { ...firstEp, path: tryPath })
                 : buildCurlSnippet(cfg, { ...firstEp, path: tryPath })}

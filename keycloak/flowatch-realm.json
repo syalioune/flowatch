@@ -1,0 +1,61 @@
+{
+  "realm": "flowatch",
+  "enabled": true,
+  "displayName": "Flowatch (OIDC test fixture)",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "offlineSessionIdleTimeout": 2592000,
+  "clients": [
+    {
+      "clientId": "flowatch",
+      "name": "Flowatch SPA",
+      "description": "Public PKCE client for the Flowatch single-page app (Story 28.4 OIDC test fixture).",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "rootUrl": "http://localhost:5173",
+      "baseUrl": "http://localhost:5173",
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/*",
+        "access.token.lifespan": "300"
+      },
+      "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "email"],
+      "optionalClientScopes": ["offline_access", "address", "phone", "microprofile-jwt"]
+    }
+  ],
+  "users": [
+    {
+      "username": "mira",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Mira",
+      "lastName": "Operator",
+      "email": "mira@flowatch.test",
+      "credentials": [{ "type": "password", "value": "mira-test", "temporary": false }],
+      "realmRoles": ["offline_access"]
+    },
+    {
+      "username": "alice",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Alice",
+      "lastName": "Admin",
+      "email": "alice@flowatch.test",
+      "credentials": [{ "type": "password", "value": "alice-test", "temporary": false }],
+      "realmRoles": ["offline_access"]
+    }
+  ]
+}

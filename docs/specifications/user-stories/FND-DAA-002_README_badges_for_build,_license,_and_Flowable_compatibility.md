@@ -2,7 +2,7 @@
 
 > **User Story ID**: FND-DAA-002
 > **Persona**: DAA
-> **Epic**: 6 — Docker & Distribution Foundation
+> **Epic**: 6 — Distribution & Discovery Foundation
 > **Milestone**: 0.0.1
 > **Source**: `_bmad-output/planning-artifacts/epics.md` (story 6.4)
 > **State**: done

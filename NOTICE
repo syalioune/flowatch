@@ -9,17 +9,21 @@ identifier, and homepage URL.
 Direct dependencies (production):
 ----------------------------------------------------------------
 
+- @bpmn-io/form-js-viewer  1.21.3  Custom: LICENSE  https://github.com/bpmn-io/form-js
 - @tanstack/react-router  1.169.2  MIT  https://github.com/TanStack/router
 - bpmn-js  17.11.1  Custom: LICENSE  https://github.com/bpmn-io/bpmn-js
 - dmn-js  16.8.2  Custom: LICENSE  https://github.com/bpmn-io/dmn-js
+- oidc-client-ts  3.5.0  Apache-2.0  https://github.com/authts/oidc-client-ts
 - react  18.3.1  MIT  https://github.com/facebook/react
 - react-dom  18.3.1  MIT  https://github.com/facebook/react
+- react-oidc-context  3.3.1  MIT  https://github.com/authts/react-oidc-context
 - zod  3.25.76  MIT  https://github.com/colinhacks/zod
 
 ----------------------------------------------------------------
 Direct dependencies (development):
 ----------------------------------------------------------------
 
+- @axe-core/playwright  4.11.3  MPL-2.0  https://github.com/dequelabs/axe-core-npm
 - @biomejs/biome  2.4.15  MIT OR Apache-2.0  https://github.com/biomejs/biome
 - @commitlint/cli  21.0.1  MIT  https://github.com/conventional-changelog/commitlint
 - @commitlint/config-conventional  21.0.1  MIT  https://github.com/conventional-changelog/commitlint

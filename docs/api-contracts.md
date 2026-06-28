@@ -1,16 +1,20 @@
 # API Contracts
 
-This document catalogs every Flowable REST endpoint that Flowatch consumes, grouped by the band it appears in within [src/api.js](../src/api.js). Flowatch owns no API of its own — it is purely a client.
+This document catalogs every Flowable REST endpoint that Flowatch consumes, grouped by the band it appears in within [src/api.ts](../src/api.ts) (and the split files `api-app.ts`, `api-history.ts`, `api-identity.ts`). Flowatch owns no API of its own — it is purely a client.
 
 ## Connection model
 
 - **Base URL** (configurable, defaults to `http://localhost:8080/flowable-rest/service`) — used for BPMN/runtime/identity/management/history/form endpoints.
-- **DMN base** — derived at call time by `dmnBase()` which replaces `/service` with `/dmn-api`, yielding `…/flowable-rest/dmn-api`. Used for all DMN endpoints.
-- **Auth** — HTTP Basic, encoded from the connection config (`username` / `password`).
-- **Content negotiation** — `Accept: application/json` by default; `Accept: */*` when the wrapper opts into `{ raw: true }` (used for XML downloads and exception stacktraces).
+- **Sub-app bases** — derived at call time by helper functions that strip the configured `servicePath` suffix via `connectionRoot()` and append the sub-app segment. All four path segments are **per-connection overrides** (`SavedConnection` `schemaVersion: 2`); the values below are the defaults when no override is set:
+  - `dmnBase()` → `connectionRoot() + (cfg.dmnPath || "/dmn-api")`
+  - `appBase()` → `connectionRoot() + (cfg.appPath || "/app-api")`
+  - `cmmnBase()` → `connectionRoot() + (cfg.cmmnPath || "/cmmn-api")` (forward-reserved, no consumer yet)
+  - service base → `connectionRoot() + (cfg.servicePath || "/service")` (the main `baseUrl`)
+- **Auth** — pluggable `AuthStrategy`: `BasicAuthStrategy` (default), `BearerAuthStrategy` (paste-a-token), `OidcAuthStrategy` (PKCE OIDC). Installed at module load by `installStrategyForActiveConnection()`. The funnel awaits `authStrategy.authorizationHeader()` — never hard-codes Basic.
+- **Content negotiation** — `Accept: application/json` by default; `Accept: */*` when the wrapper opts into `{ raw: true }` (used for XML downloads and exception stacktraces); `{ asResponse: true }` returns the raw `Response` for binary callers.
 - **Multipart** — deployment uploads bypass the JSON funnel and POST `FormData`.
 
-Every JSON wrapper passes through `request(method, path, { params, body, base, raw })` in [src/api.js:50](../src/api.js#L50). On success it returns parsed JSON (or text if not JSON). On failure it throws an `Error` with `.status` set to the HTTP code and `.message` set to the server's response body (or `HTTP NNN` if the body is empty).
+Every JSON wrapper passes through `request(method, path, { params, body, base, raw, asResponse })` in [src/api.ts](../src/api.ts). On success it returns parsed JSON (or text if `raw:true`). On failure it throws an `Error` with `.status` set to the HTTP code and `.message` set to the server's response body (or `HTTP NNN` if the body is empty).
 
 Every call — success or failure — pushes an entry into `API_LOG` and fires a `window` `CustomEvent('api:log', { detail: entry })`. The `ApiInspector` component listens for this event.
 
@@ -36,6 +40,9 @@ Every call — success or failure — pushes an entry into `API_LOG` and fires a
 | `startProcessInstance(body)`               | POST   | `/runtime/process-instances`                          | Body shape: `{ processDefinitionKey \| processDefinitionId, businessKey?, tenantId?, variables? }` |
 | `deleteProcessInstance(id, reason)`        | DELETE | `/runtime/process-instances/{id}?deleteReason=…`      |                                             |
 | `getProcessInstanceVariables(id)`          | GET    | `/runtime/process-instances/{id}/variables`           |                                             |
+| `setProcessInstanceVariables(id, vars)`    | PUT    | `/runtime/process-instances/{id}/variables`           | Body: array of `{name, value, type, scope?}`. Returns `201 Created` for both insert and upsert (RC-15). Response echoes `scope:"local"` regardless of input — ignore the echo. (FR-19) |
+| `deleteProcessInstanceVariable(id, name)`  | DELETE | `/runtime/process-instances/{id}/variables/{name}`    | `encodeURIComponent(name)` non-negotiable. `204 No Content`; `404` if missing. NOT idempotent (RC-15). (FR-19) |
+| `listEventSubscriptions(params)`           | GET    | `/runtime/event-subscriptions`                        | Supports `processInstanceId`, `eventType`, `eventName`, `tenantId` filters. (FR-54). |
 | `listTasks(params)`                        | GET    | `/runtime/tasks`                                      | Used both for screens and for `navCounts`   |
 | `taskAction(taskId, action, body)`         | POST   | `/runtime/tasks/{taskId}`                             | Body: `{ action, ...extra }`. Actions: `claim`, `complete`, `delegate`, `resolve`, `unclaim` |
 | `updateTask(id, fields)`                   | PUT    | `/runtime/tasks/{id}`                                 | Body `Partial<{priority, dueDate, owner, assignee}>` (FR-44). Same URL as `taskAction` — engine discriminates by HTTP method (POST action-verbs vs PUT field-patches). Returns the echoed FlowableTask. Throws if `fields` is empty. |
@@ -59,9 +66,16 @@ Every call — success or failure — pushes an entry into `API_LOG` and fires a
 | `listJobs(params)`               | GET    | `/management/jobs`                                    | `withException=true` is a common filter                        |
 | `listTimerJobs(params)`          | GET    | `/management/timer-jobs`                              |                                                                |
 | `listDeadLetterJobs(params)`     | GET    | `/management/deadletter-jobs`                         |                                                                |
-| `executeJob(id)`                 | POST   | `/management/jobs/{id}`                               | Body `{ action: "execute" }`                                   |
-| `moveDeadLetterJob(id)`          | POST   | `/management/deadletter-jobs/{id}`                    | Body `{ action: "move" }` (back to executable queue)           |
-| `jobStacktrace(id)`              | GET    | `/management/jobs/{id}/exception-stacktrace`          | Returns **raw text** (`raw: true`)                             |
+| `executeJob(id)`                 | POST   | `/management/jobs/{id}`                               | Body `{ action: "execute" }`. Executable-jobs namespace only (RC-11). |
+| `executeTimerJob(id)`            | POST   | `/management/timer-jobs/{id}`                         | Body `{ action: "move" }` — moves timer to executable queue for immediate pickup. Operator label: "Execute now". Wire verb: `move` (RC-11). |
+| `rescheduleTimerJob(id, dueDate)`| POST   | `/management/timer-jobs/{id}`                         | Body `{ action: "reschedule", dueDate: <iso-utc> }`. See `datetime-local` round-trip in CLAUDE.md. |
+| `moveDeadLetterJob(id)`          | POST   | `/management/deadletter-jobs/{id}`                    | Body `{ action: "move" }` (back to executable queue). (RC-11). |
+| `jobStacktrace(id)`              | GET    | `/management/jobs/{id}/exception-stacktrace`          | Returns **raw text** (`raw: true`). Executable-jobs namespace. |
+| `timerJobStacktrace(id)`         | GET    | `/management/timer-jobs/{id}/exception-stacktrace`    | Returns **raw text** (`raw: true`). Timer-jobs namespace (RC-11). |
+| `deadLetterJobStacktrace(id)`    | GET    | `/management/deadletter-jobs/{id}/exception-stacktrace` | Returns **raw text** (`raw: true`). Dead-letter namespace (RC-11). |
+| `listBatches(params)`            | GET    | `/management/batches`                                 | Supports `searchKey`, `status`, `tenantId` filters. (FR-53). |
+| `getBatch(id)`                   | GET    | `/management/batches/{id}`                            | Single batch detail. (FR-53). |
+| `listBatchParts(batchId, params)`| GET    | `/management/batches/{batchId}/batch-parts`           | Returns batch-part rows for `<BatchPartsPanel>` row-expand. (FR-53). |
 | `ping()`                         | GET    | `/management/engine`                                  | Returns `{ name, version, resourceUrl, exception }`            |
 
 ## History
@@ -104,6 +118,16 @@ All DMN wrappers pass `{ base: dmnBase() }`. The `dmnBase()` helper rewrites the
 | `removeDmnDeployment(id, params?)`            | DELETE | `/dmn-repository/deployments/{id}`                                    | Pass `{cascade: true}` to delete decisions referenced by historic executions. Without cascade, the engine returns 409 if any historic execution references a decision. |
 | `listDmnHistoryExecutions(params?)`           | GET    | `/dmn-history/historic-decision-executions`                           | Supports `decisionKey`, `processInstanceId`, `startedBefore/After`, `sort/order` filters. Response items: `FlowableHistoricDecisionExecution`. |
 
+## App (under `/flowable-rest/app-api`)
+
+All App wrappers pass `{ base: appBase() }`. `deployBar` is in the multipart section below.
+
+| Wrapper                              | Method | Path (relative to app-api root)              | Notes                                                                                 |
+| ------------------------------------ | ------ | -------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `listAppDefinitions(params)`         | GET    | `/app-repository/app-definitions`            | Read-only browse of deployed `.bar` app definitions. (FR-55). |
+
+> **Note:** `app-runtime/app-instances` is NOT exposed in `flowable-rest:7.2.0` — only the browse side is feasible (see [compat.md](./compat.md) FR-55).
+
 ## Deployment uploads (multipart)
 
 These two wrappers bypass the `request()` JSON funnel — they build a `FormData`, set `Authorization` manually, and `fetch()` directly. They still push their result into `API_LOG` and fire `api:log`, so the Inspector still shows them.
@@ -112,8 +136,9 @@ These two wrappers bypass the `request()` JSON funnel — they build a `FormData
 | -------------------------------- | ------ | ------------------------------------------------------- | ---------------------------------------------------------------------- |
 | `deployBpmn(name, xml)`          | POST   | `/repository/deployments`                               | Multipart fields: `file` (XML blob, named `<name>`), optional `tenantId`, `deploymentName` |
 | `deployDmn(name, xml)`           | POST   | `/dmn-repository/deployments` (on `dmnBase()`)          | Same shape, against the DMN sub-app                                    |
+| `deployBar(name, file)`          | POST   | `/app-repository/deployments` (on `appBase()`)          | Must use the App sub-app — BPMN sub-app silently skips `.app` manifest; DMN rejects `.bar`. Full cascade: AppDeployer → BpmnDeployer + DmnDeployer. See RC-17 in [runtime-caveats.md](./runtime-caveats.md). (FR-55) |
 
-> Flowable rejects the JSON-with-base64 deployment shape used by older mock-mode code paths. Multipart is the only supported route. See [src/api.js:186-228](../src/api.js#L186-L228).
+> Flowable rejects the JSON-with-base64 deployment shape. Multipart is the only supported route for all three deployers. See [src/api.ts](../src/api.ts).
 
 ## Diagnostics / helpers exported from `api`
 
@@ -122,6 +147,8 @@ These two wrappers bypass the `request()` JSON funnel — they build a `FormData
 | `api.config()`               | Returns a **copy** of the current connection config.                                                     |
 | `api.setConfig(partial)`     | Shallow-merges partial config into the live `cfg`, persists to `localStorage` (`flowatch.connection.v1`). |
 | `api.log()`                  | Returns a copy of `API_LOG` (most recent first, max 60 entries).                                         |
+| `api.getAuthStrategy()`      | Returns the currently installed `AuthStrategy` instance.                                                 |
+| `api.setAuthStrategy(s)`     | Installs a new `AuthStrategy`. Called by `installStrategyForActiveConnection()`.                         |
 | `API_LOG`                    | Live array, exported for direct read access by the Inspector.                                            |
 
 ## Error contract
@@ -137,4 +164,4 @@ Screens render these messages **verbatim** in `ErrorBox` — no friendly rewrite
 
 ## Local fixtures and seed data
 
-There are **no fixtures**. There is no `mocks/` folder. The repo policy is explicit: screens read live data or render empty/error states. The only embedded data in the codebase is the three starter XMLs in [modeler.jsx](../src/modeler.jsx) (`BLANK_BPMN_XML`, `LOAN_BPMN_XML`, `LOAN_DMN_XML`), and the per-screen endpoint metadata in [data.js](../src/data.js).
+There are **no fixtures**. There is no `mocks/` folder. The repo policy is explicit: screens read live data or render empty/error states. The only embedded data in the codebase is the three starter XMLs in [src/modeler/starters.ts](../src/modeler/starters.ts) (`BLANK_BPMN_XML`, `LOAN_BPMN_XML`, `LOAN_DMN_XML`), and the per-screen endpoint metadata in [src/data.js](../src/data.js).

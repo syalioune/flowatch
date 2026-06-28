@@ -1,0 +1,38 @@
+meta {
+  name: Execute timer job (fire now)
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/management/timer-jobs/{{jobId}}
+  body: json
+  auth: basic
+}
+
+body:json {
+  {
+    "action": "move"
+  }
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  jobId: PASTE_A_TIMER_JOB_ID
+}
+
+docs {
+  # Execute timer job ("fire now")
+
+  Timer-job IDs live in a different namespace than executable-job IDs —
+  POST /management/jobs/{timerId} returns 404. The "fire now" recipe is
+  `{ action: "move" }` which queues the timer to the executable-jobs
+  namespace; the async executor picks it up on its next poll.
+
+  Operator label: "Execute now". Wire-level verb: "move".
+  Related: PRD FR-25, RC-11 in docs/runtime-caveats.md.
+}

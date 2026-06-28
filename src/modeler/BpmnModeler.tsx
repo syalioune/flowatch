@@ -21,6 +21,8 @@ import React from "react";
 import { api, type FlowableProcessDefinition } from "../api";
 import { Icon, toast } from "../components";
 import { DeployBpmnModal, type DeployBpmnModalTarget } from "../lib/deploy-bpmn-modal";
+import { FlowablePropertiesPanel } from "./FlowablePropertiesPanel";
+import flowableModdle from "./flowable-moddle.json";
 import { BLANK_BPMN_XML, LOAN_BPMN_XML } from "./starters";
 
 // @migration-any: bpmn-js DI container, event-bus payloads, and BO shapes
@@ -52,23 +54,6 @@ interface CommandStackChangedEvent {
 }
 
 // ─── Element type helpers ───────────────────────────────────────────
-const bpmnKind = (el: AnyEl): string => {
-  if (!el || !el.type) return "—";
-  return (el.type as string).replace(/^bpmn:/, "");
-};
-const bpmnIconClass = (el: AnyEl): string => {
-  const t = bpmnKind(el);
-  if (t === "StartEvent") return "bpmn-icon-start-event-none";
-  if (t === "EndEvent") return "bpmn-icon-end-event-none";
-  if (t === "UserTask") return "bpmn-icon-user-task";
-  if (t === "ServiceTask") return "bpmn-icon-service-task";
-  if (t === "BusinessRuleTask") return "bpmn-icon-business-rule-task";
-  if (t === "ScriptTask") return "bpmn-icon-script-task";
-  if (t === "ExclusiveGateway") return "bpmn-icon-gateway-xor";
-  if (t === "ParallelGateway") return "bpmn-icon-gateway-parallel";
-  if (t === "SequenceFlow") return "bpmn-icon-connection";
-  return "bpmn-icon-task";
-};
 
 // PR #168 follow-up: turn an operator-typed filename into a Flowable-safe
 // process id. Strips the .bpmn(20).xml extension, replaces non-id chars
@@ -255,6 +240,13 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
       m = new BpmnModelerClass({
         container: containerRef.current as HTMLElement,
         keyboard: { bindTo: window },
+        // Story 30.1: register the Flowable moddle descriptor so every
+        // flowable: attribute + extensionElements child is TYPED — the
+        // load-bearing round-trip foundation (FR-38 / D-8 / ADR-006).
+        // Typed properties read via bo.get("flowable:<attr>") and write via
+        // modeling.updateProperties / updateModdleProperties; untyped/foreign
+        // content still survives via moddle's lax handling (AC-4).
+        moddleExtensions: { flowable: flowableModdle },
       });
     } catch (e) {
       setError(String(e));
@@ -392,25 +384,6 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
       search: newId ? { definitionId: newId } : {},
       replace: true,
     });
-  };
-
-  const updateName = (val: string) => {
-    const m = modelerRef.current;
-    if (!m || !selected) return;
-    m.get("modeling").updateProperties(selected, { name: val });
-  };
-  const updateExtAttr = (attr: string, val: unknown) => {
-    const m = modelerRef.current;
-    if (!m || !selected) return;
-    const modeling = m.get("modeling");
-    const props: Record<string, unknown> = {};
-    props[attr] = val;
-    try {
-      modeling.updateProperties(selected, props);
-    } catch {
-      (selected.businessObject as Record<string, unknown>)[attr] = val;
-      setVersion((v) => v + 1);
-    }
   };
 
   const saveXML = async () => {
@@ -642,9 +615,6 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
     else canvas.zoom(canvas.zoom() * ((dir as number) > 0 ? 1.15 : 1 / 1.15));
   };
 
-  const sel = selected;
-  const bo = sel && sel.businessObject;
-
   return (
     <div className="modeler" data-engine="real">
       <div className="mod-toolbar">
@@ -729,7 +699,14 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
           <Icon name="plus" size={13} />
           New
         </button>
-        <button type="button" className="btn" data-size="sm" data-variant="ghost" onClick={saveXML}>
+        <button
+          type="button"
+          className="btn"
+          data-size="sm"
+          data-variant="ghost"
+          data-testid="bpmn-save-xml"
+          onClick={saveXML}
+        >
           <Icon name="save" size={13} />
           Save
         </button>
@@ -838,261 +815,13 @@ export const BpmnModeler = ({ initialDefinitionId }: BpmnModelerProps) => {
         )}
       </div>
 
-      <div className="mod-props">
-        <div className="panel-hd">
-          <span className="panel-title">{sel ? "Properties" : "Outline"}</span>
-          {sel && (
-            <span
-              className="mono"
-              style={{ marginLeft: "auto", fontSize: 11, color: "var(--fg-mute)" }}
-            >
-              {bpmnKind(sel)}
-            </span>
-          )}
-        </div>
-        <div style={{ padding: sel ? 14 : 0, overflowY: "auto" }}>
-          {!sel && (
-            <div className="mod-outline-tree">
-              <div
-                className="out-row"
-                style={{ color: "var(--fg-mute)", paddingTop: 8, paddingBottom: 4 }}
-              >
-                <span
-                  className="mono"
-                  style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase" }}
-                >
-                  elements · {elements.length}
-                </span>
-              </div>
-              {elements.map((el) => (
-                <button
-                  type="button"
-                  key={el.id}
-                  className="out-row"
-                  onClick={() =>
-                    modelerRef.current && modelerRef.current.get("selection").select(el)
-                  }
-                >
-                  <span
-                    className={bpmnIconClass(el)}
-                    style={{ fontSize: 14, color: "var(--fg-soft)" }}
-                  />
-                  <span
-                    style={{
-                      flex: 1,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {(el.businessObject && el.businessObject.name) || el.id}
-                  </span>
-                  <span className="kind">{bpmnKind(el)}</span>
-                </button>
-              ))}
-              <div style={{ padding: "10px 14px" }}>
-                <div className="text-xs mute">
-                  Drag from the bpmn-js palette to add elements. Click any node to edit
-                  Flowable-specific attributes here. Use the dropdown above to load a deployed
-                  definition from the engine, or deploy this canvas as a new revision.
-                </div>
-              </div>
-            </div>
-          )}
-          {sel && (
-            <>
-              <div
-                data-testid="bpmn-properties-pending-banner"
-                style={{
-                  margin: "0 0 12px",
-                  padding: "10px 12px",
-                  background: "var(--bg-sunken)",
-                  border: "1px solid var(--warn)",
-                  borderRadius: 6,
-                  color: "var(--fg-soft)",
-                  fontSize: 12,
-                  lineHeight: 1.45,
-                }}
-              >
-                <strong style={{ color: "var(--warn)" }}>
-                  Flowable-specific properties pending
-                </strong>
-                <br />
-                Name &amp; XML id below persist via bpmn-js. Flowable extension attributes (Service
-                Task class / async, User Task assignee &amp; form key, Business Rule decisionRef, …)
-                render here but
-                <em> edits don't yet round-trip to the BPMN XML</em> — full support lands in Epic 30
-                (Flowable properties panel).
-              </div>
-              <div className="form-row">
-                <label>
-                  Name <span className="mono">bpmn:name</span>
-                </label>
-                <input
-                  className="input"
-                  key={sel.id + ":name:" + version}
-                  defaultValue={(bo && bo.name) || ""}
-                  onBlur={(e) => updateName(e.target.value)}
-                />
-              </div>
-              <div className="form-row">
-                <label>
-                  ID <span className="mono">XML id</span>
-                </label>
-                <input
-                  className="input mono"
-                  value={sel.id}
-                  readOnly
-                  style={{ fontFamily: "var(--font-mono)", opacity: 0.7 }}
-                />
-              </div>
-
-              {bpmnKind(sel) === "UserTask" && (
-                <>
-                  <div className="form-row">
-                    <label>
-                      Assignee <span className="mono">flowable:assignee</span>
-                    </label>
-                    <input
-                      className="input mono"
-                      key={sel.id + ":asg:" + version}
-                      defaultValue={bo.assignee || ""}
-                      placeholder="${initiator}"
-                      onBlur={(e) => updateExtAttr("assignee", e.target.value)}
-                    />
-                  </div>
-                  <div className="form-row">
-                    <label>
-                      Candidate groups <span className="mono">flowable:candidateGroups</span>
-                    </label>
-                    <input
-                      className="input mono"
-                      key={sel.id + ":cg:" + version}
-                      defaultValue={bo.candidateGroups || ""}
-                      onBlur={(e) => updateExtAttr("candidateGroups", e.target.value)}
-                    />
-                  </div>
-                  <div className="form-row">
-                    <label>
-                      Form key <span className="mono">flowable:formKey</span>
-                    </label>
-                    <input
-                      className="input mono"
-                      key={sel.id + ":fk:" + version}
-                      defaultValue={bo.formKey || ""}
-                      onBlur={(e) => updateExtAttr("formKey", e.target.value)}
-                    />
-                  </div>
-                  <div className="form-row">
-                    <label>
-                      Due date <span className="mono">flowable:dueDate · ISO</span>
-                    </label>
-                    <input
-                      className="input mono"
-                      key={sel.id + ":dd:" + version}
-                      defaultValue={bo.dueDate || ""}
-                      placeholder="P2D"
-                      onBlur={(e) => updateExtAttr("dueDate", e.target.value)}
-                    />
-                  </div>
-                </>
-              )}
-              {bpmnKind(sel) === "ServiceTask" && (
-                <>
-                  <div className="form-row">
-                    <label>Implementation</label>
-                    <select className="select" defaultValue="class">
-                      <option value="class">Java delegate (class)</option>
-                      <option value="expression">Expression</option>
-                      <option value="delegateExpression">Delegate expression</option>
-                    </select>
-                  </div>
-                  <div className="form-row">
-                    <label>
-                      Class <span className="mono">flowable:class</span>
-                    </label>
-                    <input
-                      className="input mono"
-                      key={sel.id + ":cls:" + version}
-                      defaultValue={bo.class || ""}
-                      placeholder="com.acme…"
-                      onBlur={(e) => updateExtAttr("class", e.target.value)}
-                    />
-                  </div>
-                  <div className="form-row">
-                    <label>
-                      Async <span className="mono">flowable:async</span>
-                    </label>
-                    <div className="seg-row">
-                      <button
-                        type="button"
-                        className="seg-btn"
-                        data-on={!bo.async ? "1" : "0"}
-                        onClick={() => updateExtAttr("async", false)}
-                      >
-                        No
-                      </button>
-                      <button
-                        type="button"
-                        className="seg-btn"
-                        data-on={bo.async ? "1" : "0"}
-                        onClick={() => updateExtAttr("async", true)}
-                      >
-                        Yes
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-              {bpmnKind(sel) === "BusinessRuleTask" && (
-                <>
-                  <div className="form-row">
-                    <label>
-                      Decision ref <span className="mono">flowable:decisionRef</span>
-                    </label>
-                    <input
-                      className="input mono"
-                      key={sel.id + ":dr:" + version}
-                      defaultValue={bo.decisionRef || ""}
-                      onBlur={(e) => updateExtAttr("decisionRef", e.target.value)}
-                    />
-                  </div>
-                  <div className="form-row">
-                    <label>Result variable</label>
-                    <input className="input mono" placeholder="decision" />
-                  </div>
-                </>
-              )}
-              {bpmnKind(sel) === "ExclusiveGateway" && (
-                <div className="form-row">
-                  <label>Default flow</label>
-                  <input className="input mono" placeholder="Flow_…" />
-                </div>
-              )}
-              {bpmnKind(sel) === "SequenceFlow" && (
-                <div className="form-row">
-                  <label>
-                    Condition <span className="mono">bpmn:conditionExpression</span>
-                  </label>
-                  <textarea
-                    className="textarea mono"
-                    key={sel.id + ":cond:" + version}
-                    defaultValue={(bo.conditionExpression && bo.conditionExpression.body) || ""}
-                    placeholder={'${decision == "approve"}'}
-                  />
-                </div>
-              )}
-
-              <div className="drawer-sect">REST</div>
-              <div className="code" style={{ whiteSpace: "pre-wrap" }}>
-                {`GET  /repository/process-definitions/{id}/model
-GET  /runtime/process-instances?processDefinitionKey=loanApproval&activityId=${sel.id}
-POST /runtime/process-instances`}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+      <FlowablePropertiesPanel
+        modelerRef={modelerRef}
+        selected={selected}
+        version={version}
+        bumpVersion={() => setVersion((v) => v + 1)}
+        elements={elements}
+      />
       <DeployBpmnModal
         target={deployTarget}
         onConfirm={doDeploy}

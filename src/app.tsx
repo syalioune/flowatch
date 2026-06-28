@@ -3,9 +3,27 @@
 import { Outlet, useNavigate, useRouter } from "@tanstack/react-router";
 import React from "react";
 import { api } from "./api";
-import { ApiInspector, SettingsModal, Sidebar, Toaster, Topbar } from "./components";
+import {
+  ApiInspector,
+  SettingsModal,
+  type SettingsTab,
+  Sidebar,
+  Toaster,
+  Topbar,
+} from "./components";
+import { VersionDriftBanner } from "./components/VersionDriftBanner";
+import {
+  installStrategyForActiveConnection,
+  REOPEN_SETTINGS_AFTER_RELOAD_KEY,
+  reloadIfOidcProviderMismatch,
+} from "./lib/install-auth-strategy";
 import { KeyboardCheatsheetModal } from "./lib/keyboard-cheatsheet-modal";
-import { NAV_INVALIDATE_COUNTS } from "./lib/nav-events";
+import {
+  NAV_INVALIDATE_COUNTS,
+  OPEN_SETTINGS_AUTH,
+  SAVED_CONNECTIONS_CHANGED,
+} from "./lib/nav-events";
+import { OIDC_AUTH_CHANGED } from "./lib/oidc-accessor";
 import { useRouteMeta } from "./lib/route-meta";
 import { listShortcutsByCategory } from "./lib/shortcuts";
 import "./lib/window-events";
@@ -55,6 +73,11 @@ interface Tenant {
 interface AppConnectionState {
   state: "pending" | "ok" | "err" | "unset";
   host: string;
+  // Story 31.1: the structured engine version from api.ping(), surfaced so
+  // <VersionDriftBanner> can compare it against __FLOWABLE_TESTED_VERSION__.
+  // Set ONLY on the "ok" commit — pending/err leave it undefined so the
+  // banner stays hidden when drift can't be determined (AC #6).
+  version?: string;
 }
 
 const DEFAULT_TENANT: Tenant = { id: "", name: "All tenants" };
@@ -70,6 +93,9 @@ function App() {
   const [focusEntry, setFocusEntry] = React.useState<{ id: string; seq: number } | null>(null);
   const focusSeqRef = React.useRef(0);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = React.useState<SettingsTab | undefined>(
+    undefined,
+  );
   const [cheatsheetOpen, setCheatsheetOpen] = React.useState(false);
   const navigate = useNavigate();
   const [tenants, setTenants] = React.useState<Tenant[]>([DEFAULT_TENANT]);
@@ -81,6 +107,17 @@ function App() {
   const [navCounts, setNavCounts] = React.useState<
     Partial<Record<"tasks" | "jobs" | "instances" | "batches" | "events", number | null>>
   >({});
+
+  // After an OIDC-provider reload, reopen Settings (Connection tab) so the
+  // operator can sign in without manually reopening the modal.
+  React.useEffect(() => {
+    const flag = sessionStorage.getItem(REOPEN_SETTINGS_AFTER_RELOAD_KEY);
+    if (flag) {
+      sessionStorage.removeItem(REOPEN_SETTINGS_AFTER_RELOAD_KEY);
+      setSettingsInitialTab("connection");
+      setSettingsOpen(true);
+    }
+  }, []);
 
   React.useEffect(() => {
     document.title = meta.title ? `${meta.title} · Flowatch` : "Flowatch";
@@ -128,7 +165,7 @@ function App() {
     commit({ state: "pending", host: "connecting…" });
     try {
       const r = await api.ping();
-      commit({ state: "ok", host: `${r.name} ${r.version} @ ${host}` });
+      commit({ state: "ok", host: `${r.name} ${r.version} @ ${host}`, version: r.version });
     } catch (_e) {
       commit({ state: "err", host: `unreachable: ${host}` });
     }
@@ -146,6 +183,37 @@ function App() {
     void probe();
     void refetchTenants();
   }, [probe, refetchTenants]);
+
+  // Story 28.2: install the AuthStrategy matching the active connection's
+  // authStrategyConfig.kind at app mount (honour the persisted kind at first
+  // paint) AND on every connection switch (SAVED_CONNECTIONS_CHANGED — the
+  // Topbar quick-switch / Manage dropdown). The Auth-tab Save calls the
+  // dispatcher itself; this listener covers the switch path.
+  React.useEffect(() => {
+    // Mount: install only (no reload — main.tsx already mounted the correct
+    // provider for the persisted active kind, so a reload would be redundant /
+    // could loop). Switch: install + reload if the OIDC provider state changed.
+    installStrategyForActiveConnection();
+    const handler = (): void => {
+      installStrategyForActiveConnection();
+      reloadIfOidcProviderMismatch();
+    };
+    window.addEventListener(SAVED_CONNECTIONS_CHANGED, handler);
+    return () => window.removeEventListener(SAVED_CONNECTIONS_CHANGED, handler);
+  }, []);
+
+  // Story 28.3: a 401 under Bearer (BearerAuthStrategy.onUnauthorized) dispatches
+  // OPEN_SETTINGS_AUTH so the operator can re-paste a token. Open Settings at the
+  // Authentication tab. Idempotent under a 401 retry-storm — opening an already-
+  // open modal at the same tab is a no-op (React bails on identical state).
+  React.useEffect(() => {
+    const handler = (): void => {
+      setSettingsInitialTab("connection");
+      setSettingsOpen(true);
+    };
+    window.addEventListener(OPEN_SETTINGS_AUTH, handler);
+    return () => window.removeEventListener(OPEN_SETTINGS_AUTH, handler);
+  }, []);
 
   // Story 23.1: a connection switch (Topbar `.connection-switch` chip OR the
   // SettingsModal Manage section dropdown) funnels through `api.setConfig` →
@@ -226,6 +294,25 @@ function App() {
     window.addEventListener(NAV_INVALIDATE_COUNTS, handler);
     return () => window.removeEventListener(NAV_INVALIDATE_COUNTS, handler);
   }, [refreshNavCounts]);
+
+  // Story 28.4 (smoke fix): react-oidc-context finishes the token exchange
+  // ASYNC after mount, so the dashboard's first probe / nav-count / loader
+  // fetches fire BEFORE the OIDC access token is available (no Authorization
+  // header → engine 401s, screens stuck on errors). When the bridge reports an
+  // auth-state change (sign-in / silent-renew completes), re-run the data
+  // fetches so the now-available Bearer token is applied. Fires on every
+  // OIDC_AUTH_CHANGED (incl. the pre-auth bridge mount) — the extra pre-token
+  // refetch is harmless (same no-header result as the initial load).
+  React.useEffect(() => {
+    const handler = (): void => {
+      void probe();
+      void refetchTenants();
+      void refreshNavCounts();
+      void router.invalidate();
+    };
+    window.addEventListener(OIDC_AUTH_CHANGED, handler);
+    return () => window.removeEventListener(OIDC_AUTH_CHANGED, handler);
+  }, [probe, refetchTenants, refreshNavCounts, router]);
 
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -395,6 +482,7 @@ function App() {
         onSettings={() => setSettingsOpen(true)}
         onTweaks={handleTweaks}
       />
+      <VersionDriftBanner detected={conn.version} />
       <main className="main">
         <Outlet />
       </main>
@@ -407,7 +495,11 @@ function App() {
         focusEntry={focusEntry}
       />
 
-      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        initialTab={settingsInitialTab}
+      />
 
       <KeyboardCheatsheetModal open={cheatsheetOpen} onClose={() => setCheatsheetOpen(false)} />
 

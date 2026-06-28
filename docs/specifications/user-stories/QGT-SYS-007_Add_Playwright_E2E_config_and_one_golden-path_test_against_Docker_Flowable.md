@@ -14,7 +14,7 @@ As CI, I want one Playwright E2E test that exercises the full operator path (dep
 **Acceptance Criteria:**
 
 **Given** the Docker Compose stack is defined (existing `docker-compose.yml`)
-**When** `playwright.config.ts` is added with a `webServer` block that starts `docker compose up` (foreground — `-d` exits before the URL probe can respond and Playwright treats early process-exit as fatal) + waits for `/management/engine` to return 200, and `e2e/golden-path.spec.ts` walks the deploy → start → claim → complete → history flow
+**When** `playwright.config.ts` is added with a `webServer` block that starts `docker compose up -d` + waits for `/management/engine` to return 200, and `e2e/golden-path.spec.ts` walks the deploy → start → claim → complete → history flow
 **Then** `npx playwright test` exits 0 with the test passing
 **And** the test uses real Flowable, no mocks (Pattern P-009)
 **And** Docker teardown happens in the `webServer.gracefulShutdown` config.

@@ -1,0 +1,35 @@
+meta {
+  name: Add task attachment (file)
+  type: http
+  seq: 18
+}
+
+post {
+  url: {{baseUrl}}/runtime/tasks/{{taskId}}/attachments
+  body: multipartForm
+  auth: basic
+}
+
+body:multipart-form {
+  name: My attachment
+  ~description: Optional description
+  ~type: application/pdf
+  content: @file()
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  taskId: PASTE_A_TASK_ID
+}
+
+docs {
+  # Add task attachment (file / binary mode)
+
+  Multipart POST. Field names: name (required), description (optional),
+  type (optional MIME), content (binary file). Engine returns 200 OK with
+  the echoed FlowableAttachment. Related: PRD FR-45, Story 21.2.
+}

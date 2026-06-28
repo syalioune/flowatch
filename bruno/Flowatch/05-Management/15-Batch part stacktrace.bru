@@ -1,0 +1,31 @@
+meta {
+  name: Batch part exception stacktrace
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{baseUrl}}/management/batch-parts/{{batchPartId}}/exception-stacktrace
+  body: none
+  auth: basic
+}
+
+headers {
+  Accept: text/plain
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  batchPartId: PASTE_A_BATCH_PART_ID
+}
+
+docs {
+  # Batch part exception stacktrace
+
+  Returns raw text. 404 when the batch part has no failure stacktrace.
+  Related: PRD FR-53.
+}

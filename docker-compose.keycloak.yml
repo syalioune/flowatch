@@ -1,0 +1,59 @@
+# Temporary Keycloak OIDC test fixture (Story 28.4).
+#
+# Standalone compose file — NOT part of the engine stack (docker-compose.yml).
+# Brings up a Keycloak in dev mode that auto-imports the `flowatch` realm
+# (public PKCE client + two test users) so the OIDC AuthStrategy can be
+# exercised end-to-end against a real IdP. The default Flowable engine is
+# Basic-only, so it cannot validate the IdP's JWTs — this fixture proves the
+# FLOW (redirect -> callback -> in-memory token -> header swap -> silent renew
+# -> sign-out), per ADR-009 / RC-18.
+#
+#   make keycloak-up     # or: docker compose -f docker-compose.keycloak.yml up -d
+#   make keycloak-down
+#
+# Admin console:  http://localhost:8081/  (admin / admin)
+# Issuer (OIDC):  http://localhost:8081/realms/flowatch
+#
+# Flowatch Settings -> Authentication -> OIDC:
+#   Issuer URL : http://localhost:8081/realms/flowatch
+#   Client ID  : flowatch
+#   Scopes     : openid, profile, email, offline_access
+#
+# Tokens live ONLY in memory (NFR-11). This is a throwaway dev fixture — never
+# deploy it; the credentials below are intentionally weak and public.
+
+# Distinct project name so this fixture is independent of the engine stack
+# (docker-compose.yml, project "flowatch") — no orphan-container warnings, and
+# `keycloak-down` never touches the engine.
+name: flowatch-keycloak
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: flowatch-keycloak
+    command: ["start-dev", "--import-realm", "--http-port=8080"]
+    environment:
+      # Keycloak 26 bootstrap admin (admin console only — not the test realm).
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      # Dev-mode hostname handling: derive issuer from the request host so
+      # tokens carry http://localhost:8081/realms/flowatch (matches what
+      # oidc-client-ts requests). No KC_HOSTNAME needed in start-dev.
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      # Host 8081 -> container 8080 (Flowable owns host 8080).
+      - "8081:8080"
+    volumes:
+      - ./keycloak/flowatch-realm.json:/opt/keycloak/data/import/flowatch-realm.json:ro
+    healthcheck:
+      # Keycloak 26 exposes health on the management port (9000) by default.
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '\"status\": \"UP\"'",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s

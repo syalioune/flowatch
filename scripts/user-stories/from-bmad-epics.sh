@@ -226,10 +226,22 @@ while IFS=$'\t' read -r epic_num epic_title story_num story_title body_enc miles
   filename="${prefix}_${safe_title}.md"
   filepath="$OUT_DIR/$filename"
 
-  # Clobber any existing file at this slug. Hand-curated edits do not survive
-  # re-emit; recover them via `git diff` or `git restore`. This avoids the
-  # -v2/-v3/... accumulation that the previous non-destructive guard produced
-  # whenever the same slug was regenerated across successive shard runs.
+  # Clobber any existing file at this slug. Hand-curated body edits do not
+  # survive re-emit; recover them via `git diff` or `git restore`. This avoids
+  # the -v2/-v3/... accumulation that the previous non-destructive guard
+  # produced whenever the same slug was regenerated across successive runs.
+  #
+  # EXCEPTION — lifecycle state is PRESERVED. The `State:` header (and its
+  # `state:` label) is hand-bumped as stories ship (backlog → in-progress →
+  # done); the epics.md source carries no per-story state, so re-deriving it
+  # would clobber `done` back to `backlog` and churn every shipped story on
+  # every re-shard. Carry the existing file's state forward; new files default
+  # to backlog.
+  state="backlog"
+  if [ -f "$filepath" ]; then
+    prev_state="$(sed -n 's/^> \*\*State\*\*: *//p' "$filepath" | head -1 | tr -d '[:space:]')"
+    [ -n "$prev_state" ] && state="$prev_state"
+  fi
 
   # Write the story file with metadata header + verbatim body.
   cat > "$filepath" <<MD
@@ -240,8 +252,8 @@ while IFS=$'\t' read -r epic_num epic_title story_num story_title body_enc miles
 > **Epic**: ${epic_num} — ${epic_title}
 > **Milestone**: ${milestone}
 > **Source**: \`_bmad-output/planning-artifacts/epics.md\` (story ${story_num})
-> **State**: backlog
-> **Labels**: type:user-story, state:backlog, area:$(echo "$AREA" | tr '[:upper:]' '[:lower:]'), release:${milestone}
+> **State**: ${state}
+> **Labels**: type:user-story, state:${state}, area:$(echo "$AREA" | tr '[:upper:]' '[:lower:]'), release:${milestone}
 
 ${body}
 MD
@@ -249,7 +261,7 @@ MD
   # Append a row to the CSV. Body is the story body verbatim (escaped).
   title_field="$(csv_escape "${prefix}: ${story_title}")"
   body_field="$(csv_escape "$body")"
-  labels_field="$(csv_escape "type:user-story,state:backlog,area:$(echo "$AREA" | tr '[:upper:]' '[:lower:]'),release:${milestone}")"
+  labels_field="$(csv_escape "type:user-story,state:${state},area:$(echo "$AREA" | tr '[:upper:]' '[:lower:]'),release:${milestone}")"
   milestone_field="$(csv_escape "$milestone")"
   printf '%s,%s,%s,%s\n' "$title_field" "$body_field" "$labels_field" "$milestone_field" >> "$CSV"
 

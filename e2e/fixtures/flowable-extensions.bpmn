@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:flowable="http://flowable.org/bpmn"
+                  xmlns:custom="http://acme.example/custom"
+                  id="defs_flowable_ext"
+                  targetNamespace="http://flowable.org/processdef">
+  <bpmn:process id="extProc" name="Extensions process" isExecutable="true"
+                flowable:candidateStarterGroups="managers">
+    <bpmn:startEvent id="start" flowable:initiator="starterUser" flowable:formKey="startForm" />
+    <bpmn:userTask id="review" name="Review"
+                   flowable:assignee="kermit"
+                   flowable:candidateGroups="sales,support"
+                   flowable:formKey="reviewForm"
+                   flowable:priority="50"
+                   flowable:async="true"
+                   flowable:exclusive="true">
+      <bpmn:extensionElements>
+        <flowable:taskListener event="create" class="com.acme.CreateListener" onTransaction="before-commit" />
+        <flowable:executionListener event="end" delegateExpression="${endListener}" />
+      </bpmn:extensionElements>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="charge" name="Charge"
+                      flowable:class="com.acme.ChargeDelegate"
+                      flowable:resultVariableName="receipt"
+                      flowable:async="true"
+                      flowable:asyncLeave="true">
+      <bpmn:extensionElements>
+        <flowable:field name="endpoint">
+          <flowable:string>https://payments.acme.example</flowable:string>
+        </flowable:field>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:callActivity id="subCall" name="Sub" calledElement="subProc"
+                       flowable:calledElementType="key"
+                       flowable:inheritBusinessKey="true">
+      <bpmn:extensionElements>
+        <flowable:in source="orderId" target="orderId" />
+        <flowable:out source="result" target="subResult" />
+        <!-- An extension with NO dedicated panel field — must still round-trip -->
+        <custom:audit channel="legacy" />
+      </bpmn:extensionElements>
+    </bpmn:callActivity>
+    <bpmn:endEvent id="end" />
+    <bpmn:sequenceFlow id="f1" sourceRef="start" targetRef="review" />
+    <bpmn:sequenceFlow id="f2" sourceRef="review" targetRef="charge" />
+    <bpmn:sequenceFlow id="f3" sourceRef="charge" targetRef="subCall" />
+    <bpmn:sequenceFlow id="f4" sourceRef="subCall" targetRef="end" />
+  </bpmn:process>
+</bpmn:definitions>

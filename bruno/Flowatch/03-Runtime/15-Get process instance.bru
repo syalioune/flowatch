@@ -1,0 +1,20 @@
+meta {
+  name: Get process instance
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{baseUrl}}/runtime/process-instances/{{instanceId}}
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  instanceId: PASTE_AN_INSTANCE_ID
+}

@@ -58,10 +58,17 @@ test.describe("Story 18.4 — g-prefix nav chord", () => {
   test("g d navigates to Dashboard", async ({ page }) => {
     await page.goto("/deployments");
     await page.waitForLoadState("networkidle").catch(() => {});
+    // The g-chord keydown listener attaches in an App-level useEffect — wait for
+    // the sidebar to be mounted (proves the effect has run) before firing keys,
+    // otherwise the first `g` can land before the listener exists (flakes under
+    // parallel load). Sidebar links are href-based per CLAUDE.md (Epic 24 retro).
+    await page.locator('a[href="/"]').first().waitFor({ state: "visible" });
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await page.keyboard.press("g");
     await page.keyboard.press("d");
-    await expect(page).toHaveURL(/\/$/);
+    // waitForURL (with timeout) over toHaveURL — explicit wait matches the
+    // sibling chord tests and tolerates navigation latency under load.
+    await page.waitForURL(/\/$/, { timeout: 5000 });
   });
 
   test("g i navigates to Instances", async ({ page }) => {

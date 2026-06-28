@@ -293,7 +293,7 @@ The runtime-variable endpoint at `/runtime/process-instances/{id}/variables` kee
 
 ---
 
-## RC-13 — `/history/historic-process-instances/{id}` is created EAGERLY at start, not lazily at end
+## RC-19 — `/history/historic-process-instances/{id}` is created EAGERLY at start, not lazily at end
 
 **Naive intuition:** the historic surface only knows about an instance once it has ENDED. `GET /history/historic-process-instances/{id}` 404s for a currently-running instance; the historic record appears only after the engine archives the lifecycle.
 
@@ -306,6 +306,8 @@ This means:
 **Workaround:** treat the historic panel's `endTime`-missing case as "this is a snapshot of an instance currently in flight" rather than as a "no historic record" path. The `<InstanceHistoricPanel>` already does this via the warn/`historic` badge. Render code that wants to gate on "instance has truly ended" should check `h.endTime != null` rather than `historic.data != null`. E2E assertions should target the badge element (`.badge[data-tone="mute"]` for ended, `.badge[data-tone="warn"]` for in-flight) — not the bare text "ended" / "historic", which collides with the `<td>Ended</td>` row label under Playwright's case-insensitive substring match.
 
 **Surfaced by:** Story 13.1 post-PR E2E run (2026-05-26) — the dual-fetch spec's "running instance ⇒ historic panel empty state" assertion failed because the historic record was populated; the panel was already rendering the in-flight badge correctly (matching the spec author's "endTime unpopulated — uncommon but possible" branch), but the test's empty-state assertion was the wrong contract for a running-instance shape.
+
+_(Previously mis-numbered RC-13 — renumbered to RC-19 to resolve collision with the JUEL-not-FEEL entry below.)_
 
 ---
 
@@ -498,6 +500,24 @@ Filed downstream notes for follow-up:
 **Workaround:** Flowatch's `api.deployBar` wrapper ([src/api.ts](../src/api.ts)) POSTs to `/app-api/app-repository/deployments` — a single multipart upload covers app-def + BPMN + DMN registration. The child BPMN deployment that the engine spawns appears in `/repository/deployments` with `parentDeploymentId` pointing at the parent app-deployment id (standalone BPMN deploys carry `parentDeploymentId === id`); the parent-vs-self mismatch is the BAR discriminator the `/deployments` list loader uses to tag rows as `kind="bar"` ([src/routes/deployments/index.tsx](../src/routes/deployments/index.tsx)).
 
 **Surfaced by:** Story 25.1 live-engine probes (2026-06-01 / 2026-06-02). The first walkthrough chose the BPMN endpoint (per spec) and discovered the missing app-def registration. A second walkthrough fanned the archive across all three sub-apps in parallel and hit the `act_uniq_procdef` unique-key collision. The third walkthrough — driven by an operator probe with a Flowable-Modeler-exported `orderApp.bar` — confirmed that the App sub-app alone handles the cascade correctly, and the manifest-vs-BPMN key mismatch silently suppresses the BPMN extraction (the failure mode is "no error, just no child BPMN registration"). The implementation now POSTs `.bar` archives to `/app-api/app-repository/deployments` exclusively.
+
+---
+
+## RC-18 — OIDC `<AuthProvider>` config is render-time; switching auth method at runtime requires a page reload, and the engine side is the operator's responsibility
+
+**Naive intuition:** selecting OIDC in the Settings Authentication tab and saving should immediately authenticate `api.*` calls with the IdP token, the way switching to Basic/Bearer does (no reload).
+
+**Actual behaviour (Story 28.4):** `react-oidc-context`'s `<AuthProvider>` is configured ONCE at root render ([src/main.tsx](../src/main.tsx)) from the active connection's persisted `{issuer, clientId, scopes}`. There is no first-class way to swap the provider's config at runtime without remounting the React root. So switching INTO OIDC (or OUT of it, or between two OIDC issuers) triggers a guarded `window.location.reload()` (`reloadIfOidcProviderMismatch()` in [src/lib/install-auth-strategy.ts](../src/lib/install-auth-strategy.ts)) — the config persists first, the reload re-runs `main.tsx` which mounts the right provider. The reload is a no-op at app mount (the provider already matches the persisted kind) so it cannot loop. A fully-dynamic provider swap without reload is a deferred refinement.
+
+**Engine-side boundary (ADR-009):** Flowatch only SENDS `Authorization: Bearer <oidc-access-token>`. The Flowable engine must be configured (operator-side Spring Security) to accept the IdP's JWTs. The default `make stack` Flowable image is Basic-only, so an OIDC-active call against it 401s — this is EXPECTED, not a bug. The smoke probe therefore verifies the FLOW (redirect → callback → in-memory token → header swap → silent renew → sign-out), not a live 200 against the Basic engine. "Flowatch cannot solve the engine side."
+
+**Resource-401 must NOT trigger an interactive redirect (loop guard).** Because the Basic-only engine 401s every OIDC call, an `OidcAuthStrategy.onUnauthorized()` that called `signinRedirect()` produced an INFINITE redirect loop: app loads → first probe 401s → redirect to IdP → sign in → back → next call 401s → redirect → … The browser never settles on the app. **Fix:** `onUnauthorized()` does a DEBOUNCED (≤1 per 10 s) best-effort SILENT renew (`signinSilent()`, iframe, no top-level navigation) and swallows failures; it NEVER `signinRedirect()`s. Interactive sign-in is USER-initiated via the Auth-tab button only. Likewise `getToken()` must not call `signinSilent()` per request (it runs on every `api.*` call — iframe storm).
+
+**Strategy must be installed BEFORE the first API call.** `installStrategyForActiveConnection()` is called at module load in [src/main.tsx](../src/main.tsx) (before render). Otherwise the earliest mount-effect calls (engine probe, nav-count badges) fire under the module-default `BasicAuthStrategy`, which — for an OIDC connection whose username/password are empty — emits `Authorization: Basic Og==` (`btoa(":")`). The app.tsx mount effect + `SAVED_CONNECTIONS_CHANGED` listener still handle runtime switches.
+
+**NFR-11 (in-memory tokens) — the default is NOT in-memory.** oidc-client-ts' DEFAULT `userStore` is `window.sessionStorage`, NOT in-memory (verified in `oidc-client-ts.d.ts`). To honour NFR-11, [src/lib/oidc-provider.tsx](../src/lib/oidc-provider.tsx) passes an explicit `userStore: new WebStorageStateStore({ store: new InMemoryWebStorage() })`. The `stateStore` is LEFT as the default `localStorage` — it holds the transient PKCE `code_verifier` + `state` that MUST survive the full-page redirect round-trip to the IdP (an in-memory stateStore would be wiped by the navigation → token exchange fails with "no matching state"). After this fix a reviewer confirms (DevTools → Application) that no access/refresh token touches web storage; only the OIDC `{issuer, clientId, scopes}` CONFIG persists. A page reload requires re-auth (silent renew if the IdP session cookie is still valid).
+
+**Surfaced by:** Story 28.4 implementation + live-Keycloak smoke (2026-06-07; `docs/oidc-testing.md` fixture). The smoke caught the redirect loop, the `Basic Og==` strategy-ordering leak, and the sessionStorage-default token-storage gap — all three fixed + re-verified end-to-end (token exchanged 200, Flowable calls carry `Bearer <jwt>`, no token in web storage). The reload-on-switch is the deliberate scope boundary; the engine-side + in-memory boundaries are the load-bearing operator/security contracts.
 
 ---
 

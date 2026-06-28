@@ -5,14 +5,14 @@ meta {
 }
 
 post {
-  url: {{baseUrl}}/identity/users/{{userId}}/groups
+  url: {{baseUrl}}/identity/groups/{{groupId}}/members
   body: json
   auth: basic
 }
 
 body:json {
   {
-    "groupId": "managers"
+    "userId": "{{userId}}"
   }
 }
 
@@ -23,6 +23,17 @@ auth:basic {
 
 vars:pre-request {
   userId: rest-admin
+  groupId: managers
 }
 
-docs { Related: PRD FR-30. }
+docs {
+  # Add user to group
+
+  Flowable 7.2 OSS only honours the group-centric route:
+  POST /identity/groups/{groupId}/members with body { userId }.
+  The inverse user-centric route (POST /identity/users/{userId}/groups)
+  returns HTTP 500 on the live engine — confirmed via Bruno during 14.3
+  post-closure verification.
+
+  Related: PRD FR-30.
+}

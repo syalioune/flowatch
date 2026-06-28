@@ -2,10 +2,8 @@
 #
 # Stryker mutation testing — scoped to src/api.ts (see stryker.config.mjs).
 # Standalone workflow because Stryker is several minutes per file and
-# shouldn't slow down the unit hot path. NOT in required_checks.json —
-# advisory only, no threshold gating (policy decision; see the proposal
-# at _bmad-output/planning-artifacts/sprint-change-proposal-2026-05-17-
-# quality-gates.md §4.4).
+# shouldn't slow down the unit hot path. In required_checks.json as
+# "Stryker (src/api.ts)" — threshold-gated at 70% (see stryker.config.mjs).
 #
 # Triggers:
 #   - PR to main / develop  → score is computed per-PR; report uploaded

@@ -14,6 +14,16 @@
 
 A single-page React + Vite GUI for **[Flowable](https://www.flowable.com/open-source/)** 7.x and beyond — the open-source BPMN/DMN process engine. Flowatch wraps the Flowable REST API and embeds the official [`bpmn-js`](https://bpmn.io/toolkit/bpmn-js/) and [`dmn-js`](https://bpmn.io/toolkit/dmn-js/) modelers in the browser. The app talks **only to the live engine** — there is no mock fallback. When the engine is unreachable, screens render explicit error states.
 
+<p align="center">
+  <img src="branding/screenshots/dashboard-editorial-light.png" alt="Flowatch Dashboard in the editorial look (light theme): process-engine overview tiles for deployments, running instances, open tasks, and jobs." width="32%">
+  <img src="branding/screenshots/dashboard-terminal-dark.png" alt="Flowatch Dashboard in the terminal look (dark theme): the same overview in a monospace, high-contrast dark identity." width="32%">
+  <img src="branding/screenshots/dashboard-industrial-dark.png" alt="Flowatch Dashboard in the industrial look (dark theme): the same overview in the industrial type identity." width="32%">
+</p>
+
+<p align="center">
+  <img src="branding/screenshots/instance-detail-editorial-light.png" alt="Flowatch process-instance detail: a running BPMN diagram with the live current-activity overlay highlighting the active 'Provide new sales lead' task, the Runtime/History/Audit tabs, and the API Inspector endpoint chips listing every REST call the screen makes." width="88%">
+</p>
+
 ## Why Flowatch exists
 
 Flowatch gives Flowable 7+ OSS users a complete browser GUI: model BPMN and DMN, deploy them, watch instances, work tasks, inspect jobs and history, and manage identity — all without writing curl commands.
@@ -60,7 +70,7 @@ The image carries only the static SPA bundle and a tiny nginx — no Node, no JR
 
 ```bash
 make install     # npm ci
-make stack       # postgres + flowable-rest 7.2.0 + nginx (:8080) + Vite (:5173)
+make stack       # postgres + flowable-rest 7.2.0 (native CORS :8080) + Vite (:5173)
 ```
 
 Without `make`:
@@ -82,7 +92,7 @@ Default credentials (configurable in the Settings modal): `rest-admin` / `test`.
 
 Health-check the engine: `make engine-health` (or `curl -u rest-admin:test http://localhost:8080/flowable-rest/service/management/engine`).
 
-**First boot pulls ~700 MB of Docker images** (postgres + flowable-rest 7.2.0 + nginx). Expect a green-light Dashboard within 2 minutes on broadband. Subsequent boots reuse the images and finish in well under a minute.
+**First boot pulls ~500 MB of Docker images** (postgres + flowable-rest 7.2.0). Expect a green-light Dashboard within 2 minutes on broadband. Subsequent boots reuse the images and finish in well under a minute.
 
 The sidebar footer shows a connection pill: **green** = engine reachable, **red** = unreachable. Click the pill to open the Settings modal and reconfigure the base URL or credentials.
 
@@ -93,7 +103,7 @@ The sidebar footer shows a connection pill: **green** = engine reachable, **red*
 
 **If the indicator stays red:**
 
-- `make engine-logs` to tail flowable + nginx + postgres.
+- `make engine-logs` to tail flowable + postgres.
 - `lsof -i :8080` (or `ss -ltnp '( sport = :8080 )'`) to check the port isn't held.
 - Docker daemon running? `docker ps` should return without error.
 - Credentials in the Settings modal match `rest-admin` / `test` (or whatever you've set).
@@ -110,7 +120,7 @@ The sidebar footer shows a connection pill: **green** = engine reachable, **red*
 | `make dev`            | `npm run dev`                            | Vite dev server with HMR (assumes engine is up)       |
 | `make build`          | `npm run build`                          | Production bundle to `dist/`                          |
 | `make preview`        | `npm run preview`                        | Serve the production bundle locally                   |
-| `make engine-up`      | `docker compose up -d`                   | Start the Docker stack (postgres + flowable + nginx)  |
+| `make engine-up`      | `docker compose up -d`                   | Start the Docker stack (postgres + flowable with native CORS) |
 | `make engine-up-flowatch` | `docker compose --profile flowatch up -d` | Same stack + the published Flowatch SPA image on `:5173` |
 | `make engine-down`    | `docker compose down`                    | Stop & remove engine containers                       |
 | `make engine-logs`    | `docker compose logs -f`                 | Tail logs from all engine services                    |
@@ -126,7 +136,7 @@ No test suite, linter, or formatter is configured yet.
 | A guided overview of what Flowatch is        | [docs/project-overview.md](docs/project-overview.md) |
 | Architecture, request flow, theming layers  | [docs/architecture.md](docs/architecture.md)         |
 | Local setup & build details                 | [docs/development-guide.md](docs/development-guide.md) |
-| Docker stack & nginx CORS proxy             | [docs/deployment-guide.md](docs/deployment-guide.md) |
+| Docker stack & native Flowable CORS         | [docs/deployment-guide.md](docs/deployment-guide.md) |
 | Flowable REST wrappers exported by `api.js` | [docs/api-contracts.md](docs/api-contracts.md)       |
 
 The full doc index lives at [docs/index.md](docs/index.md).
@@ -137,7 +147,7 @@ The full doc index lives at [docs/index.md](docs/index.md).
 
 ## AI-assisted development
 
-Flowatch is built openly with AI as a first-class collaborator. Treat that as a feature, not a disclaimer: it's how a single maintainer can deliver Flowable-grade scope on a community budget. Every commit is human-reviewed and the maintainer (`Signed-off-by: Alioune SY`) carries the DCO; an `Co-Authored-By: Claude Opus 4.x` trailer is appended whenever an agent materially co-wrote the change.
+Flowatch is built openly with AI as a first-class collaborator. Treat that as a feature, not a disclaimer: it's how a single maintainer can deliver Flowable-grade scope on a community budget. See [docs/claude-code-token-metrics.md](docs/claude-code-token-metrics.md) for the full token-usage breakdown across the road to v1.0.0. Every commit is human-reviewed and the maintainer (`Signed-off-by: Alioune SY`) carries the DCO; an `Co-Authored-By: Claude Opus 4.x` trailer is appended whenever an agent materially co-wrote the change.
 
 **Tools the project uses:**
 

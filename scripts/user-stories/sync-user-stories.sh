@@ -177,7 +177,10 @@ done < <(jq -r '.[] | [.number, .state, .title, .url,
 declare -A LOCAL_FILES   # filename -> 1
 
 while IFS= read -r -d '' file; do
-  LOCAL_FILES["$(basename "$file")"]="1"
+  base="$(basename "$file")"
+  # README.md is the directory's own index, not a user-story file — never drift.
+  [[ "$base" == "README.md" ]] && continue
+  LOCAL_FILES["$base"]="1"
 done < <(find "$STORIES_DIR" -maxdepth 1 -type f -name '*.md' -print0)
 
 # --- diff ------------------------------------------------------------------

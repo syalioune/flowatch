@@ -1,0 +1,29 @@
+meta {
+  name: Get task attachment content (binary)
+  type: http
+  seq: 19
+}
+
+get {
+  url: {{baseUrl}}/runtime/tasks/{{taskId}}/attachments/{{attachmentId}}/content
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  taskId: PASTE_A_TASK_ID
+  attachmentId: PASTE_AN_ATTACHMENT_ID
+}
+
+docs {
+  # Get task attachment binary content
+
+  Only valid for file-mode attachments. URL-mode attachments are opened
+  via their externalUrl directly — this endpoint returns 404 for them.
+  Related: PRD FR-45, Story 21.3.
+}

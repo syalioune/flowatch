@@ -515,19 +515,19 @@
 }
 .ep-method[data-m="GET"] {
   background: color-mix(in oklab, var(--info) 18%, transparent);
-  color: var(--info);
+  color: var(--info-fg);
 }
 .ep-method[data-m="POST"] {
   background: color-mix(in oklab, var(--ok) 18%, transparent);
-  color: var(--ok);
+  color: var(--ok-fg);
 }
 .ep-method[data-m="PUT"] {
   background: color-mix(in oklab, var(--warn) 22%, transparent);
-  color: var(--warn);
+  color: var(--warn-fg);
 }
 .ep-method[data-m="DELETE"] {
   background: color-mix(in oklab, var(--bad) 18%, transparent);
-  color: var(--bad);
+  color: var(--bad-fg);
 }
 .ep-chip-row {
   display: flex;
@@ -871,22 +871,22 @@
   background: currentColor;
 }
 .badge[data-tone="ok"] {
-  color: var(--ok);
+  color: var(--ok-fg);
   background: color-mix(in oklab, var(--ok) 12%, transparent);
   border-color: color-mix(in oklab, var(--ok) 30%, transparent);
 }
 .badge[data-tone="warn"] {
-  color: var(--warn);
+  color: var(--warn-fg);
   background: color-mix(in oklab, var(--warn) 14%, transparent);
   border-color: color-mix(in oklab, var(--warn) 32%, transparent);
 }
 .badge[data-tone="bad"] {
-  color: var(--bad);
+  color: var(--bad-fg);
   background: color-mix(in oklab, var(--bad) 14%, transparent);
   border-color: color-mix(in oklab, var(--bad) 32%, transparent);
 }
 .badge[data-tone="info"] {
-  color: var(--info);
+  color: var(--info-fg);
   background: color-mix(in oklab, var(--info) 14%, transparent);
   border-color: color-mix(in oklab, var(--info) 32%, transparent);
 }
@@ -1024,6 +1024,42 @@
   stroke: var(--fg-soft) !important;
 }
 
+/* form-js viewer chrome blend (Story 29.1, Pattern P-007).
+   @bpmn-io/form-js exposes its own `--color-*` design tokens on
+   `.fjs-container`; rather than fight its rules per-element, we remap those
+   tokens to Flowatch's data-look / data-theme CSS variables so the form
+   inherits the active look + theme automatically. No hard-coded colors —
+   every value resolves through the existing token vocabulary. */
+.form-js-host .fjs-container {
+  --color-text: var(--fg);
+  --color-text-light: var(--fg-soft);
+  --color-text-lighter: var(--fg-mute);
+  --color-text-lightest: var(--fg-mute);
+  --color-background: var(--bg-elev);
+  --color-background-disabled: var(--bg-sunken);
+  --color-background-readonly: var(--bg-sunken);
+  --color-borders: var(--line);
+  --color-borders-group: var(--line);
+  --color-borders-disabled: var(--line);
+  --color-borders-readonly: var(--line);
+  --color-accent: var(--accent);
+  --color-warning: var(--bad);
+  font-family: var(--font-body, inherit);
+}
+.form-js-host .fjs-form-field-label {
+  color: var(--fg-soft);
+}
+.form-js-host .fjs-input,
+.form-js-host .fjs-textarea,
+.form-js-host .fjs-select {
+  background: var(--bg-elev);
+  color: var(--fg);
+  border-color: var(--line);
+}
+.form-js-host .fjs-form-field-error {
+  color: var(--bad);
+}
+
 /* DMN decision-table chrome blend */
 .dmn-host .dmn-decision-table-container {
   background: var(--bg) !important;
@@ -1052,6 +1088,15 @@
   font-size: 12px;
   color: var(--fg-soft);
   cursor: pointer;
+  /* The element-row is a <button>; reset the UA `buttonface` background
+     (a light system colour) so the row inherits the dark panel surface —
+     otherwise dark-theme --fg-soft/--fg-mute text sits on #efefef and fails
+     AA contrast (Story 32.2). */
+  appearance: none;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
 }
 .mod-outline-tree .out-row:hover {
   background: var(--bg-hover);
@@ -1352,6 +1397,47 @@
 }
 .drawer-sect:first-child {
   margin-top: 0;
+}
+/* Story 30.1 — Flowable extensionElements editor lists (listeners, field
+   injection, in/out mappings) inside the BPMN properties panel. Token
+   vocabulary only (Pattern P-007); no hard-coded colors. */
+.ext-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 6px;
+}
+.ext-list-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+/* The add-forms are a single-column grid (each control on its own full-width
+   row) — `.input`/`.select` keep their inherited `width:100%`. `min-width:0`
+   guards against any future flex parent collapsing a child to min-content
+   (the "22px-wide, impossible to fill" bug). */
+.ext-add .input,
+.ext-add .select {
+  min-width: 0;
+}
+/* An existing extensionElements entry, rendered as an editable stacked block
+   (each control on its own full-width row) with a Remove button. */
+.ext-entry {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  margin-bottom: 6px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+.ext-entry .input,
+.ext-entry .select {
+  min-width: 0;
 }
 .code {
   font-family: var(--font-mono);
@@ -1829,4 +1915,62 @@ html[data-look="industrial"] .kpi {
   line-height: 1.55;
   color: var(--fg);
   white-space: pre;
+}
+
+/* Story 31.1 — version-drift advisory banner. Non-blocking chrome strip
+   between the Topbar and <main>. Token-only (Pattern P-007); warn-tinted
+   background derives from --warn so it reads across all look/theme combos.
+   Density rescales via --pad / --gap like the rest of the chrome. */
+.version-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  padding: calc(var(--pad) * 0.6) var(--pad);
+  background: color-mix(in oklab, var(--warn) 16%, var(--bg));
+  border-bottom: 1px solid var(--line);
+  color: var(--fg);
+  font-size: 13px;
+}
+.version-banner-msg {
+  flex: 1;
+}
+.version-banner-msg a {
+  color: var(--accent);
+}
+.version-banner-dismiss {
+  flex: none;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--fg);
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 8px;
+  height: calc(var(--row-h) * 0.6);
+}
+.version-banner-dismiss:hover {
+  border-color: var(--line-strong);
+}
+
+/* Story 34.1 — collapsible "Advanced: sub-app URI prefixes" group inside the
+   Add/Edit connection modals + Settings connection tab. Pattern P-007: reads
+   --gap / --pad / --line from data-density/data-look; no hard-coded values. */
+.adv-prefixes {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: calc(var(--pad) * 0.5) var(--pad);
+}
+.adv-prefixes > summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.adv-prefixes[open] > summary {
+  margin-bottom: var(--gap);
+}
+.adv-prefixes-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap);
 }

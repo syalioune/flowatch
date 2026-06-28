@@ -1,0 +1,30 @@
+meta {
+  name: Get historic process instance
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/history/historic-process-instances/{{instanceId}}
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  instanceId: PASTE_AN_INSTANCE_ID
+}
+
+docs {
+  # Get historic process instance
+
+  Per-id GET for the historic detail panel. Returns the same DTO shape as
+  items in the list response. Used by the instance-detail dual-fetch pattern
+  (runtime panel + historic panel) — the historic panel shows state even after
+  the instance has ended and the runtime endpoint returns 404.
+  Related: PRD FR-28, Story 13.1.
+}

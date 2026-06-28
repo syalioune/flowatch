@@ -155,7 +155,8 @@ const HEADLINES = {
     "🎉 v1 MVP — Flowable 6.x OSS UI parity rebuilt against flowable-rest 7.2.0. Connection probe, API Inspector, BPMN/DMN deployments + definitions + runtime + tasks + jobs + history + identity, vanilla bpmn-js/dmn-js modelers, three-look design system, a11y + snapshot coverage.",
   "0.0.3":
     "6.x parity gaps — instance variable edit, task edit + attachments, user/group lifecycle, multi-connection switch, batches + event subscriptions, app-definition browse, BPMN token overlay, model versioning.",
-  // '1.0.0': 'GA — pluggable auth (Basic/Bearer/OIDC PKCE), form-js designer + standalone forms, Flowable-specific bpmn-js properties panel, engine version compatibility banner, full WCAG AA audit, public release.',
+  "1.0.0":
+    "GA — pluggable auth (Basic/Bearer/OIDC PKCE), Flowable BPMN properties panel + DMN JUEL round-trip guard, version-drift advisory banner, axe-core a11y gate, configurable sub-app URI prefixes, native Flowable CORS (nginx proxy removed), public release.",
 };
 
 function headlineFor(version) {

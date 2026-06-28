@@ -222,9 +222,14 @@ export const DecisionDetail: React.FC<DecisionDetailProps> = ({ decision }) => {
             <EmptyState entry={getEmptyState("decisionResource")} />
           )}
           {xml.data && (
+            // biome-ignore lint/a11y/useSemanticElements: a <pre> is the correct monospace container for XML; role="region" only adds the scrollable-region semantics axe wants — a <section> would lose the <pre> formatting (Story 32.2 D1).
             <pre
               className="code"
               data-testid="decision-xml-pre"
+              role="region"
+              aria-label="DMN XML source"
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: WCAG SC 2.1.1 / axe scrollable-region-focusable — the XML source scrolls and MUST be keyboard-reachable (Story 32.2 D1).
+              tabIndex={0}
               style={{ maxHeight: 480, overflow: "auto", whiteSpace: "pre", fontSize: 11 }}
             >
               {xml.data}

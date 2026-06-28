@@ -1,6 +1,6 @@
 # ===== Flowatch top-level Makefile ============================================
 # Single-package React + Vite GUI for Flowable 7+. The Flowable engine itself
-# runs via docker compose (postgres + flowable-rest + nginx CORS proxy).
+# runs via docker compose (postgres + flowable-rest with native CORS).
 
 SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
@@ -10,6 +10,7 @@ OWNER := $(shell echo "$(REPO)" | cut -d/ -f1)
 NAME  := $(shell echo "$(REPO)" | cut -d/ -f2)
 
 COMPOSE     := docker compose
+KC_COMPOSE  := docker compose -f docker-compose.keycloak.yml
 ENGINE_BASE := http://localhost:8080/flowable-rest/service
 ENGINE_AUTH := rest-admin:test
 
@@ -23,14 +24,14 @@ install:  ## npm ci
 	npm ci
 dev:      ## Vite dev server on :5173 (assumes engine already running)
 	npm run dev
-stack:    ## Full local stack: postgres + flowable + nginx + Vite (one-shot via scripts/dev/run-dev.sh)
+stack:    ## Full local stack: postgres + flowable (native CORS) + Vite (one-shot via scripts/dev/run-dev.sh)
 	bash scripts/dev/run-dev.sh
 build:    ## Production bundle to dist/
 	npm run build
 preview:  ## Serve the production bundle locally
 	npm run preview
 
-# --- Engine (Docker Compose: postgres + flowable-rest + nginx CORS proxy) --
+# --- Engine (Docker Compose: postgres + flowable-rest with native CORS) ----
 .PHONY: engine-up engine-up-flowatch engine-down engine-stop engine-restart engine-ps engine-logs engine-clean engine-health engine-shell engine-psql
 engine-up:       ## Start the engine stack (detached)
 	$(COMPOSE) up -d
@@ -55,6 +56,21 @@ engine-shell:    ## Open a shell in the flowable container
 	$(COMPOSE) exec flowable sh
 engine-psql:     ## psql into the postgres database
 	$(COMPOSE) exec postgres psql -U flowable -d flowable
+
+# --- Keycloak OIDC test fixture (Story 28.4) -------------------------------
+.PHONY: keycloak-up keycloak-down keycloak-logs keycloak-ps
+keycloak-up:     ## Start the Keycloak OIDC test IdP (:8081, realm=flowatch, users mira/alice)
+	$(KC_COMPOSE) up -d
+	@echo "Keycloak  : http://localhost:8081/  (admin / admin)"
+	@echo "Issuer    : http://localhost:8081/realms/flowatch"
+	@echo "Client ID : flowatch  ·  Scopes: openid, profile, email, offline_access"
+	@echo "Users     : mira/mira-test  ·  alice/alice-test"
+keycloak-down:   ## Stop and remove the Keycloak fixture
+	$(KC_COMPOSE) down
+keycloak-logs:   ## Tail Keycloak logs
+	$(KC_COMPOSE) logs -f
+keycloak-ps:     ## Show Keycloak fixture status
+	$(KC_COMPOSE) ps
 
 # --- GitHub bootstrap (one-time per repo) ----------------------------------
 .PHONY: bootstrap bootstrap-labels bootstrap-milestones bootstrap-project bootstrap-protect
@@ -118,13 +134,14 @@ LANDING_STAGE := _site
 .PHONY: landing-stage landing-preview landing-check
 landing-stage: ## Assemble _site/ from landing/ + branding/ (idempotent)
 	@rm -rf $(LANDING_STAGE)
-	@mkdir -p $(LANDING_STAGE)/fonts
+	@mkdir -p $(LANDING_STAGE)/fonts $(LANDING_STAGE)/screenshots
 	@cp landing/index.html landing/style.css landing/.nojekyll $(LANDING_STAGE)/
 	@cp branding/flowatch-lockup.svg $(LANDING_STAGE)/
 	@cp branding/flowatch-favicon.svg $(LANDING_STAGE)/favicon.svg
 	@cp branding/fonts/ibm-plex-sans-400.woff2 branding/fonts/ibm-plex-sans-500.woff2 branding/fonts/ibm-plex-sans-600.woff2 $(LANDING_STAGE)/fonts/
 	@cp branding/fonts/ibm-plex-mono-400.woff2 branding/fonts/ibm-plex-mono-500.woff2 $(LANDING_STAGE)/fonts/
 	@cp branding/fonts/ibm-plex-serif-400.woff2 branding/fonts/ibm-plex-serif-500.woff2 $(LANDING_STAGE)/fonts/
+	@cp branding/screenshots/*.png $(LANDING_STAGE)/screenshots/
 	@echo "Staged → $(LANDING_STAGE)/"
 landing-preview: landing-stage ## Serve the staged landing site on http://localhost:4173
 	@echo "Serving $(LANDING_STAGE)/ at http://localhost:4173  (Ctrl+C to stop)"

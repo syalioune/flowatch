@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
+             xmlns:custom="http://acme.example/dmn"
+             id="Definitions_flowable_decision" name="Flowable Decision Fixture"
+             namespace="http://flowable.org/dmn">
+  <inputData id="iScore" name="Credit Score" />
+  <inputData id="iIncome" name="Annual Income" />
+  <decision id="riskDecision" name="Risk Decision">
+    <!-- Generic OMG-standard extensionElements escape hatch with a non-DMN
+         child — Flowable's DMN converter ships no flowable: namespace, so
+         this is the only extensibility point and it must round-trip. -->
+    <extensionElements>
+      <custom:meta owner="risk-team" reviewed="2026-06-07" />
+    </extensionElements>
+    <informationRequirement><requiredInput href="#iScore" /></informationRequirement>
+    <informationRequirement><requiredInput href="#iIncome" /></informationRequirement>
+    <!-- COLLECT + SUM are NON-default (UNIQUE is the DMN default and is
+         omitted on serialize) so the round-trip test sees them explicitly. -->
+    <decisionTable id="DT_risk" hitPolicy="COLLECT" aggregation="SUM">
+      <input id="i_score" label="Score">
+        <inputExpression id="ie_score" typeRef="number"><text>score</text></inputExpression>
+      </input>
+      <input id="i_income" label="Income">
+        <inputExpression id="ie_income" typeRef="number"><text>income</text></inputExpression>
+      </input>
+      <output id="o_points" name="points" label="Points" typeRef="number" />
+      <output id="o_band" name="band" label="Band" typeRef="string" />
+      <!-- Flowable cell expressions are JUEL, NOT S-FEEL (RC-13). Unary
+           tests are accepted as-is; ranges are compound JUEL in CDATA. -->
+      <rule id="ru1">
+        <inputEntry id="ru1i1"><text>&gt;= 80</text></inputEntry>
+        <inputEntry id="ru1i2"><text><![CDATA[${income >= 50000}]]></text></inputEntry>
+        <outputEntry id="ru1o1"><text>10</text></outputEntry>
+        <outputEntry id="ru1o2"><text>"prime"</text></outputEntry>
+      </rule>
+      <rule id="ru2">
+        <inputEntry id="ru2i1"><text>&lt; 80</text></inputEntry>
+        <inputEntry id="ru2i2"><text>-</text></inputEntry>
+        <outputEntry id="ru2o1"><text>5</text></outputEntry>
+        <outputEntry id="ru2o2"><text>"standard"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="DMNDiagram_fd">
+      <dmndi:DMNShape id="shape_dec" dmnElementRef="riskDecision">
+        <dc:Bounds x="240" y="60" width="180" height="80" />
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="shape_score" dmnElementRef="iScore">
+        <dc:Bounds x="160" y="240" width="160" height="60" />
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="shape_income" dmnElementRef="iIncome">
+        <dc:Bounds x="360" y="240" width="160" height="60" />
+      </dmndi:DMNShape>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

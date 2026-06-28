@@ -1,0 +1,28 @@
+meta {
+  name: Delete group
+  type: http
+  seq: 15
+}
+
+delete {
+  url: {{baseUrl}}/identity/groups/{{groupId}}
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  groupId: managers
+}
+
+docs {
+  # Delete group
+
+  Hard-delete. Flowable cascade-deletes membership join rows server-side.
+  Returns 204 on success; 404 on non-existent id.
+  Related: PRD FR-47, Story 22.3.
+}

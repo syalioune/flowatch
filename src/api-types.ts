@@ -20,6 +20,14 @@ export interface FlowableConfig {
   username: string;
   password: string;
   tenantId: string;
+  // Story 34.1 — per-sub-app URI prefix overrides (FR-59). Blank/undefined →
+  // the *Base() helper's standard flowable-rest:7.2.0 default. Single
+  // leading-slash-normalized URI segments, NOT full URLs. servicePath is the
+  // suffix connectionRoot() strips from baseUrl to recover the deployment root.
+  servicePath?: string | undefined;
+  dmnPath?: string | undefined;
+  cmmnPath?: string | undefined;
+  appPath?: string | undefined;
 }
 
 export interface FlowablePage<T> {
@@ -186,6 +194,12 @@ export interface FlowableFormProperty {
 export interface FlowableTaskForm {
   formKey?: string;
   formProperties?: FlowableFormProperty[];
+  // Story 29.1 (FR-23): a form-js definition carries a `components` array
+  // (the form-js schema) instead of `formProperties`. The discriminator
+  // `classifyTaskForm` (src/components/TaskFormPanel.tsx) branches on which
+  // field is a populated array. `unknown[]` because the form-js schema shape
+  // is owned by @bpmn-io/form-js-viewer, not the Flowable wire contract.
+  components?: unknown[];
 }
 
 // Story 24.1: Flowable batch operations DTO (FR-53). Permissive optional

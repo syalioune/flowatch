@@ -1,0 +1,30 @@
+meta {
+  name: Get deployment resource (binary)
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/repository/deployments/{{deploymentId}}/resourcedata/{{resourceName}}
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  deploymentId: PASTE_A_DEPLOYMENT_ID
+  resourceName: PASTE_RESOURCE_NAME
+}
+
+docs {
+  # Get deployment resource binary
+
+  Returns the binary content of a single resource from a BPMN deployment.
+  Used by the DeploymentDetail route for file download. The resource name
+  must be URL-encoded for names containing slashes or special characters.
+  Related: PRD FR-13, Story 9.6.
+}

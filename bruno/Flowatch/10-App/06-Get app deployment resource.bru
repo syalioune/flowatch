@@ -1,0 +1,28 @@
+meta {
+  name: Get app deployment resource (binary)
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{appBase}}/app-repository/deployments/{{deploymentId}}/resourcedata/{{resourceName}}
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  deploymentId: PASTE_AN_APP_DEPLOYMENT_ID
+  resourceName: PASTE_RESOURCE_NAME
+}
+
+docs {
+  # Get app deployment resource binary
+
+  Returns the binary content of a single resource from an app deployment.
+  Related: PRD FR-55, Story 25.1.
+}

@@ -1,0 +1,34 @@
+meta {
+  name: Update group
+  type: http
+  seq: 14
+}
+
+put {
+  url: {{baseUrl}}/identity/groups/{{groupId}}
+  body: json
+  auth: basic
+}
+
+body:json {
+  {
+    "name": "Updated Group Name",
+    "type": "assignment"
+  }
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  groupId: managers
+}
+
+docs {
+  # Update group
+
+  PUT with partial fields (name / type). `id` is immutable — omit from body.
+  Related: PRD FR-47, Story 22.3.
+}

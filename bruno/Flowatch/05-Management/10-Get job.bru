@@ -1,0 +1,20 @@
+meta {
+  name: Get job
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/management/jobs/{{jobId}}
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  jobId: PASTE_A_JOB_ID
+}

@@ -8,7 +8,7 @@ As CI, I want the project to have a `tsconfig.json` extending `@tsconfig/vite-re
 **When** `tsconfig.json` is added with `""strict"": true`, `""noUncheckedIndexedAccess"": true`, `""exactOptionalPropertyTypes"": true`, and `src/api.js` is renamed to `src/api.ts` with types for the Flowable response envelopes
 **Then** `npx tsc --noEmit` exits 0 across the project
 **And** the `request()` function has typed signatures for HTTP method, path, options, and return value
-**And** ADR-001 and Pattern P-001 are referenced in the file's top-level comment.","type:user-story,state:backlog,area:qgt,release:0.0.1",0.0.1
+**And** ADR-001 and Pattern P-001 are referenced in the file's top-level comment.","type:user-story,state:done,area:qgt,release:0.0.1",0.0.1
 QGT-SYS-002: Install Biome v2 and remove ESLint/Prettier dependencies,"
 As CI, I want Biome v2 to be the only lint+format tool, so that the toolchain has one binary and one config file. Per ADR-007 and PRD FR-F2.
 
@@ -18,7 +18,7 @@ As CI, I want Biome v2 to be the only lint+format tool, so that the toolchain ha
 **When** `@biomejs/biome` is installed, `biome.json` is added at repo root, and any `.eslintrc*` / `.prettierrc*` files are removed
 **Then** `npx biome ci` passes on the migrated `src/api.ts`
 **And** the `package.json` has scripts `lint`, `format`, `check` wrapping Biome
-**And** ESLint and Prettier packages are absent from `package.json` and `package-lock.json`.","type:user-story,state:backlog,area:qgt,release:0.0.1",0.0.1
+**And** ESLint and Prettier packages are absent from `package.json` and `package-lock.json`.","type:user-story,state:done,area:qgt,release:0.0.1",0.0.1
 QGT-SYS-003: Wire pre-commit Biome formatter via Husky,"
 As a contributor, I want Biome to auto-format my staged files on commit, so that I don't have to remember to run it manually.
 
@@ -28,7 +28,7 @@ As a contributor, I want Biome to auto-format my staged files on commit, so that
 **When** Biome is installed and I run a `git commit` with formatting violations
 **Then** the hook runs `npx biome format --write` against the staged files
 **And** the corrected files are re-staged automatically
-**And** the commit succeeds with no manual intervention.","type:user-story,state:backlog,area:qgt,release:0.0.1",0.0.1
+**And** the commit succeeds with no manual intervention.","type:user-story,state:done,area:qgt,release:0.0.1",0.0.1
 QGT-SYS-004: Migrate remaining `src/` files to TypeScript,"
 As a maintainer, I want every source file under `src/` to be `.ts` or `.tsx`, so that the project is fully type-checked end-to-end. Per ADR-001.
 
@@ -40,7 +40,7 @@ As a maintainer, I want every source file under `src/` to be `.ts` or `.tsx`, so
 **And** `npx biome check src/` passes
 **And** the migration markers (where `any` is intentionally accepted) reference an open issue for tightening.
 
----","type:user-story,state:backlog,area:qgt,release:0.0.1",0.0.1
+---","type:user-story,state:done,area:qgt,release:0.0.1",0.0.1
 QGT-SYS-005: Install Vitest and add unit test for `request()` funnel,"
 As CI, I want Vitest to run unit tests on every push, so that regressions to the request funnel are caught immediately.
 
@@ -50,7 +50,7 @@ As CI, I want Vitest to run unit tests on every push, so that regressions to the
 **When** `vitest` + `@testing-library/react` + `@testing-library/jest-dom` are installed, `vitest.config.ts` is added, and `src/api/__tests__/request.test.ts` covers the `request()` success path, 4xx error path, and 5xx error path (using a real fetch-mock at the HTTP level — no `vi.mock(api)`)
 **Then** `npx vitest run` passes
 **And** coverage for `src/api/client.ts` is ≥ 70% per the threshold set in `vitest.config.ts`
-**And** Pattern P-001 is referenced in the test file (the funnel rule).","type:user-story,state:backlog,area:qgt,release:0.0.1",0.0.1
+**And** Pattern P-001 is referenced in the test file (the funnel rule).","type:user-story,state:done,area:qgt,release:0.0.1",0.0.1
 QGT-SYS-006: Wire Vitest browser mode with Playwright provider for component tests,"
 As a maintainer, I want component tests to run in real Chromium so that `window`, `localStorage`, `IntersectionObserver`, and DOM events behave as they will in production.
 
@@ -59,7 +59,7 @@ As a maintainer, I want component tests to run in real Chromium so that `window`
 **Given** Vitest unit tier is wired (Story 2.1)
 **When** `@vitest/browser` + `@playwright/test` are installed and `vitest.workspace.ts` configures a separate browser project pointing at the Playwright provider, with one example component test (e.g. `<ErrorBox>`) under `src/components/__tests__/ErrorBox.spec.tsx`
 **Then** `npx vitest --workspace=vitest.workspace.ts run` passes both projects
-**And** the example test asserts a real DOM-rendered error message matching the verbatim engine response.","type:user-story,state:backlog,area:qgt,release:0.0.1",0.0.1
+**And** the example test asserts a real DOM-rendered error message matching the verbatim engine response.","type:user-story,state:done,area:qgt,release:0.0.1",0.0.1
 QGT-SYS-007: Add Playwright E2E config and one golden-path test against Docker Flowable,"
 As CI, I want one Playwright E2E test that exercises the full operator path (deploy BPMN → start instance → claim task → complete task → check history) against a Dockerized `flowable-rest:7.2.0`, so that any regression in the Flowable REST contract surfaces in CI.
 
@@ -69,7 +69,7 @@ As CI, I want one Playwright E2E test that exercises the full operator path (dep
 **When** `playwright.config.ts` is added with a `webServer` block that starts `docker compose up -d` + waits for `/management/engine` to return 200, and `e2e/golden-path.spec.ts` walks the deploy → start → claim → complete → history flow
 **Then** `npx playwright test` exits 0 with the test passing
 **And** the test uses real Flowable, no mocks (Pattern P-009)
-**And** Docker teardown happens in the `webServer.gracefulShutdown` config.","type:user-story,state:backlog,area:qgt,release:0.0.1",0.0.1
+**And** Docker teardown happens in the `webServer.gracefulShutdown` config.","type:user-story,state:done,area:qgt,release:0.0.1",0.0.1
 QGT-SYS-008: Add visual snapshot baseline for the API Inspector (single look × theme × density),"
 As a maintainer, I want at least one visual snapshot guarding the API Inspector's appearance, so that accidental design-system regressions surface as failing tests. Per NFR-23.
 
@@ -79,7 +79,7 @@ As a maintainer, I want at least one visual snapshot guarding the API Inspector'
 **When** `e2e/visual/api-inspector.spec.ts` runs the app in `editorial / light / regular` and takes a snapshot of the Inspector drawer with 3 sample API_LOG entries
 **Then** `npx playwright test --update-snapshots` produces the baseline
 **And** subsequent `npx playwright test` passes against the baseline
-**And** the test verifies the method-coloured pill mapping (GET → info, POST → ok, PUT → warn, DELETE → bad).","type:user-story,state:backlog,area:qgt,release:0.0.1",0.0.1
+**And** the test verifies the method-coloured pill mapping (GET → info, POST → ok, PUT → warn, DELETE → bad).","type:user-story,state:done,area:qgt,release:0.0.1",0.0.1
 QGT-SYS-009: Add `npm test` / `npm run e2e` / `npm run test:browser` script aliases,"
 As a contributor, I want one-line npm scripts for each test tier, so that I don't have to remember which Vitest project flag is which.
 
@@ -90,7 +90,7 @@ As a contributor, I want one-line npm scripts for each test tier, so that I don'
 **Then** each script runs the expected tier and reports a clear exit code
 **And** the scripts are documented in DEVELOPERS.md §5.
 
----","type:user-story,state:backlog,area:qgt,release:0.0.1",0.0.1
+---","type:user-story,state:done,area:qgt,release:0.0.1",0.0.1
 NAV-SYS-001: Install TanStack Router and add the root route,"
 As a maintainer, I want TanStack Router installed with a single root route mounting the chrome (Sidebar + Topbar + ApiInspector + Toaster), so that subsequent screen routes can be added incrementally without ripping out the current `App.jsx` switch.
 
@@ -99,7 +99,7 @@ As a maintainer, I want TanStack Router installed with a single root route mount
 **Given** TanStack Router is not yet installed
 **When** `@tanstack/react-router` + `@tanstack/router-vite-plugin` are installed, `src/routes/__root.tsx` is added with the chrome, and `vite.config.ts` includes the router plugin
 **Then** `npm run dev` starts and the root path `/` renders the chrome
-**And** the previous `view`-switch can coexist temporarily as the Dashboard placeholder.","type:user-story,state:backlog,area:nav,release:0.0.1",0.0.1
+**And** the previous `view`-switch can coexist temporarily as the Dashboard placeholder.","type:user-story,state:done,area:nav,release:0.0.1",0.0.1
 "NAV-MIR-001: Convert Dashboard, BPMN, DMN screens to TanStack Router routes","
 As Mira, I want bookmarkable URLs for the Dashboard, BPMN modeler, and DMN modeler screens, so that I can return directly to where I was working.
 
@@ -109,7 +109,7 @@ As Mira, I want bookmarkable URLs for the Dashboard, BPMN modeler, and DMN model
 **When** `src/routes/index.tsx` (Dashboard), `src/routes/bpmn.tsx`, and `src/routes/dmn.tsx` are added
 **Then** navigating to `/`, `/bpmn`, `/dmn` renders the right screen
 **And** the Sidebar nav items use `Link` components from TanStack Router with `data-active` driven by route match
-**And** browser back/forward buttons work between the three.","type:user-story,state:backlog,area:nav,release:0.0.1",0.0.1
+**And** browser back/forward buttons work between the three.","type:user-story,state:done,area:nav,release:0.0.1",0.0.1
 NAV-MIR-002: Convert Deployments + Definitions screens with detail routes,"
 As Mira, I want `/deployments/:id` and `/definitions/:id` URLs that deep-link to a specific deployment or definition, so that I can share or bookmark them.
 
@@ -119,7 +119,7 @@ As Mira, I want `/deployments/:id` and `/definitions/:id` URLs that deep-link to
 **When** `src/routes/deployments/index.tsx`, `src/routes/deployments/$id.tsx`, `src/routes/definitions/index.tsx`, `src/routes/definitions/$id.tsx` are added
 **Then** clicking a row navigates to the detail URL
 **And** the detail route's loader fetches the resource via the appropriate `api.*` wrapper
-**And** invalid IDs surface as `ErrorBox` with the verbatim engine 404 message (Pattern P-002, P-003).","type:user-story,state:backlog,area:nav,release:0.0.1",0.0.1
+**And** invalid IDs surface as `ErrorBox` with the verbatim engine 404 message (Pattern P-002, P-003).","type:user-story,state:done,area:nav,release:0.0.1",0.0.1
 NAV-MIR-003: Convert Process Instances + Tasks + Jobs screens to routes,"
 As Mira, I want every operations screen reachable via URL so that I can bookmark ""open dead-letter jobs"" or ""my tasks"" pre-filtered.
 
@@ -129,7 +129,7 @@ As Mira, I want every operations screen reachable via URL so that I can bookmark
 **When** `src/routes/instances/index.tsx`, `src/routes/instances/$id.tsx`, `src/routes/tasks/index.tsx`, `src/routes/tasks/$id.tsx`, `src/routes/jobs.tsx` are added with search params for filters (`?type=executable|timer|deadletter`, `?assignee=me|all`)
 **Then** `/jobs?type=deadletter` opens the Jobs screen with the dead-letter tab active
 **And** `/tasks?assignee=me` filters tasks to the active user
-**And** search param state is typed (TanStack Router auto-types via Zod schema).","type:user-story,state:backlog,area:nav,release:0.0.1",0.0.1
+**And** search param state is typed (TanStack Router auto-types via Zod schema).","type:user-story,state:done,area:nav,release:0.0.1",0.0.1
 NAV-MIR-004: Convert History + Identity + Tenants screens to routes,"
 As Mira, I want History, Identity, and Tenants screens routable for the same bookmarking + sharing reasons as Story 3.4.
 
@@ -139,7 +139,7 @@ As Mira, I want History, Identity, and Tenants screens routable for the same boo
 **When** `src/routes/history.tsx`, `src/routes/identity/index.tsx`, `src/routes/identity/users.$id.tsx`, `src/routes/identity/groups.$id.tsx`, `src/routes/tenants.tsx` are added
 **Then** all 11 screens (Dashboard, BPMN, DMN, Deployments, Definitions, Instances, Tasks, Jobs, History, Identity, Tenants) are reachable via URL
 **And** the Sidebar Active state is driven by route match (not the legacy `view` state)
-**And** the legacy `view` state in `App.tsx` is removed.","type:user-story,state:backlog,area:nav,release:0.0.1",0.0.1
+**And** the legacy `view` state in `App.tsx` is removed.","type:user-story,state:done,area:nav,release:0.0.1",0.0.1
 NAV-SYS-002: Remove `VIEW_TITLE` and `ENDPOINT_BY_VIEW` legacy maps,"
 As a maintainer, I want the legacy `VIEW_TITLE` and `ENDPOINT_BY_VIEW` constants gone, so that the three-place-to-update toil is eliminated. Per FR-F5 and the PRD ""add a new screen"" task simplification.
 
@@ -151,7 +151,7 @@ As a maintainer, I want the legacy `VIEW_TITLE` and `ENDPOINT_BY_VIEW` constants
 **And** the PageHead endpoint chips come from the active route's `endpoints` metadata
 **And** adding a new screen requires editing exactly one file (the new route).
 
----","type:user-story,state:backlog,area:nav,release:0.0.1",0.0.1
+---","type:user-story,state:done,area:nav,release:0.0.1",0.0.1
 FND-SYS-001: Add `check` and `unit` GitHub Actions jobs,"
 As CI, I want `biome ci` + `tsc --noEmit` + `vitest run` to run on every PR, so that style/type/unit-test regressions block merge.
 
@@ -161,7 +161,7 @@ As CI, I want `biome ci` + `tsc --noEmit` + `vitest run` to run on every PR, so 
 **When** `.github/workflows/ci.yml` is added with `check` job (Biome ci + tsc --noEmit) and `unit` job (vitest run) configured to run on `push` and `pull_request`
 **Then** opening a PR triggers both jobs
 **And** both jobs are listed in `.github/protection/required_checks.json`
-**And** all GitHub Actions versions are SHA-pinned per NFR-26.","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+**And** all GitHub Actions versions are SHA-pinned per NFR-26.","type:user-story,state:done,area:fnd,release:0.0.1",0.0.1
 FND-SYS-002: Add `e2e` job with Docker Compose Flowable,"
 As CI, I want Playwright E2E to run against a Dockerized Flowable on every PR, so that regressions in the Flowable REST contract or Flowatch's wrappers surface before merge.
 
@@ -171,7 +171,7 @@ As CI, I want Playwright E2E to run against a Dockerized Flowable on every PR, s
 **When** `.github/workflows/ci.yml` includes an `e2e` job that runs `docker compose up -d`, waits for engine readiness, runs Playwright, and uploads the report as an artifact on failure
 **Then** the job passes when Story 2.3's golden-path test passes
 **And** the job runs in ≤ 5 minutes (target — Flowable cold-start is ~30s of that)
-**And** Pattern P-009 (live-API only) is honored — no mocks.","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+**And** Pattern P-009 (live-API only) is honored — no mocks.","type:user-story,state:done,area:fnd,release:0.0.1",0.0.1
 FND-SYS-003: Add `build` job that uploads the `dist/` artifact,"
 As CI, I want a `build` job that runs `vite build` and uploads `dist/`, so that the `pages` job can deploy it and so that build failures are caught before merge.
 
@@ -181,7 +181,7 @@ As CI, I want a `build` job that runs `vite build` and uploads `dist/`, so that 
 **When** `.github/workflows/ci.yml` includes a `build` job running `npm ci && npm run build` and uploading `dist/` via `actions/upload-artifact@<pinned-sha>`
 **Then** every PR has the build artifact attached
 **And** the build size is reported in the job summary
-**And** the job is listed in `.github/protection/required_checks.json`.","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+**And** the job is listed in `.github/protection/required_checks.json`.","type:user-story,state:done,area:fnd,release:0.0.1",0.0.1
 FND-SYS-004: Wire Dependabot SHA-pin bumps weekly,"
 As a maintainer, I want Dependabot to bump SHA-pinned GitHub Actions weekly, so that the supply chain stays current without manual sweeps. Per NFR-26.
 
@@ -193,7 +193,7 @@ As a maintainer, I want Dependabot to bump SHA-pinned GitHub Actions weekly, so 
 **And** the PRs are labeled `area:ci-cd` per the dependabot config
 **And** existing tests + check jobs gate the bump PRs.
 
----","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+---","type:user-story,state:done,area:fnd,release:0.0.1",0.0.1
 FND-SYS-005: Install commitlint and wire `.husky/commit-msg` hook,"
 As CI, I want commit messages validated against Conventional Commits 1.0 before the commit is created, so that non-conforming commits are blocked at the hook level (not just at PR review).
 
@@ -203,7 +203,7 @@ As CI, I want commit messages validated against Conventional Commits 1.0 before 
 **When** `@commitlint/cli` + `@commitlint/config-conventional` are installed and `commitlint.config.cjs` is added at repo root with the scope vocabulary from `release.config.mjs` THEMES
 **Then** running `git commit -m ""feat: bad scope""` succeeds (valid CC)
 **And** running `git commit -m ""broken: bad type""` fails with a hook exit
-**And** the new commitlint scopes match every theme in release.config.mjs (validated by `node scripts/release/check-scope.mjs`).","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+**And** the new commitlint scopes match every theme in release.config.mjs (validated by `node scripts/release/check-scope.mjs`).","type:user-story,state:done,area:fnd,release:0.0.1",0.0.1
 FND-SYS-006: Wire semantic-release for automated release notes,"
 As a maintainer, I want semantic-release to compute the version bump, generate the CHANGELOG entry, tag the commit, and publish a GitHub Release directly from the Conventional Commits range on each push to a release branch, so that I never hand-write a CHANGELOG. Per NFR-25.
 
@@ -213,7 +213,7 @@ As a maintainer, I want semantic-release to compute the version bump, generate t
 **When** `.github/workflows/release.yml` is added running `npx semantic-release` against `release/*` and `main` branches, with `GITHUB_TOKEN` granted `contents: write` + `issues: write` + `pull-requests: write` permissions, all action SHAs pinned per NFR-26
 **Then** squash-merging `release/0.0.1 → main` triggers the workflow, which computes `v0.0.1` from the aggregated `feat:` commits, generates a CHANGELOG.md entry, creates the `v0.0.1` git tag, and publishes a GitHub Release with auto-generated notes
 **And** the release notes use the theme structure from `release.config.mjs` (Modelers, Runtime, etc.)
-**And** subsequent `release/x.y.z → main` merges follow the same flow without manual intervention.","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+**And** subsequent `release/x.y.z → main` merges follow the same flow without manual intervention.","type:user-story,state:done,area:fnd,release:0.0.1",0.0.1
 FND-SYS-007: Add Apache 2.0 SPDX headers to all new source files,"
 As a maintainer, I want every new source file under `src/` to start with an SPDX-License-Identifier header, so that license provenance is auditable per NFR-28.
 
@@ -222,7 +222,7 @@ As a maintainer, I want every new source file under `src/` to start with an SPDX
 **Given** the repo is Apache 2.0 licensed (LICENSE file exists)
 **When** every `.ts`, `.tsx`, `.css`, `.html` file under `src/` and `branding/` gets a top comment `// SPDX-License-Identifier: Apache-2.0` (or `/* … */` for CSS)
 **Then** a CI grep check (`scripts/ci/check-spdx.sh`) passes
-**And** the check is added to the `check` job in `.github/workflows/ci.yml`.","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+**And** the check is added to the `check` job in `.github/workflows/ci.yml`.","type:user-story,state:done,area:fnd,release:0.0.1",0.0.1
 FND-SYS-008: Dependency license-compatibility check + NOTICE file + About-modal credits,"
 As a maintainer, I want CI to verify every transitive dependency is license-compatible with Apache 2.0, plus a `NOTICE` file at repo root that mirrors into an ""About"" modal in the app, so that license obligations are visible to operators and enforced on every PR. Per NFR-29, NFR-30.
 
@@ -233,7 +233,7 @@ As a maintainer, I want CI to verify every transitive dependency is license-comp
 **Then** any disallowed license fails the build with the offending package name
 **And** a `NOTICE` file at repo root enumerates each direct dependency + its license + its homepage URL, regenerated by `scripts/release/generate-notice.mjs` (drift between `NOTICE` and `package.json` fails CI)
 **And** Flowatch's ""About"" modal (opened from the Settings gear menu) renders the same NOTICE content (fetched at build time, not at runtime — bundle remains air-gapped per NFR-9)
-**And** the About modal shows: app name, version, git SHA (from Story 6.5), Apache 2.0 link, and a scrollable dependency credits list.","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+**And** the About modal shows: app name, version, git SHA (from Story 6.5), Apache 2.0 link, and a scrollable dependency credits list.","type:user-story,state:done,area:fnd,release:0.0.1",0.0.1
 FND-SYS-009: Enforce ≤ 50 KB per source file limit in CI,"
 As a maintainer, I want CI to block any source file exceeding 50 KB, so that the codebase stays navigable per NFR-21.
 
@@ -245,7 +245,7 @@ As a maintainer, I want CI to block any source file exceeding 50 KB, so that the
 **And** the check excludes `src/styles/tokens.css` only if it has a documented exemption comment (`/* size-exempt: design-token table */`) — every other file is enforced
 **And** the script's threshold is configurable via env var (`MAX_SOURCE_FILE_BYTES`) so it can be temporarily relaxed in an emergency hotfix.
 
----","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+---","type:user-story,state:done,area:fnd,release:0.0.1",0.0.1
 FND-DAA-001: Verify one-command Docker stack reaches Dashboard in < 2 min,"
 As Daan, I want `docker compose up -d && npm run dev` to land me on a working Dashboard in under 2 minutes on a fresh machine, so that the evaluation friction is minimal.
 
@@ -255,7 +255,7 @@ As Daan, I want `docker compose up -d && npm run dev` to land me on a working Da
 **When** the user runs `docker compose up -d && npm install && npm run dev` and opens `http://localhost:5173`
 **Then** the Dashboard renders with the connection indicator green within 120 seconds (including Docker pull + Flowable warmup on a typical broadband connection)
 **And** the `bash scripts/dev/run-dev.sh` script automates this in one command (Epic 6 has this already from Phase-2 work)
-**And** README.md ""Quick start"" section documents this end-to-end.","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+**And** README.md ""Quick start"" section documents this end-to-end.","type:user-story,state:done,area:fnd,release:0.0.1",0.0.1
 FND-MIR-001: Remove Google Fonts CDN from index.html (NFR-9 fix),"
 As an air-gapped operator, I want Flowatch to load IBM Plex fonts from the project bundle rather than `fonts.googleapis.com`, so that I can run it without external network. Per NFR-9.
 
@@ -265,7 +265,7 @@ As an air-gapped operator, I want Flowatch to load IBM Plex fonts from the proje
 **When** the IBM Plex font files (woff2) are self-hosted under `branding/fonts/` and `src/styles/fonts.css` declares `@font-face` rules pointing at them, and the Google Fonts links are removed from `index.html`
 **Then** `npm run dev` shows the correct fonts (IBM Plex Sans, Mono, Serif) across all three looks
 **And** browser DevTools Network tab shows zero requests to `fonts.googleapis.com` or `fonts.gstatic.com`
-**And** the build output size increase is < 500 KB (woff2 fonts).","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+**And** the build output size increase is < 500 KB (woff2 fonts).","type:user-story,state:done,area:fnd,release:0.0.1",0.0.1
 FND-MIR-002: Harden nginx CORS proxy (production-aware config),"
 As Mira, I want the nginx CORS config to work in both local dev (allow `http://localhost:5173`) and any production origin the operator configures via `ALLOWED_ORIGIN`, so that the same Docker image works in both contexts.
 
@@ -275,7 +275,7 @@ As Mira, I want the nginx CORS config to work in both local dev (allow `http://l
 **When** the config is parameterized via env var `ALLOWED_ORIGIN` (defaulting to `http://localhost:5173`) and rebuilt to use `envsubst`
 **Then** running `docker compose up` with `ALLOWED_ORIGIN=https://your-flowatch-host.example` produces an nginx that allows that origin
 **And** the default unchanged behavior works for local dev
-**And** the OPTIONS preflight short-circuit (204) is preserved.","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+**And** the OPTIONS preflight short-circuit (204) is preserved.","type:user-story,state:done,area:fnd,release:0.0.1",0.0.1
 "FND-DAA-002: README badges for build, license, and Flowable compatibility","
 As Daan (evaluator landing on the GitHub repo), I want the README to display badges for build status, license, and the Flowable version Flowatch is tested against, so that I can assess project health and compatibility in seconds. Per FR-F11.
 
@@ -285,7 +285,7 @@ As Daan (evaluator landing on the GitHub repo), I want the README to display bad
 **When** the maintainer adds shield.io badges for: (a) CI build status (`actions/workflows/ci.yml/badge.svg`), (b) license (`Apache-2.0`), (c) `tested against Flowable 7.2.0` (sourced from `docs/compat.md`'s tested version)
 **Then** the three badges render at the top of the README in a single row
 **And** the Flowable-version badge value is generated by `scripts/release/update-readme-badges.mjs` from `docs/compat.md` (single source of truth — no hard-coded duplication)
-**And** the script is wired into the `check` job of `.github/workflows/ci.yml` so a drift between the README badge and `compat.md` fails CI.","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+**And** the script is wired into the `check` job of `.github/workflows/ci.yml` so a drift between the README badge and `compat.md` fails CI.","type:user-story,state:done,area:fnd,release:0.0.1",0.0.1
 FND-MIR-003: Surface git commit SHA + Flowable-tested version in chrome footer,"
 As Mira (debugging a deployed Flowatch instance), I want the sidebar footer to show the git commit SHA the build was cut from plus the Flowable version Flowatch was tested against, so that I can correlate observed behavior to a specific build without inspecting bundle bytes. Per NFR-20.
 
@@ -296,7 +296,45 @@ As Mira (debugging a deployed Flowatch instance), I want the sidebar footer to s
 **Then** dev builds show `build dev · tested vs Flowable 7.2.0` (no real SHA outside of CI)
 **And** CI builds embed the actual short SHA
 **And** the Flowable-tested version is sourced from a single constant emitted alongside the badge generator in Story 6.4 (no duplicate hard-coded literal)
-**And** the footer text is selectable (for copy-paste into bug reports).
+**And** the footer text is selectable (for copy-paste into bug reports).","type:user-story,state:done,area:fnd,release:0.0.1",0.0.1
+FND-DAA-003: Author the GitHub Pages presentation site under `landing/`,"
+As Daan (evaluator who landed on a forum link), I want a one-page project presentation at `https://syalioune.github.io/flowatch/`, so that I can decide in under a minute whether Flowatch is worth my afternoon — without reading a README written half for contributors. Per FR-F12.
+
+**Acceptance Criteria:**
+
+**Given** PRD FR-F12 and the branding assets in `branding/` (lockup, favicon, IBM Plex fonts)
+**When** `landing/` is populated with `index.html`, `style.css`, `.nojekyll`, and `README.md` documenting the folder, and `index.html` includes the following sections in order
+  1. Hero — lockup, one-sentence positioning, primary CTA (`docker pull` command), secondary CTA (GitHub repo link). Pre-alpha banner visible above the fold.
+  2. Why Flowatch exists (≤ 4 sentences condensing README §""Why Flowatch exists"")
+  3. What you get — three tiles: Modeler (BPMN + DMN) · Admin (deployments, instances, jobs, history) · Identity & Tenants. *Not* a per-screen feature inventory.
+  4. What makes it different — three bullets: API Inspector · three-look design system · Flowable-aware (REST quirks, multipart, DMN sub-app prefix)
+  5. Get started — Docker quickstart, same commands as README's ""Pull the image"" section (text-first in 0.0.1; screenshots back-filled later when DOC-DAA-001 lands in 1.0.0)
+  6. OSS promises — four single-sentence bullets: Apache 2.0 · no telemetry · no SaaS lock-in · no enterprise-only gating
+  7. Project status — pre-alpha framing, link to latest release on GitHub, link to `docs/compat.md`, link to issue tracker
+  8. Footer — GitHub repo link, docs index link, license link, the line ""Not affiliated with Flowable.com Ltd.""
+**Then** the page renders correctly in latest Chromium, Firefox, Safari (NFR-13)
+**And** it scores ≥ 95 on Lighthouse Performance, Accessibility, Best Practices, SEO
+**And** there are zero `https://` external references in `<script src>`, asset-loading `<link href>` (rel = `stylesheet | preload | prefetch | modulepreload | icon | manifest | dns-prefetch | preconnect`), `@font-face src`, or `@import` declarations — navigation/canonical `href`s are allowed and unaffected (NFR-9 enforcement via `make landing-check`)
+**And** all visual tokens resolve to the same OKLCH values as `:root[data-look=""editorial""][data-theme=""light""][data-density=""regular""]` in `src/styles.css` (typography, accent, spacing, line-heights)
+**And** the page contains no SaaS clichés (no gradient cards, no glass-morphism, no animated illustrations, no email capture, no chat widget, no testimonial blocks, no social-proof logo strip, no ""request a demo"")
+**And** the pre-alpha banner is visible without scrolling on a 1440×900 viewport
+**And** `landing/index.html` and `landing/style.css` include `<!-- SPDX-License-Identifier: Apache-2.0 -->` per FR-F7 / NFR-28
+**And** the page is previewable locally via `make landing-preview` (Makefile target documented in [docs/repo-settings.md](../../docs/repo-settings.md)).
+
+**Notes:**
+- Screenshot strip is deliberately deferred to a follow-up story in 0.0.2 or 1.0.0 once DOC-DAA-001 produces look × theme × density screenshots of the rebuilt app. Inlining pre-rebuild screenshots would set the wrong expectation for visitors who then install the current build.","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
+FND-SYS-010: Deploy `landing/` to GitHub Pages via SHA-pinned workflow,"
+As CI, I want a workflow that builds and publishes the landing site to GitHub Pages on every push to `develop` touching `landing/**` or `branding/**`, so that the live page tracks repo state without manual deploy steps. Per FR-F13. (`develop` is the long-lived default branch; deploying from `main` would mean the site updates only at GA tags.)
+
+**Acceptance Criteria:**
+
+**Given** PRD FR-F13 and Story 6.6 producing `landing/index.html` + `landing/style.css`
+**When** `.github/workflows/pages.yml` is added with two jobs:
+  - `landing-check` — runs on PRs to `develop` paths-filtered to `landing/**`, validates the absence of external `https://` asset references (matches the `make landing-check` regex). **NOT** added to `.github/protection/required_checks.json` (path-filtered).
+  - `pages-deploy` — runs on push to `develop` paths-filtered to `landing/**` or `branding/**`, builds `_site/` via `make landing-stage` (which copies `landing/*.html`, `landing/*.css`, `branding/flowatch-lockup.svg`, `branding/flowatch-favicon.svg` → `favicon.svg`, and the IBM Plex woff2 family into `_site/fonts/`), and ships via SHA-pinned `actions/configure-pages`, `actions/upload-pages-artifact`, `actions/deploy-pages` (each with a trailing `# vX.Y.Z` version comment per NFR-26 — never strip those). The job condition gates on `github.ref == 'refs/heads/develop'` to prevent accidental deploys from feature branches via `workflow_dispatch` re-runs. The workflow has `permissions:` scoped to `contents: read`, `pages: write`, `id-token: write` (least-privilege OIDC for GitHub Pages).
+**Then** Dependabot's `github-actions` ecosystem (see `.github/dependabot.yml`) picks up the new actions for weekly SHA bumps
+**And** Repo → Settings → Pages → Source = ""GitHub Actions"" is set (one-time manual step documented in a new ""GitHub Pages"" subsection of `docs/repo-settings.md`)
+**And** the workflow does NOT appear in `.github/protection/required_checks.json` (it is a post-merge deploy, not a merge gate; the `landing-check` PR job is implicitly gating because PR review requires green CI per existing protection, but it is path-filtered).
 
 ---","type:user-story,state:backlog,area:fnd,release:0.0.1",0.0.1
 NAV-MIR-005: Load + persist connection config from localStorage,"
@@ -630,7 +668,32 @@ As Mira, I want to see variable changes and tasks across history for a given ins
 **Given** the user is on `/history?type=variables` or `/history?type=tasks`
 **When** the route loader calls the corresponding wrapper (`listHistoricVariables`, `listHistoricTasks`)
 **Then** rows show variable/task with their context (instance id, name, value/type for variables; assignee/completion for tasks)
-**And** filtering by `processInstanceId` is supported via search param.
+**And** filtering by `processInstanceId` is supported via search param.","type:user-story,state:backlog,area:hst,release:0.0.2",0.0.2
+HST-MIR-004: Inspector previewBody renders the truncation envelope explicitly,"
+As Mira (operator inspecting API calls in the Inspector drawer), I want the body preview to render the `{__preview, __truncated}` envelope shape in an operator-readable form, so that I can immediately recognise when a body was truncated by the byte budget rather than mistaking the envelope itself for the request payload. Per Epic 10 retrospective A-3 (promoted from three-epic carry-forward chain on 2026-05-25).
+
+**Acceptance Criteria:**
+
+**Given** an `API_LOG` entry whose `body` field is the truncation envelope `{__preview: string, __truncated: number}` (produced by `captureBody` in [src/api.ts](src/api.ts) when the body exceeds `BODY_BYTE_BUDGET = 16 KB`)
+**When** the operator expands the row in the Inspector drawer
+**Then** the body preview renders as:
+
+```
+[body truncated: <__truncated> bytes total]
+<__preview>...
+```
+
+rather than as `{__preview: ""{...}"", __truncated: 51234}` JSON
+**And** non-envelope bodies continue to render as `JSON.stringify(d, null, 2)?.slice(0, 4000) ?? String(d)` (unchanged behaviour for the 99% case)
+**And** the Inspector unit-test suite (`src/components/__tests__/ErrorBox.spec.tsx` or a sibling `ApiInspector.spec.tsx`) covers both rendering branches with explicit assertions on the envelope-detection path
+**And** no change to `captureBody` is required — the envelope-detection lives at render time in [src/components.tsx](src/components.tsx)'s `previewBody` helper
+**And** the change is scoped to ~10 LOC plus tests; do NOT widen scope to other Inspector polish items in the same PR (single-issue PR per Epic 12 retro §3.4 spirit).
+
+**Dev Notes:**
+
+- This story closes the Epic 10 retro A-3 carry-forward chain (Epic 10 → Epic 11 → Epic 12 → promoted 2026-05-25). The ""opportunistic during Epic N"" framing failed three times because no Epic N story touched `src/components.tsx`. Promoting to a dedicated story unblocks the work.
+- The implementation outline lives in [_bmad-output/implementation-artifacts/epic-10-retro-2026-05-25.md §A-3](../implementation-artifacts/epic-10-retro-2026-05-25.md) — a ~10-LOC branch added to `previewBody`. The spec author can lift it verbatim.
+- Surface this independently of Epic 13's History theme — it touches the Inspector drawer, not any History endpoint. Scheduling it in Epic 13 simply uses the window; it has no semantic dependency on 13.1 / 13.2 / 13.3.
 
 ---","type:user-story,state:backlog,area:hst,release:0.0.2",0.0.2
 IDT-MIR-001: List users with pagination,"
@@ -1112,7 +1175,7 @@ As Mira, I want a non-blocking banner if I'm running a Flowable version Flowatch
 **And** clicking dismiss persists the dismissal for that version in localStorage.
 
 ---","type:user-story,state:backlog,area:nav,release:1.0.0",1.0.0
-HST-MIR-004: Run end-to-end a11y audit across 8 look × theme combos + 11 screens,"
+HST-MIR-005: Run end-to-end a11y audit across 8 look × theme combos + 11 screens,"
 As Mira (operator with accessibility needs), I want a full a11y audit producing a list of issues + fix plan, so that v1.0 is genuinely accessible. Per NFR-15-NFR-17.
 
 **Acceptance Criteria:**
@@ -1122,7 +1185,7 @@ As Mira (operator with accessibility needs), I want a full a11y audit producing 
 **Then** the report is produced at `docs/a11y-audit-1.0.0.md`
 **And** every violation is either fixed in a follow-up story or documented as ""won't fix"" with rationale
 **And** the final a11y score is ≥ 95/100 axe-core threshold.","type:user-story,state:backlog,area:hst,release:1.0.0",1.0.0
-"HST-MIR-005: Fix every ""won't ship"" a11y violation found by Story 32.1","
+"HST-MIR-006: Fix every ""won't ship"" a11y violation found by Story 32.1","
 As Mira, I want every blocking a11y issue from the audit fixed before 1.0 ships, so that I can use Flowatch with a screen reader or keyboard.
 
 **Acceptance Criteria:**
@@ -1159,6 +1222,52 @@ As Daan, I want a clear social preview card when someone shares the GitHub repo 
 **Then** the card is uploaded to GitHub repo settings → Social preview
 **And** sharing the repo URL renders the card on major social platforms (verified manually).
 
+**Carry-forward note (added by sprint-change-proposal-2026-05-17):**
+The landing page itself ships in milestone 0.0.1 (Epic 6, Stories 6.6 + 6.7, PRD FR-F12 / FR-F13). The 1.0.0 Epic 33 stories enrich it as follow-ups:
+
+- After **Story 33.1** (screenshots per look) lands, open a follow-up story to back-fill the screenshots strip into `landing/index.html`.
+- **Story 33.2** (forum post) MUST link `https://syalioune.github.io/flowatch/` as the primary CTA, not the bare GitHub repo URL.
+- **Story 33.3** (social-preview card) MUST reuse the lockup + tagline string from `landing/index.html` for visual continuity.
+
+---","type:user-story,state:backlog,area:doc,release:1.0.0",1.0.0
+NAV-MIR-010: Configurable per-sub-app URI prefixes,"
+As Mira (an operator running a Flowable engine with non-standard sub-app mount paths), I want to override the DMN/CMMN/App (and process) URI prefixes per connection, so that Flowatch reaches every sub-app on my deployment. Per FR-59.
+
+**Acceptance Criteria:**
+
+**Given** a saved connection
+**When** I open its settings
+**Then** advanced (collapsible) fields let me set `servicePath` / `dmnPath` / `cmmnPath` / `appPath`, with the standard defaults shown as placeholders (common case stays one-field)
+**And** the fields live in the Settings connection tab + the Add/Edit connection modals (PUT-with-partial-fields family)
+
+**Given** a prefix is left blank
+**Then** the `*Base()` helper falls back to the standard Flowable default (`/service` → `/dmn-api` / `/cmmn-api` / `/app-api`) — no behavior change for existing connections
+
+**Given** I set `dmnPath` to a custom value
+**Then** every DMN `api.*` call targets root + custom path (verified in the API Inspector); the `request()` funnel is unchanged
+
+**Given** an existing v1 connection in `localStorage`
+**When** the app loads
+**Then** `src/lib/saved-connections.ts` migrates it losslessly (v1→v2, optional segment strings, validated string-or-undefined) and keeps the default derivation
+
+**And** unit/token-contract tests cover derivation, defaults, and migration; live e2e stays on defaults (no non-standard engine available — fixture/unit-verified, mirroring the form-js COMPAT-BOUNDARY discipline).","type:user-story,state:backlog,area:nav,release:1.0.0",1.0.0
+NAV-SYS-003: Native Flowable CORS — remove the nginx proxy,"
+As a maintainer, I want the bundled stack to rely on Flowable's native CORS instead of an nginx sidecar, so that the deployment is simpler and operators pointing at their own engines have a documented native-CORS path. Per NFR-31.
+
+**Acceptance Criteria:**
+
+**Given** `docker compose up`
+**When** the stack boots
+**Then** `flowable` publishes `:8080` directly with `flowable.rest.app.cors.*` configured and the SPA reaches it cross-origin with the `Authorization` header (preflight returns `Access-Control-Allow-Headers: Authorization`)
+
+**Given** the change lands
+**Then** the nginx service, `docker/nginx.conf.template`, and `docker/40-validate-origin.sh` are removed; the `flowatch` profile `depends_on: flowable`; and `ALLOWED_ORIGIN` feeds the flowable service env
+
+**Given** the COMPAT-BOUNDARY verification gate (load-bearing)
+**Then** native CORS is live-verified against `flowable-rest:7.2.0` — exact Spring relaxed-binding env-var spelling resolved (`flowable.rest.app.cors.allowed-origins` → `FLOWABLE_REST_APP_CORS_ALLOWEDORIGINS`) and a real cross-origin `api.*` call with `Authorization` browser-proven to survive preflight — BEFORE nginx is deleted; if the image does not honor it, the story HALTS and reports
+
+**And** README / Makefile (`engine-up` / `engine-health` / `engine-logs`) / `scripts/dev/run-dev.sh` / landing copy are updated; boot-to-working-dashboard stays < 2 min.
+
 ---
 
-## v2+ Placeholder Epics (no stories — gated)","type:user-story,state:backlog,area:doc,release:1.0.0",1.0.0
+## v2+ Placeholder Epics (no stories — gated)","type:user-story,state:backlog,area:nav,release:1.0.0",1.0.0

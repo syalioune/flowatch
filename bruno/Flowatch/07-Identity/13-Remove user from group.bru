@@ -1,0 +1,30 @@
+meta {
+  name: Remove user from group
+  type: http
+  seq: 13
+}
+
+delete {
+  url: {{baseUrl}}/identity/groups/{{groupId}}/members/{{userId}}
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{username}}
+  password: {{password}}
+}
+
+vars:pre-request {
+  groupId: managers
+  userId: rest-admin
+}
+
+docs {
+  # Remove user from group
+
+  Flowable 7.2 OSS does NOT honour DELETE /identity/users/{userId}/groups/{groupId}
+  (returns HTTP 500). The working recipe is DELETE /identity/groups/{groupId}/members/{userId}.
+  Returns 204 on success; 404 if the membership doesn't exist.
+  Related: PRD FR-30.
+}

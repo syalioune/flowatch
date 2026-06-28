@@ -53,4 +53,4 @@ make landing-check       # fails on any external https:// asset reference
   app's editorial tokens move, copy the new OKLCH values into `style.css` by
   hand — there is no build coupling between the app and this page, by design.
 - **Apache 2.0 SPDX header** on every source file. FR-F7, NFR-28.
-- **Pre-alpha banner** visible above the fold. The page must not over-promise.
+- **Release banner** visible above the fold. Update the version and message on each major release.

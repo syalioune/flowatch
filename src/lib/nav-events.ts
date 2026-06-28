@@ -40,3 +40,20 @@ export const NAV_INVALIDATE_COUNTS = "nav:invalidate-counts" as const;
  * Hoist origin: Story 23.1 (FR-49).
  */
 export const SAVED_CONNECTIONS_CHANGED = "saved-connections:changed" as const;
+
+/**
+ * Open the Settings modal on the Connection tab.
+ *
+ * Dispatched by {@link BearerAuthStrategy}'s `onUnauthorized` (Story 28.3) when
+ * the engine returns 401 so the operator can locate and edit their active
+ * connection. The app-level listener ([src/app.tsx](../app.tsx)) opens
+ * `<SettingsModal>` with its initial tab set to `"connection"`. The
+ * Authentication tab was removed in Story 34.1 amendments — auth is now edited
+ * via the connection row's Edit button in {@link ManageConnectionsPanel}.
+ * OIDC (Story 28.4) MAY also reuse this seam, though its primary 401 recovery
+ * is silent-renew, not open-Settings.
+ *
+ * Hoist origin: Story 28.3 (FR-4). Per CLAUDE.md "never use bare string
+ * literals in dispatch sites" — always dispatch via this constant.
+ */
+export const OPEN_SETTINGS_AUTH = "settings:open-auth" as const;
