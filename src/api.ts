@@ -179,7 +179,9 @@ export const appBase = (): string => connectionRoot() + (cfg.appPath || "/app-ap
 
 export const API_LOG: ApiLogEntry[] = [];
 const MAX_LOG = 60;
+let logFrozen = false;
 const logCall = (entry: ApiLogEntry): void => {
+  if (logFrozen) return;
   API_LOG.unshift(entry);
   if (API_LOG.length > MAX_LOG) API_LOG.length = MAX_LOG;
   window.dispatchEvent(new CustomEvent<ApiLogEntry>("api:log", { detail: entry }));
@@ -237,6 +239,8 @@ if (import.meta.env.DEV && typeof window !== "undefined") {
   const w = window as unknown as {
     __flowatchSeedApiLog?: (entries: ApiLogEntry[]) => void;
     __flowatchClearApiLog?: () => void;
+    __flowatchPauseApiLog?: () => void;
+    __flowatchResumeApiLog?: () => void;
   };
   w.__flowatchSeedApiLog = (entries) => {
     for (const entry of entries) {
@@ -251,6 +255,17 @@ if (import.meta.env.DEV && typeof window !== "undefined") {
     // mistaking a synthetic blank entry for a real API call. ApiInspector
     // subscribes to both events and re-reads API_LOG on either signal.
     window.dispatchEvent(new Event("api:log-cleared"));
+  };
+  // Freeze / unfreeze the log ring-buffer. While frozen, logCall() is a no-op
+  // so in-flight real API calls that settle after the test's clear+seed step
+  // cannot pollute the deterministic seed set. Seed entries bypass logFrozen
+  // because they write directly to API_LOG (not via logCall). Visual tests
+  // call pause → clear → seed → assert → (implicitly end page life).
+  w.__flowatchPauseApiLog = () => {
+    logFrozen = true;
+  };
+  w.__flowatchResumeApiLog = () => {
+    logFrozen = false;
   };
 }
 
