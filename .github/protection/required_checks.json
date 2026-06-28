@@ -1,1 +1,1 @@
-["check", "unit", "e2e", "build", "Analyze (javascript-typescript)"]
+["check", "unit", "e2e", "build", "Analyze (javascript-typescript)", "Stryker (src/api.ts)"]
