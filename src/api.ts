@@ -187,11 +187,7 @@ const logCall = (entry: ApiLogEntry): void => {
   window.dispatchEvent(new CustomEvent<ApiLogEntry>("api:log", { detail: entry }));
 };
 
-// NFR-8: scheme-preserving redaction of the Authorization header before the
-// entry lands in API_LOG. Splits on the first space so "Basic <base64>" becomes
-// "Basic ***" and a future "Bearer <jwt>" becomes "Bearer ***". The clone via
-// spread is what makes this safe — the headers object passed to fetch() is
-// never mutated; only the captured copy is.
+// Clone-and-redact: keeps the headers object handed to fetch() untouched.
 function redactAuthHeader(headers: Record<string, string>): Record<string, string> {
   const out = { ...headers };
   if (out.Authorization) {
@@ -201,13 +197,7 @@ function redactAuthHeader(headers: Record<string, string>): Record<string, strin
   return out;
 }
 
-// Epic 9 retro A-3 (Story 10.2): body byte-budget guard. The Inspector's
-// previewBody synchronously JSON.stringifies entry.body on click; a 100 KB
-// variables blob from startProcessInstance would lock the main thread. We
-// truncate at capture time so the ring buffer's memory footprint is bounded
-// and the drawer's preview stays interactive. Bodies whose stringified form
-// throws (circular refs, BigInt, throwing toJSON) pass through unchanged —
-// the render-time fallback in previewBody handles those.
+// Truncate at capture time so large bodies don't lock the Inspector on render.
 export const BODY_BYTE_BUDGET = 16 * 1024;
 
 export interface TruncatedBody {
@@ -256,11 +246,6 @@ if (import.meta.env.DEV && typeof window !== "undefined") {
     // subscribes to both events and re-reads API_LOG on either signal.
     window.dispatchEvent(new Event("api:log-cleared"));
   };
-  // Freeze / unfreeze the log ring-buffer. While frozen, logCall() is a no-op
-  // so in-flight real API calls that settle after the test's clear+seed step
-  // cannot pollute the deterministic seed set. Seed entries bypass logFrozen
-  // because they write directly to API_LOG (not via logCall). Visual tests
-  // call pause → clear → seed → assert → (implicitly end page life).
   w.__flowatchPauseApiLog = () => {
     logFrozen = true;
   };
@@ -386,22 +371,9 @@ export async function request<T = unknown>(
       headers["Content-Type"] = "application/json";
     }
     const init: RequestInit = { method, headers };
-    // Per AC-2/AC-6/AC-7: redact the Authorization header on the captured
-    // copy before any further work so success, 4xx, 5xx, network-error, AND
-    // body-serialization-error (circular ref, BigInt, throwing toJSON) paths
-    // all surface the redacted form in API_LOG. The `headers` object handed
-    // to fetch() is untouched — redactAuthHeader clones via spread.
     entry.headers = redactAuthHeader(headers);
     if (body) {
       init.body = JSON.stringify(body);
-      // Per Story 8.1 AC-3 + Story 10.2 A-3: capture the original JS value
-      // (not the stringified form) so the Inspector can pretty-print, but
-      // truncate at capture time when the stringified form exceeds the
-      // byte budget. Note: entry.body and init.body diverge above the
-      // budget — init.body always carries the real bytes sent on the
-      // wire; entry.body may carry the truncated envelope. The Inspector's
-      // "Copy as curl" surfaces entry.body and therefore the envelope on
-      // oversized requests — accepted (a 100 KB clipboard isn't useful).
       entry.body = captureBody(body);
     }
     const res = await fetch(url, init);
