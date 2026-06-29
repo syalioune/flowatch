@@ -642,12 +642,10 @@ const customTransform = (commit, context) => {
 //      by major.minor).
 //   3. Drops in the live numbers tally (closed issues + commits +
 //      breaking-change count).
-//   4. Appends the pre-1.0 posture banner.
 const headlineLine = headlineFor(milestone);
 const headerPreface = [
   headlineLine ? `\n\n${headlineLine}\n` : "",
   tally ? `\n${tally}\n` : "",
-  `\n${PRE_1_0_BANNER}\n`,
 ].join("");
 
 const augmentedHeaderPartial = `${presetWriter.headerPartial}${headerPreface}`;
