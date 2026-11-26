@@ -16,8 +16,11 @@ _Scope: Stories 8.1 → 34.2 — from post-v0.0.1 baseline to v1.0.0 graduation_
 | Metric | Captured (May 19–Jun 18) | Projected full project |
 |--------|--------------------------|------------------------|
 | API-equivalent cost | $2,219.75 | **~$2,620–2,820** |
-| Total tokens consumed | 3,109,433,517 | ~3.7–3.8 B (est.) |
+| Total tokens consumed (ccusage) | 3,109,433,517 | ~3.7–3.8 B (est.) |
 | Cache read ratio | 97.96 % | ~97 % (est.) |
+| RTK commands proxied | 6,435 | — |
+| RTK tokens eliminated (pre-model) | 8.4 M (59.2 % of shell output) | — |
+| RTK avoided cost (API-equivalent est.) | ~$125–160 | — |
 | Stories shipped | ~80 | **~114** |
 | Epics closed | 27 (Epics 8–34) | 34 (Epics 1–34) |
 | Active dev days | 27 (ccusage) / 35 calendar days (May 15–Jun 18) | **30** (git: 4 pre-period May 15–18 + 26 in-period) |
@@ -163,6 +166,33 @@ The haiku-4-5 appearances align with multi-agent Workflow sessions (sub-agent fl
 
 ## Efficiency analysis
 
+### Shell-output filtering (RTK)
+
+[RTK (Rust Token Killer)](https://github.com/ckreiling/rtk) acts as a transparent CLI proxy: every shell command Claude issues is rewritten to `rtk <cmd>`, which compresses the output before it re-enters the model as a tool result. The 8.4 M tokens RTK eliminated never appeared in the ccusage ledger — they were filtered before reaching the model.
+
+| Metric | Value |
+|--------|------:|
+| Commands proxied | 6,435 |
+| Raw output (pre-filter) | 14.3 M tokens |
+| Filtered output (post-filter) | 5.8 M tokens |
+| **Tokens eliminated** | **8.4 M (59.2 %)** |
+| Total exec time | 1,010 min (avg 9.4 s / cmd) |
+
+Top saving sources (by volume eliminated):
+
+| Command | Runs | Tokens saved | Avg filter rate |
+|---------|-----:|-------------:|:--------------:|
+| `vitest run` | 148 | 4.5 M | 98.6 % |
+| `git diff origin/main…` | 2 | 1.04 M | ~97 % |
+| `read` | 498 | 738.5 K | 22.2 % |
+| `playwright test` (all variants) | 15 | ~729 K | ~100 % |
+| `ls` | 666 | 192.5 K | 53.6 % |
+| `grep` | 1,043 | 131.7 K | 16.6 % |
+
+Vitest alone accounts for **54 % of all RTK savings** (4.5 M of 8.4 M). Test runners emit full pass/fail output that Claude needs only summarized; RTK's 98.6 % filter rate on those runs reflects near-total verbatim suppression.
+
+**Relationship to ccusage figures.** The 53.8 M "new" tokens in the ccusage ledger (input + cache-create) represent what actually entered the model after RTK filtering. Without RTK those same commands would have contributed ~8.4 M additional tokens — pushing new-token volume to ~62.2 M (+15.6 %). At opus-4-8 cache-create rates (~$18.75/M) that gap represents roughly **$125–160 in avoided API-equivalent cost**, on top of the $2,219.75 captured total. The secondary benefit is architectural: smaller tool-result payloads reduce cache-create pressure and keep each turn's rolling context tighter, compounding across all 27 active days.
+
 ### Cache return on investment
 
 The 53 M cache-create tokens represent the cumulative "investment" in context — every page of CLAUDE.md, file reads, conversation history written into the cache. The 3.05 B cache-read tokens are the "return": each subsequent turn re-consumed that context without regenerating it.
@@ -181,6 +211,36 @@ Output (~117.7 K/story) is the model's actual generated text — code, reasoning
 
 The $27.75/story captured average spans a 2-story spike like Story 12.2 to trivial follow-up commits; median is $15–20 for smaller stories, $50–80 for complex multi-file epics (OIDC, Modeler properties). Projected full-project figures: ~114 stories at ~$23–25, ~34 epics at ~$79, 5 releases at ~$544.
 
+### Cost and lines by story phase
+
+Each story passes through three phases visible in git history: **analysis** (story spec written into the BMad companion repo), **implementation** (code committed to the public repo), and **review** (code-review findings applied as patches + story spec amended with DAR block). The figures below are derived from commit diff statistics across both repos (149 full story specs in `flowatch-bmad/_bmad-output/implementation-artifacts/`, 40 sampled `feat` commits, and 20 sampled review-fix commits). Phase-level token ratios are inferred from commit iteration patterns and per-day spend ÷ stories-per-day; ccusage has only daily granularity so error bars are ±30–40 % at single-story level.
+
+**Lines produced per story (commit diff, both repos)**
+
+| Phase | Artifact | p25 | Median | p75 | Max |
+|-------|----------|----:|-------:|----:|----:|
+| Analysis — full story spec | Markdown (bmad impl-artifact) | 326 | **432** | 567 | 957 |
+| Analysis — public shard | Markdown (public repo summary) | 19 | **20** | 21 | 37 |
+| Implementation — code diff | Net lines changed (ins + del) | ~250 | **~490** | ~950 | 2,734 |
+| Review — story amend | Markdown additions (DAR + SDR block) | — | **~80–200** | — | ~200 |
+| Review — code patches | Net lines changed | — | **~50–180** | — | 522 |
+
+Per-story combined output: **~700–1,200 lines** (code + markdown) for a typical story; **2,000–3,500 lines** for complex stories (OIDC, BPMN/DMN moddle, design-system split).
+
+**Estimated cost share by phase (at $27.75 captured median/story)**
+
+| Phase | Mechanism | Est. share | $/story |
+|-------|-----------|:----------:|--------:|
+| Analysis (`bmad-create-story` + spec write) | Single-pass generation: reads epic + PRD + patterns → outputs ~430-line spec. No test loops. | ~15–20 % | ~$4–6 |
+| Implementation (`bmad-dev-story` code) | Iterative: code gen → vitest (≈1.8 runs/story avg, 148 total ÷ 80 stories) → fix → repeat. Cache grows during session. | ~55–65 % | ~$15–18 |
+| Review (`/code-review` + amend + patches) | Focused: diff read, full findings report (not committed), targeted patches + DAR amend. | ~20–25 % | ~$5–7 |
+
+Three observations from the data:
+
+- **Implementation dominates cost but not line count.** The vitest iteration loops (filtered at 98.6 % by RTK before reaching the model) inflate token volume without leaving lines in git. A story with a 250-line spec can cost more than one with a 500-line spec if it requires more test-fix cycles.
+- **Spec size and implementation cost correlate weakly.** The `.bar`-upload story (957-line spec) produced only 218 net code lines; the BPMN moddle story (281-line spec) produced 2,131 net code lines. Spec verbosity ≠ implementation complexity.
+- **Review is underrepresented in line counts but not in cost.** The code-review skill generates a full findings report (token-expensive, not committed) before producing the visible patch commits, so the 50–180 lines in git understate the token work done in that phase.
+
 ### Peak-day anatomy
 
 | Rank | Date | Cost | Dominant driver |
@@ -195,6 +255,54 @@ The May 25–27 cluster ($934.03 — 42 % of captured spend, ~34 % of full-proje
 
 ---
 
+## Sonnet-vs-Opus retrospective
+
+The project ran primarily on **Opus 4.7 → 4.8** (May 19–Jun 15), switching to **Sonnet 4.6** only for the final three lightweight stories (Jun 16–18). What would the cost picture have looked like on a mostly-Sonnet run?
+
+### The 4.x price ratio
+
+Unlike the Claude 3 era (Opus-3 at $15/M vs Sonnet-3.5 at $3/M = 5× gap), the 4.x family has converged significantly:
+
+| Model | Input $/1M | Output $/1M |
+|-------|----------:|----------:|
+| Opus 4.7 / 4.8 | $5.00 | $25.00 |
+| Sonnet 4.6 | $3.00 | $15.00 |
+
+**Ratio: 1.67× (Sonnet = 60 % of Opus cost)** — consistent across all token types including cache-create and cache-read, since those rates are proportional multiples of the base rate.
+
+### Counterfactual estimates
+
+| Scenario | Sonnet share | Est. total | vs. actual |
+|----------|:-----------:|----------:|:---------:|
+| All-Sonnet (theoretical) | 100 % | ~$1,332 | 1.67× cheaper |
+| Aggressive hybrid | 70 % | ~$1,598 | 1.39× cheaper |
+| Conservative hybrid | 40 % | ~$1,687 | 1.32× cheaper |
+
+All-Sonnet: $2,219.75 × 0.60 ≈ **$1,332** — saves ~$888 (~40 % off). Not a dramatic halving.
+
+### Empirical validation
+
+The Jun 16–18 Sonnet period: 3 stories at $30.92 total (~$10.3/story) vs. the overall average of ~$27.75/story — **~37 % cheaper**, remarkably close to the theoretical 40 %. This confirms the ratio holds in practice for representative workloads.
+
+### The quality gate
+
+Roughly 30–40 % of stories were architecturally demanding enough to benefit from Opus reasoning depth:
+
+- OIDC 4-part auth chain (complex multi-file security invariants)
+- BPMN moddle event chain + Flowable engine integration
+- Design system 3 × 2 × 3 token matrix (combinatorial correctness)
+- Multi-agent Workflow harnesses with complex fan-out logic
+
+The remaining 60–70 % — CRUD screens, CSS/responsive fixes, REST wrappers, Playwright test authoring for well-specified stories, documentation — were viable Sonnet targets.
+
+Complex stories also tend to be more token-intensive (more iteration, longer context chains), so even at 35 % of story count they may represent ~50 % of token spend. A realistic "mostly Sonnet" run likely lands at **~$1,600–1,700 (~1.3–1.4× cheaper)**.
+
+### Bigger picture
+
+The more impactful optimization was already in place: the **57× cache-read multiplier** (97.96 % of all tokens were cache reads) means per-token cost barely matters — what matters is the number of distinct bytes written to cache and re-read across turns. RTK's 59.2 % shell-output compression ($125–160 in avoided cost) was a secondary lever. A mostly-Sonnet strategy would have saved **$500–900 in absolute terms**; the cache architecture and RTK filtering together saved far more without any quality tradeoff.
+
+---
+
 ## Reproduce
 
 ```bash
@@ -203,3 +311,19 @@ npx ccusage@latest claude daily --instances --project="$PROJECT"
 ```
 
 Requires [ccusage](https://github.com/ryoppippi/ccusage) and a Claude Code session log for this project path. Run without `--project` to see all projects.
+
+### Per-artifact token count (spot-check)
+
+To validate the per-phase analysis against a specific story spec, pass the raw Markdown file to the [token-counting endpoint](https://docs.anthropic.com/en/api/counting-tokens):
+
+```bash
+curl -s https://api.anthropic.com/v1/messages/count_tokens \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "content-type: application/json" \
+  -d "$(jq -n --rawfile c 11-4-delegate-and-resolve-task-actions.md \
+        '{model:"claude-opus-4-8", messages:[{role:"user",content:$c}]}')" \
+| jq -r '.input_tokens'
+```
+
+Replace `11-4-delegate-and-resolve-task-actions.md` with any story spec from `flowatch-bmad/_bmad-output/implementation-artifacts/`. This measures the raw spec size as a single-message prompt — it does not account for the rolling CLAUDE.md + codebase context that dominates cache-read volume during an actual session. Use it to sanity-check the "Analysis — full story spec" row in the phase table above (median 432 lines → typically 6,000–10,000 input tokens for a mid-size spec).

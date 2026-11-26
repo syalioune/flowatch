@@ -234,16 +234,18 @@ export const ManageConnectionsPanel: React.FC<ManageConnectionsPanelProps> = ({
                 >
                   {truncated}
                 </code>
+                {result && (
+                  <div style={{ marginTop: 2 }}>
+                    <span className="badge" data-tone={result.ok ? "ok" : "bad"}>
+                      <span className="sr-only">Status: </span>
+                      {result.text}
+                    </span>
+                  </div>
+                )}
               </div>
               {c.id === state.activeId && (
                 <span className="badge" data-tone="ok">
                   <span className="sr-only">Status: </span>Active
-                </span>
-              )}
-              {result && (
-                <span className="badge" data-tone={result.ok ? "ok" : "bad"}>
-                  <span className="sr-only">Status: </span>
-                  {result.text}
                 </span>
               )}
               <button

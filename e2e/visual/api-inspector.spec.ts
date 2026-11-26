@@ -82,8 +82,13 @@ test("API Inspector — editorial / light / regular default", async ({ page }) =
       typeof (window as Window & { __flowatchSeedApiLog?: unknown }).__flowatchSeedApiLog ===
       "function",
   );
-  // The app polls Flowable on mount (Dashboard); clear before seeding so the
-  // baseline is deterministic.
+  // Freeze the log BEFORE clearing: in-flight real API calls from the
+  // Dashboard / nav-count mount effects that settle after this point are
+  // silently dropped by logCall(), so they cannot pollute the seed set.
+  await page.evaluate(() => {
+    (window as unknown as { __flowatchPauseApiLog: () => void }).__flowatchPauseApiLog();
+  });
+  // Clear any entries that landed before the freeze, then seed the baseline.
   await page.evaluate(() => {
     (window as unknown as { __flowatchClearApiLog: () => void }).__flowatchClearApiLog();
   });

@@ -67,7 +67,7 @@ export default {
     "e2e/.playwright-cache",
     "**/__screenshots__",
   ],
-  // No `thresholds` block — gate-less by design. Adding one would
-  // make Stryker exit non-zero below the cut-off, which the CI
-  // workflow is NOT yet set up to handle.
+  // Baseline established at 71.46% (2026-06-21). Threshold set to 70%
+  // to catch regressions without requiring perfection on the first gate.
+  thresholds: { high: 80, low: 70, break: 70 },
 };
